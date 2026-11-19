@@ -117,7 +117,19 @@ public class StationService(IDbContextFactory<CafeDbContext> dbFactory)
     {
         if (InputValidation.Validate(input) is { } errors)
         {
-            return ServiceResult.Fail(InputValidation.Summarise(errors), errors);
+            // Fields of the other kind are discarded below, so a bad value in one must not block the save.
+            string[] irrelevant = input.Kind == StationKind.PC
+                ? [nameof(StationInput.TvIpAddress), nameof(StationInput.TvMacAddress)]
+                : [nameof(StationInput.AgentMachineId)];
+            foreach (var key in irrelevant)
+            {
+                errors.Remove(key);
+            }
+
+            if (errors.Count > 0)
+            {
+                return ServiceResult.Fail(InputValidation.Summarise(errors), errors);
+            }
         }
 
         entity.Name = input.Name.Trim();

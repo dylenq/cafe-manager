@@ -219,6 +219,36 @@ public class StationServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Pc_station_ignores_invalid_leftover_tv_fields()
+    {
+        var typeId = await TypeAsync();
+        var input = Pc(typeId);
+        input.TvIpAddress = "999.1.1.1";
+        input.TvMacAddress = "not-a-mac";
+
+        var result = await _stations.CreateAsync(input);
+
+        Assert.True(result.Success);
+        var loaded = await _stations.GetAsync(result.Value!.Id);
+        Assert.Null(loaded!.TvIpAddress);
+        Assert.Null(loaded.TvMacAddress);
+    }
+
+    [Fact]
+    public async Task Console_station_ignores_invalid_leftover_machine_id_but_still_validates_tv_fields()
+    {
+        var typeId = await TypeAsync("Console");
+        var ok = Console(typeId);
+        ok.AgentMachineId = new string('x', 101);
+        Assert.True((await _stations.CreateAsync(ok)).Success);
+
+        var bad = Console(typeId, "PS5-2", ip: "999.1.1.1");
+        var result = await _stations.CreateAsync(bad);
+        Assert.False(result.Success);
+        Assert.True(result.FieldErrors.ContainsKey("TvIpAddress"));
+    }
+
+    [Fact]
     public async Task Deleted_station_type_is_a_validation_failure_not_a_missing_station()
     {
         var typeId = await TypeAsync();

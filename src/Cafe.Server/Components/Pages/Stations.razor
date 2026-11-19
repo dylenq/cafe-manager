@@ -56,7 +56,7 @@
                     </div>
                     <div class="col-6 col-md-4">
                         <label class="form-label" for="station-kind">Kind</label>
-                        <InputSelect id="station-kind" class="form-select" @bind-Value="input.Kind">
+                        <InputSelect id="station-kind" class="form-select" @bind-Value="input.Kind" @bind-Value:after="OnKindChanged">
                             <option value="@StationKind.PC">PC</option>
                             <option value="@StationKind.Console">Console</option>
                         </InputSelect>
@@ -201,6 +201,21 @@ else
         confirmingDeleteId = null;
         errorMessage = null;
         showForm = true;
+    }
+
+    // Fields of the kind that is no longer selected are hidden, so clear them: stale invalid values would otherwise
+    // fail validation with no visible message.
+    private void OnKindChanged()
+    {
+        if (input.Kind == StationKind.PC)
+        {
+            input.TvIpAddress = null;
+            input.TvMacAddress = null;
+        }
+        else
+        {
+            input.AgentMachineId = null;
+        }
     }
 
     private void CancelForm()

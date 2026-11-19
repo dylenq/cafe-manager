@@ -1,8 +1,12 @@
+using Cafe.Server.Dashboard;
 using Cafe.Server.Data;
+using Cafe.Server.Sessions;
 using Cafe.Server.Stations;
 using Cafe.Shared;
 using Cafe.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cafe.Tests;
 
@@ -149,5 +153,109 @@ public class DashboardSessionCardsTests : SessionTestBase
 
         Assert.Contains("In session", card);
         Assert.DoesNotContain("Offline", card);
+    }
+
+    private sealed class RecordingHandler : IExpiryActionHandler
+    {
+        public int Calls { get; private set; }
+
+        public Task ExecuteAsync(Station station, CancellationToken cancellationToken)
+        {
+            Calls++;
+            return Task.CompletedTask;
+        }
+    }
+
+    private async Task<List<StationCardModel>> CardsAsync()
+    {
+        using var scope = Factory.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<DashboardService>().GetCardsAsync();
+    }
+
+    [Fact]
+    public async Task End_to_end_prepaid_expiry_warning_grace_and_handler()
+    {
+        var typeId = await TypeAsync("Rig", 6000m);
+        await RuleAsync(RateRuleKind.Multiplier, 1m, new TimeOnly(0, 0), new TimeOnly(23, 59), typeId);
+        var a = await StationAsync("PC-A", typeId);
+        await StationAsync("PC-B", typeId);
+        var session = await PrepaidAsync(a, 15);
+        var handler = new RecordingHandler();
+        var sp = Factory.Services;
+        var evaluator = new ExpiryEvaluator(
+            sp.GetRequiredService<IDbContextFactory<CafeDbContext>>(), Factory.Clock,
+            sp.GetRequiredService<SessionSettingsService>(), sp.GetRequiredService<SessionNotifier>(),
+            [handler], NullLogger<ExpiryEvaluator>.Instance);
+
+        // One login up front: antiforgery and cookies are time-bound and the clock jumps below.
+        using var client = await Factory.CreateAuthenticatedClientAsync();
+        var page = await client.GetStringAsync("/");
+        Assert.Contains("In session", Card(page, "PC-A"));
+        Assert.Contains("15:00", Card(page, "PC-A"));
+
+        // Inside the warning window (default first warning at 10 minutes left).
+        Advance(TimeSpan.FromMinutes(6));
+        await evaluator.EvaluateAsync();
+        var warned = (await CardsAsync()).Single(c => c.Name == "PC-A");
+        Assert.Equal(StationStatus.Expiring, warned.Status);
+        Assert.Equal(AlertLevel.Warning, SessionAlerts.GetLevel(warned.Session!, Factory.Clock.GetUtcNow()));
+
+        // Past expiry: grace starts and the card says TIME UP.
+        Advance(TimeSpan.FromMinutes(10));
+        await evaluator.EvaluateAsync();
+        var graced = (await CardsAsync()).Single(c => c.Name == "PC-A");
+        Assert.Equal(AlertLevel.TimeUp, SessionAlerts.GetLevel(graced.Session!, Factory.Clock.GetUtcNow()));
+        Assert.Contains("TIME UP", Card(await client.GetStringAsync("/"), "PC-A"));
+        Assert.Equal(0, handler.Calls);
+
+        // Past grace (default 2 minutes): station is idle again, handler fired exactly once.
+        Advance(TimeSpan.FromMinutes(3));
+        await evaluator.EvaluateAsync();
+        await evaluator.EvaluateAsync();
+        var done = (await CardsAsync()).Single(c => c.Name == "PC-A");
+        Assert.Equal(StationStatus.Idle, done.Status);
+        Assert.Equal(1, handler.Calls);
+
+        var history = await client.GetStringAsync("/sessions");
+        Assert.Contains("PC-A", history);
+        Assert.Contains("Expired", history);
+
+        var saved = await LoadAsync(session.Id);
+        Assert.Equal(SessionEndReason.Expired, saved.EndReason);
+        var order = saved.Events.OrderBy(e => e.Id).Select(e => e.Type)
+            .Where(t => t is SessionEventType.WarningReached or SessionEventType.Expired
+                or SessionEventType.GraceElapsed or SessionEventType.ExpiryActionFired)
+            .Distinct().ToList();
+        Assert.Equal(
+            [SessionEventType.WarningReached, SessionEventType.Expired, SessionEventType.GraceElapsed, SessionEventType.ExpiryActionFired],
+            order);
+    }
+
+    [Fact]
+    public async Task End_to_end_open_ended_pause_resume_move_stop_audit_and_charge()
+    {
+        var typeId = await TypeAsync("Rig", 6000m);
+        var a = await StationAsync("PC-A", typeId);
+        var b = await StationAsync("PC-B", typeId);
+        var session = await OpenEndedAsync(b);
+
+        Advance(TimeSpan.FromMinutes(10));
+        Assert.True((await SvcAsync(s => s.PauseAsync(session.Id))).Success);
+        Advance(TimeSpan.FromMinutes(5));
+        Assert.True((await SvcAsync(s => s.ResumeAsync(session.Id))).Success);
+        Advance(TimeSpan.FromMinutes(5));
+        Assert.True((await SvcAsync(s => s.MoveAsync(session.Id, a))).Success);
+        Advance(TimeSpan.FromMinutes(10));
+        var stop = await SvcAsync(s => s.StopAsync(session.Id));
+
+        Assert.True(stop.Success, stop.Error);
+        // 10 + 5 + 10 = 25 active minutes at 6000/hour (the paused 5 minutes are not billed).
+        Assert.Equal(2500.00m, stop.Value);
+        var saved = await LoadAsync(session.Id);
+        Assert.Equal(2500.00m, saved.ChargedAmount);
+        var types = saved.Events.OrderBy(e => e.Id).Select(e => e.Type).ToList();
+        Assert.Equal(
+            [SessionEventType.Started, SessionEventType.Paused, SessionEventType.Resumed, SessionEventType.Moved, SessionEventType.Stopped],
+            types);
     }
 }

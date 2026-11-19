@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 3
 current_phase_name: PC Agent
 status: executing
-stopped_at: Completed 02-05-PLAN.md
-last_updated: "2026-11-19T21:36:36.711Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-11-19T21:40:58.343Z"
 last_activity: 2026-11-20
 last_activity_desc: Phase 2 execution started
-state_head: a5e7a8636dd713f1cd2cb7c8b1d85b1fe32e112d
+state_head: 01b68ed53cbf326c18124c851bb8d73793e9c009
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 14
-  completed_plans: 9
+  completed_plans: 10
   percent: 0
 ---
 
@@ -65,6 +65,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 2 P03 | ~25m | 3 tasks | 14 files |
 | Phase 2 P02-04 | 30min | 2 tasks | 8 files |
 | Phase 2 P05 | 25min | 3 tasks | 17 files |
+| Phase 3 P01 | 25min | 2 tasks | 40 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,7 @@ Recent decisions affecting current work:
 - [Phase 2]: Open-ended pricing shared via SessionCharges so card estimate equals stop charge
 - [Phase 2]: 02-04: expiry handlers run after Ended commit (at most once); ExpiryActionFired is a second save; IExpiryEvaluator interface and Sessions:RunTicker flag (default true, off in test factory)
 - [Phase 2]: Acknowledged alerts stay flagged on the card but stop pulsing; tracker beeps once per alert level change
+- [Phase 3]: Agent hub gated only by shared-key middleware; /hubs exempt from setup gate
 
 ### Pending Todos
 
@@ -106,6 +108,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-19T19:42:50.338Z
-Stopped at: Completed 02-05-PLAN.md
+Last session: 2026-11-19T21:40:58.329Z
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None

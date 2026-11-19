@@ -1,0 +1,379 @@
+@page "/rate-rules"
+@attribute [Authorize]
+@using System.Globalization
+@using Cafe.Server.Data
+@using Cafe.Server.Pricing
+@using Cafe.Server.Stations
+@inject RateRuleService RuleService
+@inject StationTypeService TypeService
+@inject ILogger<RateRules> Logger
+
+<PageTitle>Rate rules - Cafe Manager</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Rate rules</h1>
+    @if (!showForm)
+    {
+        <button type="button" class="btn btn-primary" @onclick="StartAdd">Add rate rule</button>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" aria-label="Close" @onclick="DismissError"></button>
+    </div>
+}
+
+@if (showForm)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">@(editingId is null ? "Add rate rule" : "Edit rate rule")</h2>
+            <EditForm Model="input" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="rule-name">Name</label>
+                        <InputText id="rule-name" class="form-control" @bind-Value="input.Name" />
+                        <ValidationMessage For="() => input.Name" class="text-danger" />
+                        @FieldError(nameof(RateRuleInput.Name))
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="rule-type">Station type</label>
+                        <InputSelect id="rule-type" class="form-select" @bind-Value="input.StationTypeId">
+                            <option value="">All types</option>
+                            @foreach (var type in types)
+                            {
+                                <option value="@type.Id">@type.Name</option>
+                            }
+                        </InputSelect>
+                        @FieldError(nameof(RateRuleInput.StationTypeId))
+                    </div>
+                    <div class="col-12">
+                        <span class="form-label d-block">Days</span>
+                        @foreach (var (flag, label) in Days)
+                        {
+                            var current = flag;
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="day-@label"
+                                       checked="@input.DaysOfWeek.HasFlag(current)"
+                                       @onchange="e => ToggleDay(current, e.Value is true)" />
+                                <label class="form-check-label" for="day-@label">@label</label>
+                            </div>
+                        }
+                        @FieldError(nameof(RateRuleInput.DaysOfWeek))
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="rule-start">Start time</label>
+                        <InputDate TValue="TimeOnly" Type="InputDateType.Time" id="rule-start" class="form-control" @bind-Value="input.StartTime" />
+                        @FieldError(nameof(RateRuleInput.StartTime))
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="rule-end">End time</label>
+                        <InputDate TValue="TimeOnly" Type="InputDateType.Time" id="rule-end" class="form-control" @bind-Value="input.EndTime" />
+                        @FieldError(nameof(RateRuleInput.EndTime))
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="rule-kind">Kind</label>
+                        <InputSelect id="rule-kind" class="form-select" @bind-Value="input.Kind">
+                            <option value="@RateRuleKind.FixedHourlyRate">Fixed hourly rate</option>
+                            <option value="@RateRuleKind.Multiplier">Multiplier</option>
+                        </InputSelect>
+                        @FieldError(nameof(RateRuleInput.Kind))
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="rule-value">@(input.Kind == RateRuleKind.Multiplier ? "Multiplier (e.g. 1.5)" : "Hourly rate")</label>
+                        <InputNumber id="rule-value" class="form-control" @bind-Value="input.Value" />
+                        <ValidationMessage For="() => input.Value" class="text-danger" />
+                        @FieldError(nameof(RateRuleInput.Value))
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="rule-priority">Priority</label>
+                        <InputNumber id="rule-priority" class="form-control" @bind-Value="input.Priority" />
+                        <ValidationMessage For="() => input.Priority" class="text-danger" />
+                        @FieldError(nameof(RateRuleInput.Priority))
+                    </div>
+                    <div class="col-6 col-md-3 d-flex align-items-end">
+                        <div class="form-check">
+                            <InputCheckbox id="rule-enabled" class="form-check-input" @bind-Value="input.IsEnabled" />
+                            <label class="form-check-label" for="rule-enabled">Enabled</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
+                    <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (rules is null)
+{
+    <p>Loading...</p>
+}
+else if (rules.Count == 0)
+{
+    <p class="text-muted">No rate rules yet. Base station-type rates apply.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Station type</th>
+                    <th>Days</th>
+                    <th>Window</th>
+                    <th>Rate</th>
+                    <th class="text-end">Priority</th>
+                    <th>Enabled</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var rule in rules)
+                {
+                    <tr>
+                        <td>@rule.Name</td>
+                        <td>@TypeName(rule.StationTypeId)</td>
+                        <td>@DaysText(rule.DaysOfWeek)</td>
+                        <td>
+                            @rule.StartTime.ToString("HH:mm", CultureInfo.InvariantCulture)-@rule.EndTime.ToString("HH:mm", CultureInfo.InvariantCulture)
+                            @if (rule.EndTime <= rule.StartTime)
+                            {
+                                <span class="badge text-bg-secondary">overnight</span>
+                            }
+                        </td>
+                        <td>@ValueText(rule)</td>
+                        <td class="text-end">@rule.Priority</td>
+                        <td>
+                            <button type="button" class="btn btn-sm @(rule.IsEnabled ? "btn-success" : "btn-outline-secondary")"
+                                    @onclick="() => ToggleEnabledAsync(rule)">@(rule.IsEnabled ? "On" : "Off")</button>
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex flex-column flex-sm-row gap-2 justify-content-end">
+                                @if (confirmingDeleteId == rule.Id)
+                                {
+                                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(rule.Id)">Confirm delete</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => confirmingDeleteId = null">Cancel</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(rule)">Edit</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => confirmingDeleteId = rule.Id">Delete</button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private static readonly (DaysOfWeekFlags Flag, string Label)[] Days =
+    [
+        (DaysOfWeekFlags.Monday, "Mon"), (DaysOfWeekFlags.Tuesday, "Tue"), (DaysOfWeekFlags.Wednesday, "Wed"),
+        (DaysOfWeekFlags.Thursday, "Thu"), (DaysOfWeekFlags.Friday, "Fri"), (DaysOfWeekFlags.Saturday, "Sat"),
+        (DaysOfWeekFlags.Sunday, "Sun"),
+    ];
+
+    private List<RateRule>? rules;
+    private List<StationType> types = [];
+    private RateRuleInput input = new();
+    private IReadOnlyDictionary<string, string> fieldErrors = new Dictionary<string, string>();
+    private int? editingId;
+    private int? confirmingDeleteId;
+    private bool showForm;
+    private bool saving;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            types = await TypeService.ListAsync();
+            rules = await RuleService.ListAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load rate rules.");
+            rules ??= [];
+            errorMessage = "Could not load the list. Refresh the page and try again.";
+        }
+    }
+
+    private RenderFragment FieldError(string field) => builder =>
+    {
+        if (fieldErrors.TryGetValue(field, out var message))
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "text-danger small");
+            builder.AddContent(2, message);
+            builder.CloseElement();
+        }
+    };
+
+    private string TypeName(int? typeId) =>
+        typeId is null ? "All types" : types.FirstOrDefault(t => t.Id == typeId)?.Name ?? "Unknown";
+
+    private static string ValueText(RateRule rule) => rule.Kind == RateRuleKind.Multiplier
+        ? "x" + rule.Value.ToString("0.##", CultureInfo.CurrentCulture)
+        : rule.Value.ToString("C", CultureInfo.CurrentCulture) + "/h";
+
+    private static string DaysText(DaysOfWeekFlags flags)
+    {
+        if (flags == DaysOfWeekFlags.All)
+        {
+            return "Every day";
+        }
+
+        var selected = Days.Select(d => flags.HasFlag(d.Flag)).ToArray();
+        var parts = new List<string>();
+        for (var i = 0; i < Days.Length; i++)
+        {
+            if (!selected[i])
+            {
+                continue;
+            }
+
+            var j = i;
+            while (j + 1 < Days.Length && selected[j + 1])
+            {
+                j++;
+            }
+
+            parts.Add(j - i >= 2 ? $"{Days[i].Label}-{Days[j].Label}" : string.Join(", ", Days[i..(j + 1)].Select(d => d.Label)));
+            i = j;
+        }
+
+        return string.Join(", ", parts);
+    }
+
+    private void ToggleDay(DaysOfWeekFlags flag, bool on) =>
+        input.DaysOfWeek = on ? input.DaysOfWeek | flag : input.DaysOfWeek & ~flag;
+
+    private void StartAdd()
+    {
+        input = new RateRuleInput();
+        editingId = null;
+        ResetMessages();
+        showForm = true;
+    }
+
+    private void StartEdit(RateRule rule)
+    {
+        input = new RateRuleInput
+        {
+            Name = rule.Name,
+            StationTypeId = rule.StationTypeId,
+            DaysOfWeek = rule.DaysOfWeek,
+            StartTime = rule.StartTime,
+            EndTime = rule.EndTime,
+            Kind = rule.Kind,
+            Value = rule.Value,
+            Priority = rule.Priority,
+            IsEnabled = rule.IsEnabled,
+        };
+        editingId = rule.Id;
+        confirmingDeleteId = null;
+        ResetMessages();
+        showForm = true;
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        editingId = null;
+        ResetMessages();
+    }
+
+    private void ResetMessages()
+    {
+        errorMessage = null;
+        fieldErrors = new Dictionary<string, string>();
+    }
+
+    private void DismissError() => errorMessage = null;
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        try
+        {
+            ServiceResult result = editingId is { } id
+                ? await RuleService.UpdateAsync(id, input)
+                : await RuleService.CreateAsync(input);
+
+            if (!result.Success)
+            {
+                errorMessage = result.Error;
+                fieldErrors = result.FieldErrors;
+                if (editingId is not null && result.Kind == FailureKind.NotFound)
+                {
+                    // Someone else removed it: close the form and refresh so the list is truthful.
+                    showForm = false;
+                    editingId = null;
+                    await LoadAsync();
+                }
+
+                return;
+            }
+
+            ResetMessages();
+            showForm = false;
+            editingId = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not save rate rule.");
+            errorMessage = "Something went wrong. Try again.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task ToggleEnabledAsync(RateRule rule)
+    {
+        try
+        {
+            var result = await RuleService.SetEnabledAsync(rule.Id, !rule.IsEnabled);
+            errorMessage = result.Success ? null : result.Error;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not toggle rate rule {RuleId}.", rule.Id);
+            errorMessage = "Something went wrong. Try again.";
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        confirmingDeleteId = null;
+        try
+        {
+            var result = await RuleService.DeleteAsync(id);
+            errorMessage = result.Success ? null : result.Error;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not delete rate rule {RuleId}.", id);
+            errorMessage = "Something went wrong. Try again.";
+        }
+
+        await LoadAsync();
+    }
+}

@@ -79,6 +79,12 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
         get { lock (_gate) { return ComputeElapsed(); } }
     }
 
+    /// <summary>Seconds left in the grace period (0 outside Grace).</summary>
+    public long GraceRemainingSeconds
+    {
+        get { lock (_gate) { return _state == AgentState.Grace ? GraceSecondsLeft() : 0; } }
+    }
+
     /// <summary>The agent clock corrected by the skew measured when the last session info arrived.</summary>
     public DateTimeOffset EstimatedServerNow
     {

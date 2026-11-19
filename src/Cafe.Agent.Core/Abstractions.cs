@@ -29,5 +29,12 @@ public interface IPowerControl
 
 public interface IAgentClock
 {
+    /// <summary>Wall clock. Only for display and clock-skew estimates: the user can change it.</summary>
     DateTimeOffset UtcNow { get; }
+
+    /// <summary>
+    /// Monotonic milliseconds from an arbitrary origin. Never goes backwards when the PC date or time is changed, so
+    /// every offline countdown is measured with it.
+    /// </summary>
+    long MonotonicMilliseconds { get; }
 }

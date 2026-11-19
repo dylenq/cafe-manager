@@ -8,7 +8,17 @@ public sealed class FakeAgentClock : IAgentClock
 {
     public DateTimeOffset UtcNow { get; set; } = new(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
 
-    public void Advance(TimeSpan by) => UtcNow += by;
+    public long MonotonicMilliseconds { get; private set; } = 5_000_000;
+
+    /// <summary>Time passes: both clocks move.</summary>
+    public void Advance(TimeSpan by)
+    {
+        UtcNow += by;
+        MonotonicMilliseconds += (long)by.TotalMilliseconds;
+    }
+
+    /// <summary>Someone changes the PC date/time: only the wall clock moves.</summary>
+    public void SetWallClock(DateTimeOffset value) => UtcNow = value;
 }
 
 public sealed class RecordingLockScreen : ILockScreen

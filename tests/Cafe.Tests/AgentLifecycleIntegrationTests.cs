@@ -22,6 +22,8 @@ public class AgentLifecycleIntegrationTests : AgentTestBase
     private sealed class ServerClockAdapter(TimeProvider time) : IAgentClock
     {
         public DateTimeOffset UtcNow => time.GetUtcNow();
+
+        public long MonotonicMilliseconds => time.GetUtcNow().ToUnixTimeMilliseconds();
     }
 
     private sealed class Rig(AgentController controller, RecordingLockScreen lockScreen, RecordingWarningDisplay display, RecordingPowerControl power) : IAsyncDisposable

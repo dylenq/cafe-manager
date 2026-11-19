@@ -31,7 +31,8 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
     private bool _connected;
     private SessionInfo? _session;
     private TimeSpan _skew;
-    private DateTimeOffset _graceEnd;
+    private long _receivedMono;
+    private long _graceEndMono;
     private bool _warningActive;
     private long _warningThresholdSeconds;
     private bool _emergency;
@@ -221,7 +222,7 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
         lock (_gate)
         {
             _emergency = false;
-            _graceEnd = _clock.UtcNow.AddSeconds(graceSeconds);
+            _graceEndMono = _clock.MonotonicMilliseconds + graceSeconds * 1000L;
             _warningActive = false;
             Safe(_lockScreen.Hide);
             SetState(AgentState.Grace);
@@ -346,6 +347,7 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
     {
         _session = info;
         _skew = info.ServerUtcNow - _clock.UtcNow;
+        _receivedMono = _clock.MonotonicMilliseconds;
     }
 
     private void ClearWarning()
@@ -354,7 +356,7 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
         _warningThresholdSeconds = 0;
     }
 
-    private void ClearGrace() => _graceEnd = default;
+    private void ClearGrace() => _graceEndMono = 0;
 
     private long SecondsSinceReceipt()
     {
@@ -363,8 +365,8 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
             return 0;
         }
 
-        var delta = (_clock.UtcNow + _skew) - _session.ServerUtcNow;
-        return (long)Math.Floor(delta.TotalSeconds);
+        // Monotonic: changing the PC date/time while offline cannot stretch the session. Never negative.
+        return Math.Max(0, (_clock.MonotonicMilliseconds - _receivedMono) / 1000);
     }
 
     private long? ComputeRemaining()
@@ -379,8 +381,11 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
 
     private long ComputeElapsed() => _session is null ? 0 : _session.ElapsedSeconds + Math.Max(0, SecondsSinceReceipt());
 
-    private long GraceSecondsLeft() =>
-        (long)Math.Max(0, Math.Ceiling((_graceEnd - _clock.UtcNow).TotalSeconds));
+    private long GraceSecondsLeft()
+    {
+        var leftMs = _graceEndMono - _clock.MonotonicMilliseconds;
+        return leftMs <= 0 ? 0 : (leftMs + 999) / 1000;
+    }
 
     private void ShowWarningCountdown()
     {

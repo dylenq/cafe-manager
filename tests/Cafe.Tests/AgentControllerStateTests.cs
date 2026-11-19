@@ -219,4 +219,41 @@ public class AgentControllerStateTests
         Assert.Equal(AgentState.Locked, a.Controller.State);
         Assert.False(a.Controller.IsEmergencyUnlocked);
     }
+
+    [Fact]
+    public async Task Setting_the_wall_clock_back_does_not_extend_the_offline_countdown()
+    {
+        var a = new UnitAgent();
+        a.Controller.HandleConnected();
+        await a.Controller.Unlock(a.Prepaid(60));
+        a.Controller.HandleDisconnected();
+
+        // The customer sets the PC clock back by an hour; 60 s really pass.
+        a.Clock.SetWallClock(a.Clock.UtcNow - TimeSpan.FromHours(1));
+        a.Clock.Advance(TimeSpan.FromSeconds(60));
+        a.Controller.Tick();
+
+        Assert.Equal(AgentState.Locked, a.Controller.State);
+    }
+
+    [Fact]
+    public async Task Setting_the_wall_clock_forward_does_not_end_the_session_early()
+    {
+        var a = new UnitAgent();
+        await a.Controller.Unlock(a.Prepaid(600));
+        a.Clock.SetWallClock(a.Clock.UtcNow + TimeSpan.FromHours(5));
+
+        Assert.Equal(600, a.Controller.RemainingSeconds);
+    }
+
+    [Fact]
+    public async Task Grace_countdown_ignores_wall_clock_changes()
+    {
+        var a = new UnitAgent();
+        await a.Controller.GraceStarted(100);
+        a.Clock.SetWallClock(a.Clock.UtcNow - TimeSpan.FromHours(1));
+        a.Clock.Advance(TimeSpan.FromSeconds(40));
+
+        Assert.Equal(60, a.Controller.GraceRemainingSeconds);
+    }
 }

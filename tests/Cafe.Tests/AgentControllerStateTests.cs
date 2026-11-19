@@ -285,4 +285,53 @@ public class AgentControllerStateTests
         Assert.Equal(AgentState.Locked, a.Controller.State);
         await a.Controller.DisposeAsync();
     }
+
+    [Fact]
+    public async Task Connected_agent_locks_itself_when_the_server_stays_silent_past_zero_plus_slack()
+    {
+        var a = new UnitAgent();
+        a.Controller.HandleConnected();
+        await a.Controller.Unlock(a.Prepaid(5));
+
+        a.Clock.Advance(TimeSpan.FromSeconds(5 + 19));
+        a.Controller.Tick();
+        Assert.Equal(AgentState.Unlocked, a.Controller.State); // still inside the slack: the server may extend
+
+        a.Clock.Advance(TimeSpan.FromSeconds(1));
+        a.Controller.Tick();
+        Assert.Equal(AgentState.Locked, a.Controller.State);
+        Assert.Contains("Time is up", a.Lock.LastLock!.Reason);
+    }
+
+    [Fact]
+    public async Task Connected_agent_in_grace_locks_itself_after_the_grace_end_plus_slack()
+    {
+        var a = new UnitAgent();
+        a.Controller.HandleConnected();
+        await a.Controller.GraceStarted(10);
+
+        a.Clock.Advance(TimeSpan.FromSeconds(10 + 19));
+        a.Controller.Tick();
+        Assert.Equal(AgentState.Grace, a.Controller.State);
+
+        a.Clock.Advance(TimeSpan.FromSeconds(1));
+        a.Controller.Tick();
+        Assert.Equal(AgentState.Locked, a.Controller.State);
+    }
+
+    [Fact]
+    public async Task A_server_extension_inside_the_slack_keeps_the_pc_unlocked()
+    {
+        var a = new UnitAgent();
+        a.Controller.HandleConnected();
+        await a.Controller.Unlock(a.Prepaid(5));
+        a.Clock.Advance(TimeSpan.FromSeconds(15));
+        a.Controller.Tick();
+
+        await a.Controller.SessionUpdated(a.Prepaid(900));
+        a.Clock.Advance(TimeSpan.FromSeconds(30));
+        a.Controller.Tick();
+
+        Assert.Equal(AgentState.Unlocked, a.Controller.State);
+    }
 }

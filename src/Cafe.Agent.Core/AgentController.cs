@@ -7,7 +7,8 @@ namespace Cafe.Agent.Core;
 /// <summary>
 /// Platform-neutral agent: owns the SignalR connection, the state machine (Locked, Unlocked, Grace) and the local
 /// one-second countdown. Locked before the first connection and while the server is unreachable. The server is
-/// authoritative whenever connected; only a disconnected agent locks itself at zero.
+/// authoritative whenever connected: a connected agent waits for the server's Lock and only locks itself when the
+/// server stays silent for ConnectedLockSlack past zero (or past the grace end); a disconnected agent locks at zero.
 /// </summary>
 public sealed class AgentController : IAgentClient, IAsyncDisposable
 {
@@ -303,7 +304,7 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
                         ShowWarningCountdown();
                     }
 
-                    if (!_connected && ComputeRemaining() is 0)
+                    if (ComputeRemaining() is 0 && (!_connected || PastZeroBeyondSlack()))
                     {
                         ApplyLockCore(new LockInfo(_session?.StationName ?? _options.MachineId, string.Empty, TimeIsUpReason));
                     }
@@ -311,7 +312,7 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
                     break;
                 case AgentState.Grace:
                     ShowGraceCountdown();
-                    if (!_connected && GraceSecondsLeft() <= 0)
+                    if (GraceSecondsLeft() <= 0 && (!_connected || GraceEndedBeyondSlack()))
                     {
                         ApplyLockCore(new LockInfo(_session?.StationName ?? _options.MachineId, string.Empty, TimeIsUpReason));
                     }
@@ -422,6 +423,14 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
     }
 
     private long ComputeElapsed() => _session is null ? 0 : _session.ElapsedSeconds + Math.Max(0, SecondsSinceReceipt());
+
+    /// <summary>Connected, but the server has said nothing for the slack period after the paid time ran out.</summary>
+    private bool PastZeroBeyondSlack() =>
+        _session?.RemainingSeconds is { } remaining
+        && remaining - SecondsSinceReceipt() <= -(long)_options.ConnectedLockSlack.TotalSeconds;
+
+    private bool GraceEndedBeyondSlack() =>
+        _clock.MonotonicMilliseconds - _graceEndMono >= (long)_options.ConnectedLockSlack.TotalMilliseconds;
 
     private long GraceSecondsLeft()
     {

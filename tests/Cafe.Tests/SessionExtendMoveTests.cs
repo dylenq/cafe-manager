@@ -27,6 +27,50 @@ public class SessionExtendMoveTests : SessionTestBase
     }
 
     [Fact]
+    public async Task Extend_after_the_grace_elapsed_but_before_a_tick_ends_the_session_instead_of_reviving_it()
+    {
+        var session = await PrepaidAsync(await StationAsync(), 30);
+        Advance(30 * Min + TimeSpan.FromMinutes(3)); // past expiry and the 2 min grace, no tick ran
+
+        var extend = await SvcAsync(s => s.ExtendAsync(session.Id, 10));
+
+        Assert.False(extend.Success);
+        Assert.Contains("grace period are over", extend.Error);
+        var saved = await LoadAsync(session.Id);
+        Assert.Equal(SessionStatus.Ended, saved.Status);
+        Assert.Equal(SessionEndReason.Expired, saved.EndReason);
+        Assert.Equal(30, saved.PurchasedMinutes);
+    }
+
+    [Fact]
+    public async Task Extend_just_after_expiry_but_before_a_tick_revives_from_grace_at_the_true_expiry()
+    {
+        var session = await PrepaidAsync(await StationAsync(), 30);
+        Advance(30 * Min + TimeSpan.FromSeconds(20));
+
+        var extend = await SvcAsync(s => s.ExtendAsync(session.Id, 10));
+
+        Assert.True(extend.Success, extend.Error);
+        var saved = await LoadAsync(session.Id);
+        Assert.Equal(SessionStatus.Active, saved.Status);
+        Assert.Equal(Start.AddMinutes(30), saved.Segments.OrderBy(x => x.Id).First().EndUtc);
+    }
+
+    [Fact]
+    public async Task Pause_after_the_time_ran_out_but_before_a_tick_is_refused_and_does_not_overrun()
+    {
+        var session = await PrepaidAsync(await StationAsync(), 30);
+        Advance(30 * Min + TimeSpan.FromSeconds(20));
+
+        var pause = await SvcAsync(s => s.PauseAsync(session.Id));
+
+        Assert.False(pause.Success);
+        var saved = await LoadAsync(session.Id);
+        Assert.Equal(SessionStatus.Grace, saved.Status);
+        Assert.Equal(Start.AddMinutes(30), Assert.Single(saved.Segments).EndUtc);
+    }
+
+    [Fact]
     public async Task Extend_active_adds_minutes_and_a_quote_projected_from_the_planned_end()
     {
         var station = await StationAsync();

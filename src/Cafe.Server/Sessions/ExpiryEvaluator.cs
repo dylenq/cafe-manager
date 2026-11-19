@@ -75,6 +75,17 @@ public class ExpiryEvaluator(
     }
 
     /// <summary>
+    /// Brings one session up to date right now (expiry into Grace, grace-elapsed ending) without waiting for the
+    /// next tick, so a mutation never acts on a session whose time has already run out. Handlers are not run here;
+    /// the next pass picks them up. Returns true when this call ended the session.
+    /// </summary>
+    public async Task<bool> ResolveAsync(int sessionId, CancellationToken cancellationToken = default)
+    {
+        var settings = await settingsService.GetAsync(cancellationToken);
+        return await ProcessAsync(sessionId, time.GetUtcNow(), settings, cancellationToken);
+    }
+
+    /// <summary>
     /// At-least-once expiry actions: every pass (including the first one at startup) also picks up sessions that
     /// expired within the last <see cref="ActionLookback"/> and have no ExpiryActionFired marker yet, whether they
     /// just ended in this pass or were left behind by a crash, a restart or failed handlers.

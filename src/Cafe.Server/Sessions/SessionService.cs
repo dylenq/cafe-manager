@@ -15,7 +15,8 @@ public class SessionService(
     TimeProvider time,
     PricingConfigService pricing,
     SessionCharges charges,
-    SessionNotifier notifier)
+    SessionNotifier notifier,
+    ExpiryEvaluator expiry)
 {
     public const int MinMinutes = 1;
     public const int MaxMinutes = 1440;
@@ -26,6 +27,8 @@ public class SessionService(
     private const string Gone = "That session no longer exists. Refresh the dashboard.";
     /// <summary>Returned by StopAsync when the session or its charge changed after the quote was shown.</summary>
     public const string ChangedMessage = "Session changed — review the new charge";
+
+    private const string GraceOver = "The time and grace period are over, so the session has ended. Start a new session.";
 
     private const string AlreadyEnded = "That session has already ended.";
 
@@ -104,8 +107,15 @@ public class SessionService(
     }
 
     /// <summary>Pauses an Active session: closes the open segment so paused time neither counts down nor bills.</summary>
-    public Task<ServiceResult<Session>> PauseAsync(int sessionId, CancellationToken cancellationToken = default) =>
-        MutateAsync<Session>(sessionId, ctx =>
+    public async Task<ServiceResult<Session>> PauseAsync(int sessionId, CancellationToken cancellationToken = default)
+    {
+        // Settle expiry first: a session whose time ran out but was not ticked yet is Grace now, not pausable.
+        if (await ResolveFirstAsync(sessionId, cancellationToken))
+        {
+            return ServiceResult<Session>.Fail(GraceOver);
+        }
+
+        return await MutateAsync<Session>(sessionId, ctx =>
         {
             var session = ctx.Session;
             if (session.Status == SessionStatus.Grace)
@@ -118,11 +128,32 @@ public class SessionService(
                 return Task.FromResult(ServiceResult<Session>.Fail("Only an active session can be paused."));
             }
 
+            // Never close a segment past the purchased time (min(now, expiry instant)).
+            if (session.PurchasedMinutes is { } purchased && SessionClock.RemainingSeconds(purchased, ActiveSeconds(session, ctx.Now)) <= 0)
+            {
+                return Task.FromResult(ServiceResult<Session>.Fail(TimeUp));
+            }
+
             CloseOpenSegments(session, ctx.Now);
             session.Status = SessionStatus.Paused;
             AddEvent(session, SessionEventType.Paused, session.StationId, ctx.Now, "Paused");
             return Task.FromResult(ServiceResult<Session>.Ok(session));
         }, cancellationToken);
+    }
+
+    /// <summary>Runs the evaluator for this session; true when that ended it (grace already elapsed).</summary>
+    private async Task<bool> ResolveFirstAsync(int sessionId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await expiry.ResolveAsync(sessionId, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The mutation's own state checks still apply; the ticker settles the session on its next pass.
+            return false;
+        }
+    }
 
     /// <summary>Resumes a Paused session by opening a new segment on its current station.</summary>
     public Task<ServiceResult<Session>> ResumeAsync(int sessionId, CancellationToken cancellationToken = default) =>
@@ -144,14 +175,20 @@ public class SessionService(
     /// Adds minutes to a prepaid session and returns the extension quote (not the new total; the new total is
     /// stored in ChargedAmount). The quote is projected from the current planned end at the current station's type.
     /// </summary>
-    public Task<ServiceResult<decimal>> ExtendAsync(int sessionId, int minutes, CancellationToken cancellationToken = default)
+    public async Task<ServiceResult<decimal>> ExtendAsync(int sessionId, int minutes, CancellationToken cancellationToken = default)
     {
         if (minutes is < MinMinutes or > MaxMinutes)
         {
-            return Task.FromResult(ServiceResult<decimal>.Fail($"Minutes must be between {MinMinutes} and {MaxMinutes}."));
+            return ServiceResult<decimal>.Fail($"Minutes must be between {MinMinutes} and {MaxMinutes}.");
         }
 
-        return MutateAsync<decimal>(sessionId, async ctx =>
+        // Settle expiry first so a session whose grace already elapsed (not ticked yet) cannot be revived.
+        if (await ResolveFirstAsync(sessionId, cancellationToken))
+        {
+            return ServiceResult<decimal>.Fail(GraceOver);
+        }
+
+        return await MutateAsync<decimal>(sessionId, async ctx =>
         {
             var session = ctx.Session;
             if (session.Mode != SessionMode.Prepaid || session.PurchasedMinutes is not { } purchased)
@@ -188,8 +225,14 @@ public class SessionService(
     }
 
     /// <summary>Moves an Active or Paused session to an enabled, idle, different station. Prepaid charges are not re-priced.</summary>
-    public Task<ServiceResult<Session>> MoveAsync(int sessionId, int targetStationId, CancellationToken cancellationToken = default) =>
-        MutateAsync<Session>(sessionId, async ctx =>
+    public async Task<ServiceResult<Session>> MoveAsync(int sessionId, int targetStationId, CancellationToken cancellationToken = default)
+    {
+        if (await ResolveFirstAsync(sessionId, cancellationToken))
+        {
+            return ServiceResult<Session>.Fail(GraceOver);
+        }
+
+        return await MutateAsync<Session>(sessionId, async ctx =>
         {
             var session = ctx.Session;
             if (session.Status == SessionStatus.Grace)
@@ -236,6 +279,7 @@ public class SessionService(
             AddEvent(session, SessionEventType.Moved, target.Id, ctx.Now, $"Moved {from.Name} -> {target.Name}");
             return ServiceResult<Session>.Ok(session);
         }, cancellationToken);
+    }
 
     /// <summary>
     /// Ends the session and returns its final charge. Prepaid charges stay as quoted (no automatic refund).

@@ -17,7 +17,11 @@ public class ExpiryEvaluatorTests : SessionTestBase
 
         public Task ExecuteAsync(Station station, CancellationToken cancellationToken)
         {
-            Calls.Add(station.Name);
+            lock (Calls)
+            {
+                Calls.Add(station.Name);
+            }
+
             return Task.CompletedTask;
         }
     }

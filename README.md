@@ -13,7 +13,7 @@ The server listens on `http://0.0.0.0:5080`, so tablets and phones on the LAN ca
 
 ## First run
 
-On an empty database every page redirects to `/setup`, where the owner chooses the shared admin password (minimum 8 characters, entered twice). Only a hash is stored. Setup cannot be re-run afterwards to reset the password. Until setup is finished, anyone on the LAN can claim the admin password, so do it right after installing.
+On an empty database every page redirects to `/setup`, where the owner chooses the shared admin password (minimum 8 characters, entered twice). Only a hash is stored. Setup cannot be re-run afterwards to reset the password. Until setup is finished the `/setup` page is only served to requests from the server PC itself (loopback), so do first-run setup on the front-desk PC at `http://localhost:5080`. Devices elsewhere on the LAN see a page explaining that. To allow remote setup (for example a headless server), set `Setup:AllowRemote` to `true` for the first run, and anyone on the LAN can then claim the admin password until you finish, so switch it back afterwards.
 
 ## Configuration
 
@@ -21,6 +21,7 @@ On an empty database every page redirects to `/setup`, where the owner chooses t
 |-----|---------|----------------------|
 | `Kestrel:Endpoints:Http:Url` | `http://0.0.0.0:5080` | `Kestrel__Endpoints__Http__Url` |
 | `ConnectionStrings:Cafe` | `Data Source=cafe.db` | `ConnectionStrings__Cafe` |
+| `Setup:AllowRemote` | `false` | `Setup__AllowRemote` |
 
 `ASPNETCORE_URLS` and the `--urls` argument also override the listen address. The schema is created and updated automatically at startup through EF Core migrations.
 

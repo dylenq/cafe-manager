@@ -174,4 +174,79 @@ public class SetupFlowTests
         Assert.Contains("Could not save the password", body);
         Assert.Null(await StoredHashAsync(baseFactory));
     }
+
+    private static CafeWebApplicationFactory RemoteFactory(bool allowRemote = false)
+    {
+        var factory = new CafeWebApplicationFactory { RemoteAddress = System.Net.IPAddress.Parse("192.168.1.50") };
+        if (allowRemote)
+        {
+            factory.ExtraSettings["Setup:AllowRemote"] = "true";
+        }
+
+        return factory;
+    }
+
+    [Theory]
+    [InlineData("/setup")]
+    [InlineData("/")]
+    public async Task Remote_visitor_before_setup_sees_friendly_page_instead_of_setup_form(string path)
+    {
+        using var factory = RemoteFactory();
+        using var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { AllowAutoRedirect = true });
+
+        var response = await client.GetAsync(path);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Contains("server PC", body);
+        Assert.Empty(FormPostHelper.ParseInputs(body));
+    }
+
+    [Fact]
+    public async Task Remote_visitor_cannot_post_setup_by_default()
+    {
+        using var factory = RemoteFactory();
+        using var client = factory.CreateNoRedirectClient();
+
+        // Even a well-formed POST (no antiforgery needed to prove the point) is refused before it reaches the page.
+        var response = await client.PostAsync("/setup", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Model.Password"] = StrongPassword,
+            ["Model.ConfirmPassword"] = StrongPassword,
+        }));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Null(await StoredHashAsync(factory));
+    }
+
+    [Fact]
+    public async Task Remote_setup_works_when_allow_remote_is_enabled()
+    {
+        using var factory = RemoteFactory(allowRemote: true);
+        using var client = factory.CreateNoRedirectClient();
+
+        var response = await PostSetup(client, StrongPassword, StrongPassword);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.NotNull(await StoredHashAsync(factory));
+    }
+
+    [Fact]
+    public async Task Remote_visitor_is_redirected_to_login_once_setup_is_complete()
+    {
+        using var factory = new CafeWebApplicationFactory();
+        using (var local = factory.CreateNoRedirectClient())
+        {
+            await PostSetup(local, StrongPassword, StrongPassword);
+        }
+
+        factory.RemoteAddress = System.Net.IPAddress.Parse("192.168.1.50");
+        using var remote = factory.CreateNoRedirectClient();
+        var login = await remote.GetAsync("/login");
+        var setup = await remote.GetAsync("/setup");
+
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, setup.StatusCode);
+        Assert.EndsWith("/login", setup.Headers.Location!.OriginalString);
+    }
 }

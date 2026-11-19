@@ -1,0 +1,144 @@
+@using Cafe.Server.Agents
+@using Cafe.Server.Data
+@inject AgentRemoteControlService Remote
+@inject ILogger<PcCommandMenu> Logger
+
+<div class="pc-command-menu mt-2" data-station-id="@StationId">
+    <button type="button" class="btn btn-sm btn-outline-secondary pc-menu-trigger"
+            aria-expanded="@_open.ToString().ToLowerInvariant()"
+            disabled="@AgentOffline"
+            title="@(AgentOffline ? "PC agent offline" : "PC commands")"
+            @onclick="Toggle">PC &#9662;</button>
+
+    @if (_open && !AgentOffline)
+    {
+        <div class="border rounded p-2 mt-1 pc-menu-panel">
+            @switch (_mode)
+            {
+                case Mode.ConfirmUnlock:
+                    <div class="small mb-1">Unlock @StationName without a session? The PC stays unlocked until you lock it or the agent reconnects.</div>
+                    <button type="button" class="btn btn-sm btn-warning" disabled="@_busy" @onclick="() => SendAsync(AgentCommandKind.Unlock)">Unlock</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="Back">Cancel</button>
+                    break;
+                case Mode.ConfirmShutdown:
+                    <div class="small mb-1">Shut down @StationName? Any unsaved work on the PC is lost.@(HasActiveSession ? " A session is running on this PC." : "")</div>
+                    <button type="button" class="btn btn-sm btn-danger" disabled="@_busy" @onclick="() => SendAsync(AgentCommandKind.Shutdown)">Shut down</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="Back">Cancel</button>
+                    break;
+                case Mode.ConfirmRestart:
+                    <div class="small mb-1">Restart @StationName? Any unsaved work on the PC is lost.@(HasActiveSession ? " A session is running on this PC." : "")</div>
+                    <button type="button" class="btn btn-sm btn-danger" disabled="@_busy" @onclick="() => SendAsync(AgentCommandKind.Restart)">Restart</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="Back">Cancel</button>
+                    break;
+                case Mode.Message:
+                    <textarea class="form-control form-control-sm mb-1 pc-menu-message" rows="2" maxlength="500"
+                              aria-label="Message to show on the PC" placeholder="Message for @StationName"
+                              @bind="_text" @bind:event="oninput"></textarea>
+                    <button type="button" class="btn btn-sm btn-primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_text))"
+                            @onclick="() => SendAsync(AgentCommandKind.Message)">Send</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="Back">Cancel</button>
+                    break;
+                default:
+                    <div class="d-flex flex-wrap gap-1">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="() => SendAsync(AgentCommandKind.Lock)">Lock</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="() => Go(Mode.ConfirmUnlock)">Unlock PC (free)</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="() => Go(Mode.Message)">Send message</button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" disabled="@_busy" @onclick="() => Go(Mode.ConfirmShutdown)">Shutdown</button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" disabled="@_busy" @onclick="() => Go(Mode.ConfirmRestart)">Restart</button>
+                    </div>
+                    break;
+            }
+
+            @if (_result is not null)
+            {
+                <div class="alert @(_resultOk ? "alert-success" : "alert-danger") py-1 px-2 mt-2 mb-0 small pc-menu-result" role="status">@_result</div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private enum Mode
+    {
+        List,
+        ConfirmUnlock,
+        ConfirmShutdown,
+        ConfirmRestart,
+        Message,
+    }
+
+    private bool _open;
+    private bool _busy;
+    private Mode _mode = Mode.List;
+    private string _text = string.Empty;
+    private string? _result;
+    private bool _resultOk;
+
+    [Parameter, EditorRequired] public int StationId { get; set; }
+
+    [Parameter, EditorRequired] public string StationName { get; set; } = string.Empty;
+
+    [Parameter] public bool AgentOffline { get; set; }
+
+    [Parameter] public bool HasActiveSession { get; set; }
+
+    private void Toggle()
+    {
+        _open = !_open;
+        _mode = Mode.List;
+        _result = null;
+    }
+
+    private void Go(Mode mode)
+    {
+        _mode = mode;
+        _result = null;
+    }
+
+    private void Back() => Go(Mode.List);
+
+    private async Task SendAsync(AgentCommandKind kind)
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _result = null;
+        try
+        {
+            var outcome = await Remote.SendAsync(StationId, kind, kind == AgentCommandKind.Message ? _text : null);
+            _resultOk = outcome.Success;
+            _result = outcome.Success ? Done(kind) : outcome.Error;
+            if (outcome.Success)
+            {
+                _mode = Mode.List;
+                if (kind == AgentCommandKind.Message)
+                {
+                    _text = string.Empty;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not send {Command} to station {StationId}.", kind, StationId);
+            _resultOk = false;
+            _result = "Could not send the command. Try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string Done(AgentCommandKind kind) => kind switch
+    {
+        AgentCommandKind.Lock => "PC locked.",
+        AgentCommandKind.Unlock => "PC unlocked.",
+        AgentCommandKind.Message => "Message sent.",
+        AgentCommandKind.Shutdown => "Shutdown sent.",
+        AgentCommandKind.Restart => "Restart sent.",
+        _ => "Sent.",
+    };
+}

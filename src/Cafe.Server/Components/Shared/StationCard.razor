@@ -15,6 +15,16 @@
         </div>
         <div class="text-muted small mb-2">@Model.TypeName</div>
         <span class="badge rounded-pill text-bg-light border">@(Model.Kind == StationKind.PC ? "PC" : "Console")</span>
+        @if (Model.AgentOffline && Model.Session is not null)
+        {
+            <span class="badge rounded-pill text-bg-secondary agent-offline-badge" title="The PC agent is not connected">Agent offline</span>
+        }
+
+        @if (Model.Kind == StationKind.PC && Model.HasAgent)
+        {
+            <PcCommandMenu StationId="Model.StationId" StationName="@Model.Name" AgentOffline="Model.AgentOffline"
+                           HasActiveSession="Model.Session is not null" />
+        }
 
         @if (Model.Session is { } session)
         {
@@ -129,6 +139,13 @@
         {
             <div class="alert alert-danger py-1 px-2 mt-2 mb-0 small" role="alert">@_error</div>
         }
+        @if (_info is not null)
+        {
+            <div class="alert alert-warning alert-dismissible py-1 px-2 mt-2 mb-0 small" role="status">
+                @_info
+                <button type="button" class="btn-close" aria-label="Dismiss" @onclick="() => _info = null"></button>
+            </div>
+        }
     </div>
 </div>
 
@@ -138,6 +155,7 @@
 
     private bool _busy;
     private string? _error;
+    private string? _info;
     private decimal? _confirmQuote;
     private int? _confirmSessionId;
     private int _confirmVersion;
@@ -186,11 +204,39 @@
             : SessionClock.FormatCountdown(active);
     }
 
-    private Task StartPrepaidAsync(int minutes) =>
-        RunAsync(() => Sessions.StartPrepaidAsync(Model.StationId, minutes), "start the session");
+    public const string AgentOfflineNotice = "PC agent offline — the PC will unlock when it reconnects.";
 
-    private Task StartOpenEndedAsync() =>
-        RunAsync(() => Sessions.StartOpenEndedAsync(Model.StationId), "start the session");
+    private async Task StartPrepaidAsync(int minutes)
+    {
+        if (await RunAsync(() => Sessions.StartPrepaidAsync(Model.StationId, minutes), "start the session"))
+        {
+            await NoticeIfAgentOfflineAsync();
+        }
+    }
+
+    private async Task StartOpenEndedAsync()
+    {
+        if (await RunAsync(() => Sessions.StartOpenEndedAsync(Model.StationId), "start the session"))
+        {
+            await NoticeIfAgentOfflineAsync();
+        }
+    }
+
+    // Starting on a disconnected PC is allowed; tell staff the PC will only unlock once its agent reconnects.
+    private async Task NoticeIfAgentOfflineAsync()
+    {
+        if (Model.AgentOffline)
+        {
+            if (OnNotice.HasDelegate)
+            {
+                await OnNotice.InvokeAsync(AgentOfflineNotice);
+            }
+            else
+            {
+                _info = AgentOfflineNotice;
+            }
+        }
+    }
 
     private Task PauseAsync(int sessionId) => RunAsync(() => Sessions.PauseAsync(sessionId), "pause the session");
 

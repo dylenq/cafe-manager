@@ -88,18 +88,15 @@ internal sealed class AgentApplication : Application
         _ = _controller.StartAsync();
     }
 
-    /// <summary>Overridden wiring point for the lock screen (real WPF implementation is supplied by the factory below).</summary>
-    internal Func<AgentApplication, AgentSettings?, ILogger, ILockScreen> LockScreenFactory { get; set; } =
-        static (_, _, _) => new NullLockScreen();
-
-    internal Func<AgentApplication, ILogger, IWarningDisplay> WarningDisplayFactory { get; set; } =
-        static (_, _) => new NullWarningDisplay();
-
     private ILockScreen CreateLockScreen(AgentSettings? settings) =>
-        LockScreenFactory(this, settings, _loggerFactory!.CreateLogger("LockScreen"));
+        new WpfLockScreen(
+            Dispatcher,
+            _loggerFactory!.CreateLogger("LockScreen"),
+            settings?.EmergencyUnlockCodeHash ?? string.Empty,
+            OnEmergencyUnlock);
 
     private IWarningDisplay CreateWarningDisplay() =>
-        WarningDisplayFactory(this, _loggerFactory!.CreateLogger("WarningDisplay"));
+        new WpfWarningDisplay(Dispatcher, _loggerFactory!.CreateLogger("WarningDisplay"));
 
     /// <summary>Called by the lock screen after a successful emergency unlock.</summary>
     internal void OnEmergencyUnlock(bool exitAgent)
@@ -143,31 +140,5 @@ internal sealed class AgentApplication : Application
         _warnings?.Hide();
         _loggerFactory?.Dispose();
         Shutdown();
-    }
-
-    private sealed class NullLockScreen : ILockScreen
-    {
-        public void Show(LockInfo info)
-        {
-        }
-
-        public void Hide()
-        {
-        }
-    }
-
-    private sealed class NullWarningDisplay : IWarningDisplay
-    {
-        public void ShowCountdown(AgentCountdown countdown)
-        {
-        }
-
-        public void ShowMessage(string text)
-        {
-        }
-
-        public void Hide()
-        {
-        }
     }
 }

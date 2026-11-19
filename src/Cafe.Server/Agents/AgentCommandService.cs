@@ -40,7 +40,8 @@ public sealed class AgentCommandService(
 
             var cafeName = await settings.GetCafeNameAsync(cancellationToken);
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-            var station = await db.Stations.AsNoTracking().FirstOrDefaultAsync(s => s.AgentMachineId == machineId, cancellationToken);
+            var station = await db.Stations.AsNoTracking().FirstOrDefaultAsync(
+                s => EF.Functions.Collate(s.AgentMachineId!, "NOCASE") == machineId, cancellationToken); // same collation as the unique index
             if (station is null)
             {
                 await SendAsync(connectionId, c => c.Lock(new LockInfo(machineId, cafeName, UnknownMachineReason)));

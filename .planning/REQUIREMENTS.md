@@ -14,14 +14,14 @@
 
 ### Sessions
 
-- [ ] **SESS-01**: Staff can start a prepaid session on an idle station for a chosen duration
+- [x] **SESS-01**: Staff can start a prepaid session on an idle station for a chosen duration
 - [x] **SESS-02**: Staff can start an open-ended session that runs until stopped and is priced at the end
 - [x] **SESS-03**: Staff can pause and resume a session, and paused time is neither counted nor billed
 - [x] **SESS-04**: Staff can extend a running session by a chosen amount of time
 - [x] **SESS-05**: Staff can move a session to another idle station, keeping its remaining time and charges
-- [ ] **SESS-06**: Staff can stop a session and see the final charge
-- [ ] **SESS-07**: The dashboard shows a live countdown (or elapsed time for open-ended sessions) per station
-- [ ] **SESS-08**: The desk UI shows a visible and audible alert when a station is within the warning window or past expiry
+- [x] **SESS-06**: Staff can stop a session and see the final charge
+- [x] **SESS-07**: The dashboard shows a live countdown (or elapsed time for open-ended sessions) per station
+- [x] **SESS-08**: The desk UI shows a visible and audible alert when a station is within the warning window or past expiry
 - [x] **SESS-09**: After expiry a configurable grace period runs, then the station's expiry action fires automatically
 - [x] **SESS-10**: Every session action (start, pause, resume, extend, move, stop, expire) is recorded in an audit trail
 
@@ -102,14 +102,14 @@
 | ADMN-02 | Phase 1 | Complete |
 | ADMN-03 | Phase 1 | Complete |
 | ADMN-04 | Phase 1 | Pending |
-| SESS-01 | Phase 2 | Pending |
+| SESS-01 | Phase 2 | Complete |
 | SESS-02 | Phase 2 | Complete |
 | SESS-03 | Phase 2 | Complete |
 | SESS-04 | Phase 2 | Complete |
 | SESS-05 | Phase 2 | Complete |
-| SESS-06 | Phase 2 | Pending |
-| SESS-07 | Phase 2 | Pending |
-| SESS-08 | Phase 2 | Pending |
+| SESS-06 | Phase 2 | Complete |
+| SESS-07 | Phase 2 | Complete |
+| SESS-08 | Phase 2 | Complete |
 | SESS-09 | Phase 2 | Complete |
 | SESS-10 | Phase 2 | Complete |
 | PRIC-01 | Phase 2 | Complete |

@@ -111,6 +111,7 @@ public class StationTypeServiceTests : IDisposable
         using var _s = scope;
         var result = await types.UpdateAsync(999, Input("X"));
         Assert.False(result.Success);
+        Assert.Equal(FailureKind.NotFound, result.Kind);
         Assert.Contains("no longer exists", result.Error);
     }
 

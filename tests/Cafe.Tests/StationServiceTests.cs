@@ -210,10 +210,26 @@ public class StationServiceTests : IDisposable
         var update = await _stations.UpdateAsync(999, Pc(typeId));
         Assert.False(update.Success);
         Assert.Contains("no longer exists", update.Error);
+        Assert.Equal(FailureKind.NotFound, update.Kind);
 
         var delete = await _stations.DeleteAsync(999);
         Assert.False(delete.Success);
         Assert.Contains("no longer exists", delete.Error);
+        Assert.Equal(FailureKind.NotFound, delete.Kind);
+    }
+
+    [Fact]
+    public async Task Deleted_station_type_is_a_validation_failure_not_a_missing_station()
+    {
+        var typeId = await TypeAsync();
+        var otherTypeId = await TypeAsync("Other");
+        var id = (await _stations.CreateAsync(Pc(typeId))).Value!.Id;
+
+        var result = await _stations.UpdateAsync(id, Pc(otherTypeId + 100));
+
+        Assert.False(result.Success);
+        Assert.Equal(FailureKind.Validation, result.Kind);
+        Assert.True(result.FieldErrors.ContainsKey("StationTypeId"));
     }
 
     [Fact]

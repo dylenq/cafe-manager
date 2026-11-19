@@ -58,7 +58,7 @@ public class StationService(IDbContextFactory<CafeDbContext> dbFactory)
         var entity = await db.Stations.FirstOrDefaultAsync(s => s.Id == id);
         if (entity is null)
         {
-            return ServiceResult.Fail(Gone);
+            return ServiceResult.NotFound(Gone);
         }
 
         // TvToken is deliberately never assigned here: pairing (Phase 4) owns it.
@@ -80,7 +80,7 @@ public class StationService(IDbContextFactory<CafeDbContext> dbFactory)
         }
         catch (DbUpdateConcurrencyException)
         {
-            return ServiceResult.Fail(Gone);
+            return ServiceResult.NotFound(Gone);
         }
         catch (DbUpdateException ex)
         {
@@ -96,7 +96,7 @@ public class StationService(IDbContextFactory<CafeDbContext> dbFactory)
         var entity = await db.Stations.FirstOrDefaultAsync(s => s.Id == id);
         if (entity is null)
         {
-            return ServiceResult.Fail(Gone);
+            return ServiceResult.NotFound(Gone);
         }
 
         db.Stations.Remove(entity);
@@ -106,7 +106,7 @@ public class StationService(IDbContextFactory<CafeDbContext> dbFactory)
         }
         catch (DbUpdateConcurrencyException)
         {
-            return ServiceResult.Fail(Gone);
+            return ServiceResult.NotFound(Gone);
         }
 
         return ServiceResult.Ok();

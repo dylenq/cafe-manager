@@ -61,7 +61,7 @@ public class StationTypeService(IDbContextFactory<CafeDbContext> dbFactory)
         var entity = await db.StationTypes.FirstOrDefaultAsync(t => t.Id == id);
         if (entity is null)
         {
-            return ServiceResult.Fail(Gone);
+            return ServiceResult.NotFound(Gone);
         }
 
         if (await db.StationTypes.AnyAsync(t => t.Id != id && t.Name == name))
@@ -78,7 +78,7 @@ public class StationTypeService(IDbContextFactory<CafeDbContext> dbFactory)
         }
         catch (DbUpdateConcurrencyException)
         {
-            return ServiceResult.Fail(Gone);
+            return ServiceResult.NotFound(Gone);
         }
         catch (DbUpdateException ex) when (InputValidation.IsUniqueViolation(ex))
         {
@@ -94,7 +94,7 @@ public class StationTypeService(IDbContextFactory<CafeDbContext> dbFactory)
         var entity = await db.StationTypes.FirstOrDefaultAsync(t => t.Id == id);
         if (entity is null)
         {
-            return ServiceResult.Fail(Gone);
+            return ServiceResult.NotFound(Gone);
         }
 
         var count = await db.Stations.CountAsync(s => s.StationTypeId == id);
@@ -110,7 +110,7 @@ public class StationTypeService(IDbContextFactory<CafeDbContext> dbFactory)
         }
         catch (DbUpdateConcurrencyException)
         {
-            return ServiceResult.Fail(Gone);
+            return ServiceResult.NotFound(Gone);
         }
         catch (DbUpdateException)
         {

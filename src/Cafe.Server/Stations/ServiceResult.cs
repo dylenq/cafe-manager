@@ -2,12 +2,26 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Cafe.Server.Stations;
 
+/// <summary>Why an operation failed, so callers never have to inspect message text.</summary>
+public enum FailureKind
+{
+    None,
+
+    /// <summary>The input or a business rule was rejected; the record still exists and the user can correct it.</summary>
+    Validation,
+
+    /// <summary>The record being edited or deleted no longer exists.</summary>
+    NotFound,
+}
+
 /// <summary>Outcome of a CRUD operation: success, or a friendly error plus optional per-field messages.</summary>
 public class ServiceResult
 {
     private static readonly IReadOnlyDictionary<string, string> NoFieldErrors = new Dictionary<string, string>();
 
     public bool Success { get; protected init; }
+
+    public FailureKind Kind { get; protected init; }
 
     public string? Error { get; protected init; }
 
@@ -16,7 +30,11 @@ public class ServiceResult
     public static ServiceResult Ok() => new() { Success = true };
 
     public static ServiceResult Fail(string error, IReadOnlyDictionary<string, string>? fieldErrors = null) =>
-        new() { Error = error, FieldErrors = fieldErrors ?? NoFieldErrors };
+        new() { Kind = FailureKind.Validation, Error = error, FieldErrors = fieldErrors ?? NoFieldErrors };
+
+    /// <summary>The target record is gone (deleted by someone else).</summary>
+    public static ServiceResult NotFound(string error) =>
+        new() { Kind = FailureKind.NotFound, Error = error };
 }
 
 public sealed class ServiceResult<T> : ServiceResult
@@ -26,7 +44,7 @@ public sealed class ServiceResult<T> : ServiceResult
     public static ServiceResult<T> Ok(T value) => new() { Success = true, Value = value };
 
     public static new ServiceResult<T> Fail(string error, IReadOnlyDictionary<string, string>? fieldErrors = null) =>
-        new() { Error = error, FieldErrors = fieldErrors ?? new Dictionary<string, string>() };
+        new() { Kind = FailureKind.Validation, Error = error, FieldErrors = fieldErrors ?? new Dictionary<string, string>() };
 }
 
 internal static class InputValidation

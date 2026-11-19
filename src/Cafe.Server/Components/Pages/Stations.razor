@@ -224,7 +224,7 @@ else
             if (!result.Success)
             {
                 errorMessage = result.Error;
-                if (editingId is not null && result.Error?.Contains("no longer exists") == true)
+                if (editingId is not null && result.Kind == FailureKind.NotFound)
                 {
                     showForm = false;
                     editingId = null;

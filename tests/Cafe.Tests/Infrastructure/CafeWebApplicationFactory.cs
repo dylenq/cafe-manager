@@ -33,6 +33,8 @@ public class CafeWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:Cafe", ConnectionString);
         builder.UseSetting("Cafe:TimeZone", "UTC");
+        // The real-time ticker would interfere with FakeTimeProvider tests; ExtraSettings can turn it back on.
+        builder.UseSetting("Sessions:RunTicker", "false");
         foreach (var (key, value) in ExtraSettings)
         {
             builder.UseSetting(key, value);

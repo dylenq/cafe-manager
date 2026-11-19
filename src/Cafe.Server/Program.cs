@@ -43,6 +43,10 @@ builder.Services.AddScoped<SessionService>();
 builder.Services.AddSingleton<IExpiryActionHandler, LoggingExpiryActionHandler>();
 builder.Services.AddSingleton<ExpiryEvaluator>();
 builder.Services.AddSingleton<IExpiryEvaluator>(sp => sp.GetRequiredService<ExpiryEvaluator>());
+if (SessionTicker.IsEnabled(builder.Configuration))
+{
+    builder.Services.AddHostedService<SessionTicker>();
+}
 
 builder.Services.AddScoped<SessionHistoryService>();
 builder.Services.AddScoped<DashboardService>();

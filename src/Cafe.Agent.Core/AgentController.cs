@@ -491,12 +491,12 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
             _disposed = true;
         }
 
-        await _stop.CancelAsync();
+        await _stop.CancelAsync().ConfigureAwait(false);
         if (_connection is { } connection)
         {
             try
             {
-                await connection.DisposeAsync();
+                await connection.DisposeAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -513,7 +513,7 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
 
             try
             {
-                await loop.WaitAsync(TimeSpan.FromSeconds(5));
+                await loop.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
             }
             catch (Exception)
             {

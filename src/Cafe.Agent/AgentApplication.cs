@@ -127,18 +127,37 @@ internal sealed class AgentApplication : Application
 
         _exiting = true;
         IsExiting = true;
-        try
-        {
-            _controller?.DisposeAsync().AsTask().GetAwaiter().GetResult();
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogWarning("Error while stopping the agent: {Reason}", ex.GetType().Name);
-        }
 
+        // Never block the UI thread on the async dispose (the SignalR callbacks and the dispose continuations would
+        // wait for a thread that is waiting for them). Hide the screens first (queued on the dispatcher, so the
+        // operator sees the unlock at once), then dispose off the dispatcher and shut down back on it.
         _lockScreen?.Hide();
         _warnings?.Hide();
-        _loggerFactory?.Dispose();
-        Shutdown();
+
+        var controller = _controller;
+        var logger = _logger;
+        var loggerFactory = _loggerFactory;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (controller is not null)
+                {
+                    await controller.DisposeAsync().ConfigureAwait(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning("Error while stopping the agent: {Reason}", ex.GetType().Name);
+            }
+            finally
+            {
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    loggerFactory?.Dispose();
+                    Shutdown();
+                }).Task.ConfigureAwait(false);
+            }
+        });
     }
 }

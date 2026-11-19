@@ -41,6 +41,21 @@ internal sealed class AgentApplication : Application
         });
         _logger = _loggerFactory.CreateLogger<AgentApplication>();
 
+        // A fault on a non-UI thread cannot be recovered in-process: .NET ends the process on an unhandled thread-pool
+        // exception, so we log it and rely on the watchdog (the Phase 7 scheduled task restarts the agent when it exits;
+        // the agent locks again on start). Unobserved task exceptions are logged and observed so they never escalate.
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
+            var type = args.ExceptionObject is Exception ex ? ex.GetType().Name : "unknown";
+            var message = args.ExceptionObject is Exception ex2 ? ex2.Message : string.Empty;
+            _logger?.LogCritical("Unhandled exception (terminating: {Terminating}): {Type}: {Message}", args.IsTerminating, type, message);
+        };
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            _logger?.LogError("Unobserved task exception: {Type}: {Message}", args.Exception.GetType().Name, args.Exception.GetBaseException().Message);
+            args.SetObserved();
+        };
+
         DispatcherUnhandledException += (_, args) =>
         {
             _logger.LogError("Unhandled UI error: {Type}: {Message}", args.Exception.GetType().Name, args.Exception.Message);

@@ -32,13 +32,37 @@ internal static class Program
         using var instance = SingleInstance.Acquire();
         if (!instance.IsFirst)
         {
-            // Another agent is already running on this PC.
+            // Fail secure: the mutex alone proves nothing (any process can pre-create it, or the owner may be hung).
+            // Exit only when the running agent answers a ping within 2 s; otherwise take over and show our own lock screen.
             using var provider = new FileLoggerProvider(Path.Combine(AppContext.BaseDirectory, "logs"));
-            provider.CreateLogger("Program").LogWarning("Another agent instance is already running; exiting.");
-            return 3;
+            var logger = provider.CreateLogger("Program");
+            if (SingleInstance.PingExisting(TimeSpan.FromSeconds(2)))
+            {
+                logger.LogWarning("Another agent instance is already running and responsive; exiting.");
+                return 3;
+            }
+
+            logger.LogWarning("The single-instance mutex is taken but no agent answered; taking over.");
         }
 
         var app = new AgentApplication();
+        if (instance.IsFirst)
+        {
+            instance.StartResponder(() =>
+            {
+                // Healthy only when the UI thread (which owns the lock screen) still processes work.
+                try
+                {
+                    app.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Normal, CancellationToken.None, TimeSpan.FromSeconds(1));
+                    return true;
+                }
+                catch (TimeoutException)
+                {
+                    return false;
+                }
+            });
+        }
+
         return app.Run();
     }
 

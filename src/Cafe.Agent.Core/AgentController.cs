@@ -470,7 +470,15 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
         {
             while (await timer.WaitForNextTickAsync(token))
             {
-                Tick();
+                try
+                {
+                    Tick();
+                }
+                catch (Exception ex)
+                {
+                    // A faulting tick must never end the loop (and with it the offline self-lock).
+                    _logger.LogError("Countdown tick failed ({Reason}); continuing.", ex.GetType().Name);
+                }
             }
         }
         catch (OperationCanceledException)

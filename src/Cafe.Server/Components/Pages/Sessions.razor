@@ -1,11 +1,13 @@
 @page "/sessions"
 @attribute [Authorize]
 @using System.Globalization
+@using Cafe.Server.Agents
 @using Cafe.Server.Data
 @using Cafe.Server.Pricing
 @using Cafe.Server.Sessions
 @using Cafe.Server.Stations
 @inject SessionHistoryService History
+@inject AgentCommandLogService CommandLog
 @inject StationService StationSvc
 @inject PricingConfigService Pricing
 @inject ILogger<Sessions> Logger
@@ -26,12 +28,67 @@
     </div>
 </div>
 
+<ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item">
+        <button type="button" role="tab" class="nav-link @(showCommands ? "" : "active")" aria-selected="@((!showCommands).ToString().ToLowerInvariant())"
+                @onclick="ShowSessionsTab">Sessions</button>
+    </li>
+    <li class="nav-item">
+        <button type="button" role="tab" class="nav-link @(showCommands ? "active" : "")" aria-selected="@showCommands.ToString().ToLowerInvariant()"
+                @onclick="ShowCommandsTab">Agent commands</button>
+    </li>
+</ul>
+
 @if (!string.IsNullOrEmpty(errorMessage))
 {
     <div class="alert alert-danger" role="alert">@errorMessage</div>
 }
 
-@if (rows is null)
+@if (showCommands)
+{
+    @if (!string.IsNullOrEmpty(commandsError))
+    {
+        <div class="alert alert-danger d-flex justify-content-between align-items-center" role="alert">
+            <span>@commandsError</span>
+            <button type="button" class="btn btn-sm btn-outline-danger" @onclick="LoadCommandsAsync">Retry</button>
+        </div>
+    }
+    else if (commands is null)
+    {
+        <p>Loading...</p>
+    }
+    else if (commands.Count == 0)
+    {
+        <p class="text-muted">No PC commands have been sent yet.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped align-middle agent-commands-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Station</th>
+                        <th>Command</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in commands)
+                    {
+                        <tr @key="entry.Id">
+                            <td>@Local(entry.AtUtc)</td>
+                            <td>@entry.StationName</td>
+                            <td>@entry.Command</td>
+                            <td>@entry.Details</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+else if (rows is null)
 {
     <p>Loading...</p>
 }
@@ -104,9 +161,16 @@ else
     private readonly HashSet<int> expanded = [];
     private string filterId = string.Empty;
     private string? errorMessage;
+    private bool showCommands;
+    private List<AgentCommandLog>? commands;
+    private string? commandsError;
+
+    // Lets a link or a refresh open straight on the Agent commands tab (/sessions?tab=commands).
+    [SupplyParameterFromQuery(Name = "tab")] public string? Tab { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
+        showCommands = string.Equals(Tab, "commands", StringComparison.OrdinalIgnoreCase);
         try
         {
             stations = await StationSvc.ListAsync();
@@ -117,14 +181,42 @@ else
         }
 
         await LoadAsync();
+        if (showCommands)
+        {
+            await LoadCommandsAsync();
+        }
     }
+
+    private void ShowSessionsTab() => showCommands = false;
+
+    private async Task ShowCommandsTab()
+    {
+        showCommands = true;
+        await LoadCommandsAsync();
+    }
+
+    private async Task LoadCommandsAsync()
+    {
+        try
+        {
+            commands = await CommandLog.ListAsync(SelectedStation());
+            commandsError = null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load the agent command log.");
+            commandsError = "Could not load the agent commands. Try again.";
+        }
+    }
+
+    private int? SelectedStation() =>
+        int.TryParse(filterId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) ? id : null;
 
     private async Task LoadAsync()
     {
         try
         {
-            int? station = int.TryParse(filterId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) ? id : null;
-            rows = await History.GetRecentAsync(station);
+            rows = await History.GetRecentAsync(SelectedStation());
             errorMessage = null;
         }
         catch (Exception ex)
@@ -140,6 +232,10 @@ else
         filterId = e.Value?.ToString() ?? string.Empty;
         expanded.Clear();
         await LoadAsync();
+        if (showCommands)
+        {
+            await LoadCommandsAsync();
+        }
     }
 
     private void Toggle(int sessionId)

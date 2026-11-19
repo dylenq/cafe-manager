@@ -4,6 +4,7 @@
 @implements IAsyncDisposable
 @inject DashboardService Dashboard
 @inject SessionNotifier Notifier
+@inject Cafe.Server.Agents.AgentRegistry AgentRegistry
 @inject ILogger<Home> Logger
 @inject TimeProvider Time
 @inject IJSRuntime Js
@@ -155,12 +156,16 @@ else
             _tickTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
             _tickLoop = TickLoopAsync(_tickTimer, _cts.Token);
             Notifier.Changed += OnSessionChanged;
+            AgentRegistry.Changed += OnAgentChanged;
             _subscribed = true;
         }
     }
 
     // A session mutation committed somewhere: re-fetch at once instead of waiting for the 5-second poll.
     private void OnSessionChanged(int stationId) => _ = RefreshNowAsync();
+
+    // An agent connected or disconnected: PC online/offline shows at once, not after the next 5-second poll.
+    private void OnAgentChanged(string machineId) => _ = RefreshNowAsync();
 
     private readonly LatestWinsGate _gate = new();
 
@@ -249,6 +254,7 @@ else
         if (_subscribed)
         {
             Notifier.Changed -= OnSessionChanged;
+            AgentRegistry.Changed -= OnAgentChanged;
         }
 
         await _cts.CancelAsync();

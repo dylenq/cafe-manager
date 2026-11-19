@@ -10,7 +10,8 @@ public class DashboardService(
     SessionSettingsService settingsService,
     SessionCharges charges,
     Cafe.Server.Pricing.PricingConfigService pricing,
-    TimeProvider time)
+    TimeProvider time,
+    Cafe.Server.Agents.AgentRegistry agents)
 {
     public async Task<List<StationCardModel>> GetCardsAsync(CancellationToken cancellationToken = default)
     {
@@ -51,7 +52,12 @@ public class DashboardService(
                 session = ToModel(entity, settings, now, estimate);
             }
 
-            cards.Add(new StationCardModel(s.Id, s.Name, s.StationType.Name, s.Kind, statusProvider.GetStatus(s, session, now), session));
+            // A PC with a machine id whose agent is not connected: shown even while a session runs (the status then
+            // stays InSession, so the card can add a small secondary indicator).
+            var agentOffline = s.Kind == Cafe.Shared.StationKind.PC
+                && !string.IsNullOrWhiteSpace(s.AgentMachineId)
+                && !agents.IsConnected(s.AgentMachineId);
+            cards.Add(new StationCardModel(s.Id, s.Name, s.StationType.Name, s.Kind, statusProvider.GetStatus(s, session, now), session, agentOffline));
         }
 
         return cards;

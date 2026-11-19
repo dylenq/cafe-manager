@@ -9,7 +9,8 @@ public sealed record StationCardModel(
     string TypeName,
     StationKind Kind,
     StationStatus Status,
-    SessionCardModel? Session = null);
+    SessionCardModel? Session = null,
+    bool AgentOffline = false);
 
 /// <summary>Snapshot of a non-ended session. Live values are derived from these plus the current time.</summary>
 public sealed record SessionCardModel(

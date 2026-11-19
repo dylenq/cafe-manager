@@ -162,17 +162,32 @@ else
     // A session mutation committed somewhere: re-fetch at once instead of waiting for the 5-second poll.
     private void OnSessionChanged(int stationId) => _ = RefreshNowAsync();
 
+    private readonly LatestWinsGate _gate = new();
+
+    // Fetches and applies the cards; a result older than one already applied is dropped (responses can overlap
+    // and arrive out of order, and a pre-mutation fetch must not overwrite a post-mutation one).
+    private async Task FetchAndApplyAsync(CancellationToken token)
+    {
+        var ticket = _gate.Begin();
+        var cards = await Dashboard.GetCardsAsync(token);
+        await InvokeAsync(async () =>
+        {
+            if (!_gate.TryApply(ticket))
+            {
+                return;
+            }
+
+            _cards = cards;
+            _stale = false;
+            await EvaluateAlertsAsync();
+        });
+    }
+
     private async Task RefreshNowAsync()
     {
         try
         {
-            var cards = await Dashboard.GetCardsAsync(_cts.Token);
-            await InvokeAsync(async () =>
-            {
-                _cards = cards;
-                _stale = false;
-                await EvaluateAlertsAsync();
-            });
+            await FetchAndApplyAsync(_cts.Token);
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
         {
@@ -208,13 +223,7 @@ else
             {
                 try
                 {
-                    var cards = await Dashboard.GetCardsAsync(token);
-                    await InvokeAsync(async () =>
-                    {
-                        _cards = cards;
-                        _stale = false;
-                        await EvaluateAlertsAsync();
-                    });
+                    await FetchAndApplyAsync(token);
                 }
                 catch (Exception ex) when (ex is not (OperationCanceledException or ObjectDisposedException))
                 {

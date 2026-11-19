@@ -61,6 +61,22 @@ public class DataModelTests
     }
 
     [Fact]
+    public async Task Agent_machine_ids_are_unique_ignoring_case_but_many_nulls_are_allowed()
+    {
+        using var factory = new CafeWebApplicationFactory();
+        await using var db = await Db(factory).CreateDbContextAsync();
+        var type = new StationType { Name = "PC", HourlyRate = 1m };
+        db.Stations.Add(new Station { Name = "PC-01", StationType = type, AgentMachineId = "Desk-1" });
+        db.Stations.Add(new Station { Name = "TV-01", StationType = type });
+        db.Stations.Add(new Station { Name = "TV-02", StationType = type });
+        await db.SaveChangesAsync();
+
+        await using var db2 = await Db(factory).CreateDbContextAsync();
+        db2.Stations.Add(new Station { Name = "PC-02", StationTypeId = type.Id, AgentMachineId = "desk-1" });
+        await Assert.ThrowsAsync<DbUpdateException>(() => db2.SaveChangesAsync());
+    }
+
+    [Fact]
     public async Task Deleting_a_station_type_with_stations_is_blocked()
     {
         using var factory = new CafeWebApplicationFactory();

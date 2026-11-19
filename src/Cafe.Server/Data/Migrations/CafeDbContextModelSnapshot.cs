@@ -38,7 +38,8 @@ namespace Cafe.Server.Data.Migrations
 
                     b.Property<string>("AgentMachineId")
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("TEXT")
+                        .UseCollation("NOCASE");
 
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("INTEGER");
@@ -71,6 +72,9 @@ namespace Cafe.Server.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AgentMachineId")
+                        .IsUnique();
 
                     b.HasIndex("Name")
                         .IsUnique();

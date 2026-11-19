@@ -32,7 +32,9 @@ public class CafeDbContext(DbContextOptions<CafeDbContext> options) : DbContext(
             e.Property(s => s.Name).IsRequired().HasMaxLength(100).UseCollation("NOCASE");
             e.HasIndex(s => s.Name).IsUnique();
             e.Property(s => s.Kind).HasConversion<int>();
-            e.Property(s => s.AgentMachineId).HasMaxLength(100);
+            e.Property(s => s.AgentMachineId).HasMaxLength(100).UseCollation("NOCASE");
+            // SQLite allows many NULLs in a unique index, so console stations (no agent) are unaffected.
+            e.HasIndex(s => s.AgentMachineId).IsUnique();
             e.Property(s => s.TvIpAddress).HasMaxLength(45);
             e.Property(s => s.TvMacAddress).HasMaxLength(17);
             e.Property(s => s.TvToken).HasMaxLength(200);

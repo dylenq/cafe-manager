@@ -183,6 +183,11 @@ public class StationService(IDbContextFactory<CafeDbContext> dbFactory)
     {
         if (InputValidation.IsUniqueViolation(ex))
         {
+            if (ex.InnerException!.Message.Contains("AgentMachineId", StringComparison.OrdinalIgnoreCase))
+            {
+                return Fail("AgentMachineId", $"Machine ID '{entity.AgentMachineId}' is already used by another station.");
+            }
+
             return Fail("Name", $"A station named '{entity.Name}' already exists.");
         }
 

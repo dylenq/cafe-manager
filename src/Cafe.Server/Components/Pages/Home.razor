@@ -5,6 +5,8 @@
 @inject DashboardService Dashboard
 @inject SessionNotifier Notifier
 @inject ILogger<Home> Logger
+@inject TimeProvider Time
+@inject IJSRuntime Js
 
 <PageTitle>Dashboard</PageTitle>
 
@@ -14,6 +16,8 @@
 {
     <div class="alert alert-warning" role="status">Live data is temporarily out of date. Retrying...</div>
 }
+
+<AlertStrip Alerts="_activeAlerts" Details="_alertDetails" OnAcknowledge="AcknowledgeAsync" />
 
 @foreach (var notice in _notices)
 {
@@ -39,7 +43,7 @@ else
         @foreach (var card in _cards)
         {
             <div class="col" @key="card.StationId">
-                <StationCard Model="card" IdleStations="IdleStations" OnNotice="AddNotice" />
+                <StationCard Model="card" IdleStations="IdleStations" OnNotice="AddNotice" Acknowledged="_tracker.IsAcknowledged(card.StationId)" />
             </div>
         }
     </div>
@@ -64,9 +68,83 @@ else
     private IReadOnlyList<IdleStation> IdleStations =>
         _cards?.Where(c => c.Session is null).Select(c => new IdleStation(c.StationId, c.Name)).ToList() ?? [];
 
+    private readonly AlertTracker _tracker = new();
+    private IReadOnlyList<ActiveAlert> _activeAlerts = [];
+    private IReadOnlyDictionary<int, string> _alertDetails = new Dictionary<int, string>();
+
+    private async Task AcknowledgeAsync(int stationId)
+    {
+        _tracker.Acknowledge(stationId);
+        await EvaluateAlertsAsync();
+    }
+
+    // Recomputes alert levels at "now", updates the strip and beeps once for stations that just entered an alert.
+    private async Task EvaluateAlertsAsync()
+    {
+        if (_cards is not null)
+        {
+            var now = Time.GetUtcNow();
+            var inputs = new List<AlertInput>();
+            var details = new Dictionary<int, string>();
+            foreach (var card in _cards)
+            {
+                if (card.Session is not { } session)
+                {
+                    continue;
+                }
+
+                var level = SessionAlerts.GetLevel(session, now);
+                inputs.Add(new AlertInput(card.StationId, card.Name, level));
+                if (level == AlertLevel.TimeUp)
+                {
+                    details[card.StationId] = session.Status == Cafe.Server.Data.SessionStatus.Grace
+                        ? $"Grace {SessionClock.FormatCountdown(SessionAlerts.GraceRemainingSeconds(session, now))}"
+                        : "Time is up";
+                }
+                else if (level == AlertLevel.Warning && session.PurchasedMinutes is { } minutes)
+                {
+                    var active = SessionClock.ActiveSeconds(session.ClosedActiveSeconds, session.OpenSegmentStartUtc, now);
+                    details[card.StationId] = $"{SessionClock.FormatCountdown(SessionClock.RemainingSeconds(minutes, active))} left";
+                }
+            }
+
+            var update = _tracker.Update(inputs);
+            _activeAlerts = update.ActiveAlerts;
+            _alertDetails = details;
+
+            if (update.NewAlerts.Count > 0 && RendererInfo.IsInteractive)
+            {
+                var kind = update.NewAlerts.Any(a => a.Level == AlertLevel.TimeUp) ? "timeup" : "warning";
+                try
+                {
+                    await Js.InvokeAsync<bool>("cafeAlerts.beep", kind);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogDebug(ex, "Alert beep unavailable.");
+                }
+            }
+        }
+
+        StateHasChanged();
+    }
+
     private void AddNotice(string text) => _notices.Insert(0, new Notice(++_noticeId, text));
 
-    protected override async Task OnInitializedAsync() => _cards = await Dashboard.GetCardsAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        _cards = await Dashboard.GetCardsAsync();
+        UpdateTrackerOnly();
+    }
+
+    // Prerender and first load: establish alert state without sound.
+    private void UpdateTrackerOnly()
+    {
+        var now = Time.GetUtcNow();
+        var update = _tracker.Update((_cards ?? []).Where(c => c.Session is not null)
+            .Select(c => new AlertInput(c.StationId, c.Name, SessionAlerts.GetLevel(c.Session!, now))));
+        _activeAlerts = update.ActiveAlerts;
+    }
 
     protected override void OnAfterRender(bool firstRender)
     {
@@ -89,11 +167,11 @@ else
         try
         {
             var cards = await Dashboard.GetCardsAsync(_cts.Token);
-            await InvokeAsync(() =>
+            await InvokeAsync(async () =>
             {
                 _cards = cards;
                 _stale = false;
-                StateHasChanged();
+                await EvaluateAlertsAsync();
             });
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
@@ -113,7 +191,7 @@ else
         {
             while (await timer.WaitForNextTickAsync(token))
             {
-                await InvokeAsync(StateHasChanged);
+                await InvokeAsync(EvaluateAlertsAsync);
             }
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
@@ -131,11 +209,11 @@ else
                 try
                 {
                     var cards = await Dashboard.GetCardsAsync(token);
-                    await InvokeAsync(() =>
+                    await InvokeAsync(async () =>
                     {
                         _cards = cards;
                         _stale = false;
-                        StateHasChanged();
+                        await EvaluateAlertsAsync();
                     });
                 }
                 catch (Exception ex) when (ex is not (OperationCanceledException or ObjectDisposedException))

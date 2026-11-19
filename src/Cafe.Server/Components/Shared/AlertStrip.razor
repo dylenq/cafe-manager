@@ -1,0 +1,36 @@
+@using Cafe.Server.Dashboard
+
+@if (Alerts.Count > 0)
+{
+    <div class="alert-strip" role="alert" aria-live="polite">
+        @foreach (var alert in Alerts)
+        {
+            <div class="alert-strip-row d-flex align-items-center justify-content-between gap-2 @(alert.Acknowledged ? "alert-strip-ack" : "alert-pulse-box")" @key="alert.StationId">
+                <div>
+                    <strong>@alert.StationName</strong>
+                    <span class="ms-2">@(alert.Level == AlertLevel.TimeUp ? "TIME UP" : "Expiring")</span>
+                    @if (Details.TryGetValue(alert.StationId, out var detail))
+                    {
+                        <span class="ms-2">@detail</span>
+                    }
+                </div>
+                @if (alert.Acknowledged)
+                {
+                    <span class="small">Acknowledged</span>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-sm btn-light" @onclick="() => OnAcknowledge.InvokeAsync(alert.StationId)">Acknowledge</button>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ActiveAlert> Alerts { get; set; } = [];
+
+    [Parameter] public IReadOnlyDictionary<int, string> Details { get; set; } = new Dictionary<int, string>();
+
+    [Parameter] public EventCallback<int> OnAcknowledge { get; set; }
+}

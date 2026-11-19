@@ -17,7 +17,7 @@ public class DashboardSessionCardsTests : SessionTestBase
     /// <summary>The slice of the page from the station's name to the next card (or end).</summary>
     private static string Card(string html, string name)
     {
-        var start = html.IndexOf($">{name}<", StringComparison.Ordinal);
+        var start = html.IndexOf($">{name}</h2>", StringComparison.Ordinal);
         Assert.True(start >= 0, $"{name} card not found");
         var next = html.IndexOf("station-card", start, StringComparison.Ordinal);
         return next < 0 ? html[start..] : html[start..next];

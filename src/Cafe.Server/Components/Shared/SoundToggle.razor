@@ -1,0 +1,65 @@
+@inject IJSRuntime Js
+@inject ILogger<SoundToggle> Logger
+
+<div class="sound-toggle">
+    @if (!_unlocked)
+    {
+        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="UnlockAsync">Enable sound</button>
+    }
+    else
+    {
+        <button type="button" class="btn btn-sm @(_muted ? "btn-outline-secondary" : "btn-outline-success")"
+                aria-pressed="@_muted.ToString().ToLowerInvariant()" @onclick="ToggleMuteAsync">@(_muted ? "Unmute" : "Mute")</button>
+    }
+</div>
+
+@code {
+    private bool _unlocked;
+    private bool _muted;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !RendererInfo.IsInteractive)
+        {
+            return;
+        }
+
+        try
+        {
+            _muted = await Js.InvokeAsync<bool>("cafeAlerts.isMuted");
+            _unlocked = await Js.InvokeAsync<bool>("cafeAlerts.isUnlocked");
+            StateHasChanged();
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or InvalidOperationException or JSException or OperationCanceledException)
+        {
+            Logger.LogDebug(ex, "Sound state unavailable.");
+        }
+    }
+
+    // The click is the user gesture the browser needs before it allows audio.
+    private async Task UnlockAsync()
+    {
+        try
+        {
+            _unlocked = await Js.InvokeAsync<bool>("cafeAlerts.unlock");
+            _muted = await Js.InvokeAsync<bool>("cafeAlerts.isMuted");
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or InvalidOperationException or JSException or OperationCanceledException)
+        {
+            Logger.LogDebug(ex, "Could not unlock sound.");
+        }
+    }
+
+    private async Task ToggleMuteAsync()
+    {
+        try
+        {
+            _muted = !_muted;
+            await Js.InvokeVoidAsync("cafeAlerts.setMuted", _muted);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or InvalidOperationException or JSException or OperationCanceledException)
+        {
+            Logger.LogDebug(ex, "Could not change mute.");
+        }
+    }
+}

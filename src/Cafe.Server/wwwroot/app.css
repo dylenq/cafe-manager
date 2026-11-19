@@ -68,3 +68,37 @@ h1:focus {
 .station-card.station-paused { border-left-color: #ffc107; }
 .station-card.station-expiring { border-left-color: #dc3545; }
 .station-card.station-offline { border-left-color: #212529; }
+
+/* Desk alerts: pulsing red for expiring and time-up stations */
+.alert-strip {
+    margin-bottom: 1rem;
+}
+
+.alert-strip-row {
+    background-color: #dc3545;
+    color: #fff;
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.35rem;
+}
+
+.alert-strip-row.alert-strip-ack {
+    background-color: #6c757d;
+}
+
+.alert-pulse-box,
+.alert-pulse {
+    animation: alert-pulse 1s ease-in-out infinite;
+}
+
+@keyframes alert-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .alert-pulse-box,
+    .alert-pulse {
+        animation: none;
+    }
+}

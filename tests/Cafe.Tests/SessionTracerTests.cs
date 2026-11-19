@@ -199,12 +199,12 @@ public class SessionTracerTests : IDisposable
         Assert.Contains(">Stop<", busyCard);
         Assert.Contains("In session", busyCard);
         var idleCard = Slice(body, "PC-02");
-        Assert.Contains("Start 60 min", idleCard);
+        Assert.Contains("Start open-ended", idleCard);
     }
 
     private static string Slice(string html, string name)
     {
-        var start = html.IndexOf($">{name}<", StringComparison.Ordinal);
+        var start = html.IndexOf($">{name}</h2>", StringComparison.Ordinal);
         Assert.True(start >= 0, $"{name} card not found");
         var next = html.IndexOf("station-card", start, StringComparison.Ordinal);
         return next < 0 ? html[start..] : html[start..next];

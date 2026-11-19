@@ -82,6 +82,30 @@
             </div>
         }
 
+        @if (_conflicts.Count > 0)
+        {
+            <div class="alert alert-warning mt-4" role="alert" id="agent-conflicts">
+                <h3 class="h6">Machine ID conflicts</h3>
+                <p class="mb-2">
+                    Another PC tried to connect with a Machine ID that is already in use. The first connection was kept and
+                    the newcomer was refused. This usually means a cloned Windows image: give each PC its own
+                    <code>MachineId</code> in <code>agentsettings.json</code>.
+                </p>
+                <ul class="mb-0">
+                    @foreach (var conflict in _conflicts)
+                    {
+                        <li @key="conflict.MachineId">
+                            <strong>@conflict.MachineId</strong>: @conflict.Attempts refused attempt(s), last @FormatLocal(conflict.LastAtUtc)
+                            @if (!string.IsNullOrEmpty(conflict.RemoteAddress))
+                            {
+                                <span>from @conflict.RemoteAddress</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
         <h3 class="h6 mt-4">Unregistered agents</h3>
         @if (_unregistered.Count == 0)
         {
@@ -167,6 +191,7 @@
     private readonly Dictionary<string, RowState> _rows = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<ConnectedAgent> _connected = [];
     private IReadOnlyList<AgentConnectionInfo> _unregistered = [];
+    private IReadOnlyList<AgentConflictInfo> _conflicts = [];
     private IReadOnlyList<StationType> _types = [];
     private IReadOnlyList<Station> _pcStations = [];
     private string _key = string.Empty;
@@ -218,6 +243,7 @@
         {
             _connected = await Admin.GetConnectedAsync();
             _unregistered = await Admin.GetUnregisteredAsync();
+            _conflicts = Admin.GetConflicts();
             _pcStations = await Admin.ListPcStationsAsync();
             _types = await TypeSvc.ListAsync();
         }

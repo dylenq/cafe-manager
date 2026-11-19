@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace Cafe.Server.Agents;
 
-public sealed class AgentHub(AgentRegistry registry, AgentCommandService commands) : Hub<IAgentClient>
+public sealed class AgentHub(AgentRegistry registry, AgentCommandService commands, ILogger<AgentHub> logger) : Hub<IAgentClient>
 {
     public override async Task OnConnectedAsync()
     {
@@ -16,8 +16,18 @@ public sealed class AgentHub(AgentRegistry registry, AgentCommandService command
         }
 
         var version = http?.Request.Headers[AgentProtocol.VersionHeader].FirstOrDefault() ?? string.Empty;
+        var remote = http?.Connection.RemoteIpAddress?.ToString();
+        if (!registry.Register(machineId, Context.ConnectionId, version, Context.Abort, remote))
+        {
+            // First connection wins: refuse the newcomer so it cannot displace or impersonate the live agent.
+            logger.LogWarning(
+                "Rejected a second connection for machine id {MachineId} from {Remote}: that machine id is already connected.",
+                machineId, remote ?? "unknown");
+            Context.Abort();
+            return;
+        }
+
         Context.Items["machineId"] = machineId;
-        registry.Register(machineId, Context.ConnectionId, version, Context.Abort);
         await base.OnConnectedAsync();
         await commands.PushStateAsync(machineId);
     }

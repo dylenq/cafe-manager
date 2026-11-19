@@ -119,6 +119,9 @@ public sealed class AgentAdminService(
             .ToList();
     }
 
+    /// <summary>Refused duplicate connections (two PCs claiming the same machine id), for the /settings warning.</summary>
+    public IReadOnlyList<AgentConflictInfo> GetConflicts() => registry.Conflicts();
+
     public async Task<IReadOnlyList<AgentConnectionInfo>> GetUnregisteredAsync(CancellationToken cancellationToken = default)
     {
         var stations = await LoadStationsAsync(cancellationToken);

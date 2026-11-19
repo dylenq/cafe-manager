@@ -7,41 +7,57 @@ public sealed record AgentConnectionInfo(
     DateTimeOffset ConnectedAtUtc,
     DateTimeOffset LastSeenUtc);
 
-/// <summary>Live map of machine id to agent connection. Keys are case-insensitive; the newest connection wins.</summary>
+/// <summary>A connection that was refused because its machine id is already connected (cloned install or rogue client).</summary>
+public sealed record AgentConflictInfo(
+    string MachineId,
+    string RejectedConnectionId,
+    string? RemoteAddress,
+    int Attempts,
+    DateTimeOffset FirstAtUtc,
+    DateTimeOffset LastAtUtc);
+
+/// <summary>
+/// Live map of machine id to agent connection. Keys are case-insensitive; the FIRST connection wins and a second
+/// connection with the same machine id is refused and recorded as a conflict (shown in /settings). A clone or a
+/// rogue client holding the shared key therefore cannot displace or impersonate the legitimate agent. A genuinely
+/// dead first connection (half-open TCP) is dropped by the SignalR keep-alive timeout, after which the real agent's
+/// backed-off retry gets in.
+/// </summary>
 public sealed class AgentRegistry(TimeProvider time, ILogger<AgentRegistry>? logger = null)
 {
     private sealed record Entry(AgentConnectionInfo Info, Action Abort);
 
     private readonly object _gate = new();
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, AgentConflictInfo> _conflicts = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Raised after a connect or disconnect with the machine id.</summary>
+    /// <summary>Raised after a connect, disconnect or refused duplicate with the machine id.</summary>
     public event Action<string>? Changed;
 
-    public void Register(string machineId, string connectionId, string version, Action abort)
+    /// <summary>Registers the connection; false when the machine id is already connected (the caller must abort the newcomer).</summary>
+    public bool Register(string machineId, string connectionId, string version, Action abort, string? remoteAddress = null)
     {
-        Entry? replaced;
+        bool accepted;
         lock (_gate)
         {
-            _entries.TryGetValue(machineId, out replaced);
             var now = time.GetUtcNow();
-            _entries[machineId] = new Entry(new AgentConnectionInfo(machineId, connectionId, version, now, now), abort);
-        }
-
-        if (replaced is not null)
-        {
-            // The replaced connection's late disconnect is ignored by Unregister (connection id no longer matches).
-            try
+            if (_entries.ContainsKey(machineId))
             {
-                replaced.Abort();
+                _conflicts.TryGetValue(machineId, out var previous);
+                _conflicts[machineId] = new AgentConflictInfo(
+                    machineId, connectionId, remoteAddress, (previous?.Attempts ?? 0) + 1, previous?.FirstAtUtc ?? now, now);
+                accepted = false;
             }
-            catch
+            else
             {
-                // Already gone.
+                _entries[machineId] = new Entry(new AgentConnectionInfo(machineId, connectionId, version, now, now), abort);
+                _conflicts.Remove(machineId);
+                accepted = true;
             }
         }
 
         RaiseChanged(machineId);
+        return accepted;
     }
 
     /// <summary>
@@ -80,6 +96,7 @@ public sealed class AgentRegistry(TimeProvider time, ILogger<AgentRegistry>? log
             }
 
             _entries.Remove(machineId);
+            _conflicts.Remove(machineId);
         }
 
         RaiseChanged(machineId);
@@ -128,6 +145,15 @@ public sealed class AgentRegistry(TimeProvider time, ILogger<AgentRegistry>? log
 
         connectionId = string.Empty;
         return false;
+    }
+
+    /// <summary>Machine ids that currently have a refused duplicate connection, newest first.</summary>
+    public IReadOnlyList<AgentConflictInfo> Conflicts()
+    {
+        lock (_gate)
+        {
+            return _conflicts.Values.OrderByDescending(c => c.LastAtUtc).ToList();
+        }
     }
 
     public IReadOnlyList<AgentConnectionInfo> Snapshot()

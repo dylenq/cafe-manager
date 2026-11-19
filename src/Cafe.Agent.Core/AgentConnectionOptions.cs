@@ -20,4 +20,10 @@ public sealed class AgentConnectionOptions
     public Action<HttpConnectionOptions>? ConfigureHttp { get; set; }
 
     public IReadOnlyList<TimeSpan>? ReconnectDelays { get; set; }
+
+    /// <summary>
+    /// A connection that stays up at least this long counts as stable: only then does the reconnect backoff start over.
+    /// A connection that is closed again at once (for example refused as a duplicate machine id) keeps the backoff growing.
+    /// </summary>
+    public TimeSpan StableConnectionThreshold { get; set; } = TimeSpan.FromSeconds(30);
 }

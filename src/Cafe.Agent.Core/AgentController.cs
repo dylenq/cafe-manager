@@ -37,6 +37,10 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
     private long _warningThresholdSeconds;
     private bool _emergency;
 
+    // Reconnect backoff, guarded by _gate. The attempt index only resets after a connection proved stable.
+    private int _attempt;
+    private long _connectedAtMono;
+
     public AgentController(
         AgentConnectionOptions options,
         ILockScreen lockScreen,
@@ -431,9 +435,11 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
         HandleDisconnected();
         if (!_stop.IsCancellationRequested)
         {
-            _logger.LogWarning("Connection to the server closed; reconnecting.");
             lock (_gate)
             {
+                var upFor = TimeSpan.FromMilliseconds(Math.Max(0, _clock.MonotonicMilliseconds - _connectedAtMono));
+                _attempt = upFor >= _options.StableConnectionThreshold ? 0 : _attempt + 1;
+                _logger.LogWarning("Connection to the server closed after {Seconds} s; reconnecting (attempt {Attempt}).", (int)upFor.TotalSeconds, _attempt);
                 _connectLoop = Task.Run(() => ConnectLoopAsync(_stop.Token));
             }
         }
@@ -443,10 +449,16 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
 
     private async Task ConnectLoopAsync(CancellationToken token)
     {
-        for (var attempt = 0; !token.IsCancellationRequested; attempt++)
+        while (!token.IsCancellationRequested)
         {
             try
             {
+                int attempt;
+                lock (_gate)
+                {
+                    attempt = _attempt;
+                }
+
                 var delay = AgentRetryPolicy.DelayFor(attempt, _options.ReconnectDelays);
                 if (delay > TimeSpan.Zero)
                 {
@@ -454,6 +466,11 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
                 }
 
                 await _connection!.StartAsync(token);
+                lock (_gate)
+                {
+                    _connectedAtMono = _clock.MonotonicMilliseconds;
+                }
+
                 HandleConnected();
                 return;
             }
@@ -464,6 +481,10 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
             catch (Exception ex)
             {
                 _logger.LogWarning("Could not reach the server ({Reason}); retrying.", ex.GetType().Name);
+                lock (_gate)
+                {
+                    _attempt++;
+                }
             }
         }
     }

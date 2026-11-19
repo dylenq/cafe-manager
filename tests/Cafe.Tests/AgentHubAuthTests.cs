@@ -109,7 +109,7 @@ public class AgentHubAuthTests : AgentTestBase
     }
 
     [Fact]
-    public async Task Newest_connection_with_the_same_machine_id_wins()
+    public async Task First_connection_with_a_machine_id_wins_and_the_duplicate_is_refused_and_recorded()
     {
         var key = await KeyAsync();
         var registry = Factory.Services.GetRequiredService<AgentRegistry>();
@@ -121,13 +121,64 @@ public class AgentHubAuthTests : AgentTestBase
         await using var second = new RecordingAgentClient(Factory, key, "PC-01");
         await second.StartAsync();
 
-        await WaitUntilAsync(() => first.IsClosed, "first aborted");
-        var current = Assert.Single(registry.Snapshot());
-        Assert.NotEqual(firstId, current.ConnectionId);
-        // The late disconnect of the replaced connection must not have removed the newest entry.
+        await WaitUntilAsync(() => second.IsClosed, "duplicate refused");
+        await WaitUntilAsync(() => registry.Conflicts().Count == 1, "conflict recorded");
+        Assert.False(first.IsClosed);
+        Assert.Equal(firstId, Assert.Single(registry.Snapshot()).ConnectionId);
+        Assert.Equal(1, Assert.Single(registry.Conflicts()).Attempts);
+        // The late disconnect of the refused connection must not have removed the live entry.
         await Task.Delay(200);
-        Assert.True(registry.IsConnected("pc-01"));
-        Assert.Equal(current.ConnectionId, Assert.Single(registry.Snapshot()).ConnectionId);
+        Assert.Equal(firstId, Assert.Single(registry.Snapshot()).ConnectionId);
+    }
+
+    [Fact]
+    public async Task Conflict_is_cleared_when_the_live_agent_disconnects()
+    {
+        var key = await KeyAsync();
+        var registry = Factory.Services.GetRequiredService<AgentRegistry>();
+        var first = new RecordingAgentClient(Factory, key, "pc-01");
+        await first.StartAsync();
+        await WaitUntilAsync(() => registry.IsConnected("pc-01"), "first connected");
+        await using var second = new RecordingAgentClient(Factory, key, "pc-01");
+        await second.StartAsync();
+        await WaitUntilAsync(() => registry.Conflicts().Count == 1, "conflict recorded");
+
+        await first.DisposeAsync();
+
+        await WaitUntilAsync(() => !registry.IsConnected("pc-01") && registry.Conflicts().Count == 0, "conflict cleared");
+    }
+
+    [Fact]
+    public async Task Duplicate_agent_backs_off_instead_of_reconnecting_in_a_storm()
+    {
+        var key = await KeyAsync();
+        var registry = Factory.Services.GetRequiredService<AgentRegistry>();
+        await using var first = new RecordingAgentClient(Factory, key, "pc-01");
+        await first.StartAsync();
+        await WaitUntilAsync(() => registry.IsConnected("pc-01"), "first connected");
+
+        var controller = new AgentController(
+            new AgentConnectionOptions
+            {
+                ServerUrl = "http://localhost", SharedKey = key, MachineId = "pc-01",
+                ReconnectDelays = [TimeSpan.Zero, TimeSpan.FromMilliseconds(400), TimeSpan.FromMilliseconds(800), TimeSpan.FromMilliseconds(1600)],
+                ConfigureHttp = o =>
+                {
+                    o.HttpMessageHandlerFactory = _ => Factory.Server.CreateHandler();
+                    o.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.LongPolling;
+                },
+            },
+            new FakeLockScreen(), new FakeWarningDisplay(), new FakePowerControl(), new Cafe.Agent.Core.SystemAgentClock(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<AgentController>.Instance);
+        await using (controller)
+        {
+            await controller.StartAsync();
+            await Task.Delay(1500);
+
+            var attempts = Assert.Single(registry.Conflicts()).Attempts;
+            Assert.InRange(attempts, 2, 4); // 0 ms, ~400 ms, ~1.2 s; a zero-delay storm would be dozens.
+            Assert.False(first.IsClosed);
+        }
     }
 
     [Fact]

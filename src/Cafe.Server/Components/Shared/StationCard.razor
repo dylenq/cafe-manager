@@ -1,0 +1,17 @@
+@using Cafe.Server.Dashboard
+@using Cafe.Shared
+
+<div class="card h-100 station-card station-@Model.Status.ToString().ToLowerInvariant()">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+            <h2 class="card-title h5 mb-1">@Model.Name</h2>
+            <StatusBadge Status="Model.Status" />
+        </div>
+        <div class="text-muted small mb-2">@Model.TypeName</div>
+        <span class="badge rounded-pill text-bg-light border">@(Model.Kind == StationKind.PC ? "PC" : "Console")</span>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public StationCardModel Model { get; set; } = null!;
+}

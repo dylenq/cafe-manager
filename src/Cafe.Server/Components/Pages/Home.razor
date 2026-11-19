@@ -1,7 +1,88 @@
-﻿@page "/"
+@page "/"
+@using Cafe.Server.Dashboard
+@implements IAsyncDisposable
+@inject DashboardService Dashboard
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Dashboard</PageTitle>
 
-<h1>Hello, world!</h1>
+<h1 class="h3 mb-3">Dashboard</h1>
 
-Welcome to your new app.
+@if (_cards is null)
+{
+    <p>Loading...</p>
+}
+else if (_cards.Count == 0)
+{
+    <div class="alert alert-info">
+        No stations yet. Set up <a href="/station-types">station types</a> and then <a href="/stations">stations</a>.
+    </div>
+}
+else
+{
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-4 g-3">
+        @foreach (var card in _cards)
+        {
+            <div class="col" @key="card.StationId">
+                <StationCard Model="card" />
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(5);
+
+    private readonly CancellationTokenSource _cts = new();
+    private PeriodicTimer? _timer;
+    private Task? _loop;
+    private List<StationCardModel>? _cards;
+
+    protected override async Task OnInitializedAsync() => _cards = await Dashboard.GetCardsAsync();
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && RendererInfo.IsInteractive)
+        {
+            _timer = new PeriodicTimer(RefreshInterval);
+            _loop = RefreshLoopAsync(_timer, _cts.Token);
+        }
+    }
+
+    private async Task RefreshLoopAsync(PeriodicTimer timer, CancellationToken token)
+    {
+        try
+        {
+            while (await timer.WaitForNextTickAsync(token))
+            {
+                var cards = await Dashboard.GetCardsAsync(token);
+                await InvokeAsync(() =>
+                {
+                    _cards = cards;
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+        {
+            // Page left or circuit ended.
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _cts.CancelAsync();
+        if (_loop is not null)
+        {
+            try
+            {
+                await _loop;
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+            {
+            }
+        }
+
+        _timer?.Dispose();
+        _cts.Dispose();
+    }
+}

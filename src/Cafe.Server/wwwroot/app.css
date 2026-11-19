@@ -58,3 +58,13 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+/* Dashboard station cards: left border colored by status */
+.station-card {
+    border-left: 0.35rem solid #6c757d;
+}
+
+.station-card.station-idle { border-left-color: #6c757d; }
+.station-card.station-insession { border-left-color: #198754; }
+.station-card.station-paused { border-left-color: #ffc107; }
+.station-card.station-expiring { border-left-color: #dc3545; }
+.station-card.station-offline { border-left-color: #212529; }

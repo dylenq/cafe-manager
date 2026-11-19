@@ -1,0 +1,27 @@
+@using Cafe.Shared
+
+<span class="badge @Style">@Text</span>
+
+@code {
+    [Parameter, EditorRequired] public StationStatus Status { get; set; }
+
+    private string Style => Status switch
+    {
+        StationStatus.Idle => "text-bg-secondary",
+        StationStatus.InSession => "text-bg-success",
+        StationStatus.Paused => "text-bg-warning",
+        StationStatus.Expiring => "text-bg-danger",
+        StationStatus.Offline => "text-bg-dark",
+        _ => "text-bg-light border",
+    };
+
+    private string Text => Status switch
+    {
+        StationStatus.Idle => "Idle",
+        StationStatus.InSession => "In session",
+        StationStatus.Paused => "Paused",
+        StationStatus.Expiring => "Expiring",
+        StationStatus.Offline => "Offline",
+        _ => Status.ToString(),
+    };
+}

@@ -17,6 +17,40 @@ namespace Cafe.Server.Data.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.15");
 
+            modelBuilder.Entity("Cafe.Server.Data.AgentCommandLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("AtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Command")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Details")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("StationId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("StationName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AtUtc");
+
+                    b.HasIndex("StationId");
+
+                    b.ToTable("AgentCommandLogs");
+                });
+
             modelBuilder.Entity("Cafe.Server.Data.RateRule", b =>
                 {
                     b.Property<int>("Id")

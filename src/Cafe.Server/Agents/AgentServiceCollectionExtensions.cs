@@ -11,6 +11,8 @@ public static class AgentServiceCollectionExtensions
         services.AddSingleton<AgentSettingsService>();
         services.AddSingleton<AgentAdminService>();
         services.AddSingleton<AgentCommandService>();
+        services.AddSingleton<AgentRemoteControlService>();
+        services.AddSingleton<AgentCommandLogService>();
         services.AddSingleton<ISessionEventSink>(sp => sp.GetRequiredService<AgentCommandService>());
         services.AddSingleton<IExpiryActionHandler, PcLockExpiryActionHandler>();
         services.AddSingleton<SessionSignalPublisher>();

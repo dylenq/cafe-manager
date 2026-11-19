@@ -18,6 +18,8 @@ public class CafeDbContext(DbContextOptions<CafeDbContext> options) : DbContext(
 
     public DbSet<RateRule> RateRules => Set<RateRule>();
 
+    public DbSet<AgentCommandLog> AgentCommandLogs => Set<AgentCommandLog>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Setting>(e =>
@@ -91,6 +93,16 @@ public class CafeDbContext(DbContextOptions<CafeDbContext> options) : DbContext(
             e.Property(x => x.AtUtc).HasConversion(dto);
             e.Property(x => x.Details).IsRequired().HasMaxLength(300);
             e.HasIndex(x => new { x.SessionId, x.AtUtc });
+        });
+
+        modelBuilder.Entity<AgentCommandLog>(e =>
+        {
+            e.Property(x => x.StationName).IsRequired().HasMaxLength(100);
+            e.Property(x => x.Command).HasConversion<int>();
+            e.Property(x => x.AtUtc).HasConversion(dto);
+            e.Property(x => x.Details).IsRequired().HasMaxLength(300);
+            e.HasIndex(x => x.AtUtc);
+            e.HasIndex(x => x.StationId);
         });
 
         modelBuilder.Entity<RateRule>(e =>

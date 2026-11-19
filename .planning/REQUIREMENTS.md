@@ -27,7 +27,7 @@
 
 ### Pricing
 
-- [ ] **PRIC-01**: Session cost uses the station type's hourly rate
+- [x] **PRIC-01**: Session cost uses the station type's hourly rate
 - [ ] **PRIC-02**: Staff can define time-of-day/day-of-week rate rules (e.g. happy hour), and costs split correctly across rule boundaries
 - [ ] **PRIC-03**: Members get member pricing (separate rate or discount) and guests pay the guest rate
 
@@ -112,7 +112,7 @@
 | SESS-08 | Phase 2 | Pending |
 | SESS-09 | Phase 2 | Pending |
 | SESS-10 | Phase 2 | Pending |
-| PRIC-01 | Phase 2 | Pending |
+| PRIC-01 | Phase 2 | Complete |
 | PRIC-02 | Phase 2 | Pending |
 | AGNT-01 | Phase 3 | Pending |
 | AGNT-02 | Phase 3 | Pending |

@@ -50,6 +50,12 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
   5. Every session action (start, pause, resume, extend, move, stop, expire) appears in an audit trail
 
 **Plans**: TBD
+- [x] 02-01-PLAN.md
+- [ ] 02-02-PLAN.md
+- [ ] 02-03-PLAN.md
+- [ ] 02-04-PLAN.md
+- [ ] 02-05-PLAN.md
+
 **UI hint**: yes
 
 ### Phase 3: PC Agent
@@ -132,7 +138,7 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 4/4 | In Progress | - |
-| 2. Session Engine & Pricing | 0/TBD | Not started | - |
+| 2. Session Engine & Pricing | 1/5 | In Progress | - |
 | 3. PC Agent | 0/TBD | Not started | - |
 | 4. Samsung TV Control | 0/TBD | Not started | - |
 | 5. Customers & Packages | 0/TBD | Not started | - |

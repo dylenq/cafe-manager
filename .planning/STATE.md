@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: Session Engine & Pricing
 status: executing
-stopped_at: Completed 01-04-PLAN.md
-last_updated: "2026-11-19T19:15:10.850Z"
-last_activity: 2026-11-19
-last_activity_desc: Phase 1 execution started
-state_head: 72a7d775efd27e833c932cc96f2b34d04338e7bf
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-11-19T19:23:56.337Z"
+last_activity: 2026-11-20
+last_activity_desc: Phase 2 execution started
+state_head: f455afff38c2b0aab9078e28fe91bb691f1b0fa0
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 9
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** Staff can start a timed session on any station, and that station reliably stops being usable when the paid time runs out: the PC locks or the TV powers off.
-**Current focus:** Phase 1 — Foundation
+**Current focus:** Phase 2 — Session Engine & Pricing
 
 ## Current Position
 
-Phase: 2 (Session Engine & Pricing) — READY TO EXECUTE
-Plan: 4 of 4
+Phase: 2 (Session Engine & Pricing) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-11-19 — Phase 1 execution started
+Last activity: 2026-11-20 — Phase 2 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P02 | 25 min | 3 tasks | 14 files |
 | Phase 1 P03 | 20 min | 3 tasks | 11 files |
 | Phase 1 P04 | 15 min | 3 tasks | 13 files |
+| Phase 2 P01 | 40min | 2 tasks | 32 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,7 @@ Recent decisions affecting current work:
 - [Phase 01]: Anonymous pages bypass [Authorize] from _Imports via [AllowAnonymous]; AuthorizeRouteView needs Components.Authorization using
 - [Phase 1]: Station form regexes allow empty/whitespace; services trim to null and re-validate with DataAnnotations
 - [Phase 1]: 01-04: Dashboard name ordering relies on Station.Name NOCASE collation; refresh timer starts only when interactive
+- [Phase 2]: 02-01: adjacent pricing slices with same type/rate/rule merge into one window; round-up pads 60-remainder seconds
 
 ### Pending Todos
 
@@ -95,6 +97,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-19T18:25:08.534Z
-Stopped at: Completed 01-04-PLAN.md
+Last session: 2026-11-19T19:23:56.324Z
+Stopped at: Completed 02-01-PLAN.md
 Resume file: None

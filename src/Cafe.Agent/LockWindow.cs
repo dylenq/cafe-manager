@@ -77,6 +77,12 @@ internal sealed class LockWindow : Window
     /// <summary>Set while the emergency dialog is open so it is not fought for focus.</summary>
     public static bool SuppressReactivation { get; set; }
 
+    /// <summary>
+    /// Only the primary window takes focus back after losing it. Secondary monitor windows never re-activate, so two
+    /// windows cannot hand activation back and forth in an endless loop.
+    /// </summary>
+    public bool IsPrimary { get; set; }
+
     public void Update(LockInfo info)
     {
         _cafe.Text = info.CafeName;
@@ -112,18 +118,26 @@ internal sealed class LockWindow : Window
 
     private void OnDeactivated(object? sender, EventArgs e)
     {
-        if (_allowClose || AgentApplication.IsExiting || SuppressReactivation)
+        if (!IsPrimary || _allowClose || AgentApplication.IsExiting || SuppressReactivation)
         {
             return;
         }
 
         Dispatcher.BeginInvoke(() =>
         {
-            if (!_allowClose && !AgentApplication.IsExiting && !SuppressReactivation)
+            if (_allowClose || AgentApplication.IsExiting || SuppressReactivation)
             {
-                Topmost = true;
-                Activate();
+                return;
             }
+
+            // Another lock window (a secondary monitor) already has focus: leave it, otherwise the two would fight.
+            if (Application.Current?.Windows.OfType<LockWindow>().Any(w => w.IsActive) == true)
+            {
+                return;
+            }
+
+            Topmost = true;
+            Activate();
         });
     }
 

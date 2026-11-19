@@ -98,7 +98,7 @@ internal sealed class WpfLockScreen : ILockScreen
 
         foreach (var monitor in monitors)
         {
-            var window = new LockWindow(monitor, info);
+            var window = new LockWindow(monitor, info) { IsPrimary = _windows.Count == 0 };
             window.EmergencyRequested += OnEmergencyRequested;
             _windows.Add(window);
             window.Show();

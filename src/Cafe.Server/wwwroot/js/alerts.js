@@ -45,22 +45,22 @@
         return !!ctx && ctx.state === 'running';
     }
 
-    // Must be called from a user gesture (click) so the browser lets audio start.
+    // Must be called from a user gesture (click) so the browser lets audio start. Returns a promise that
+    // resolves to whether the context is running once resume() has settled.
     function unlock() {
         try {
             var c = getContext();
             if (!c) {
-                return false;
+                return Promise.resolve(false);
             }
-            if (c.state !== 'running') {
-                var p = c.resume();
-                if (p && typeof p.catch === 'function') {
-                    p.catch(function () { });
-                }
+            if (c.state === 'running') {
+                return Promise.resolve(true);
             }
-            return c.state === 'running';
+            return Promise.resolve(c.resume())
+                .then(function () { return c.state === 'running'; })
+                .catch(function () { return false; });
         } catch (e) {
-            return false;
+            return Promise.resolve(false);
         }
     }
 

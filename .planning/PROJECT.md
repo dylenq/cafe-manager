@@ -69,7 +69,7 @@ Staff can start a timed session on any station, and that station reliably stops 
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| .NET 10 for server and agent | User's preference; native Windows integration | — Pending |
+| .NET 10 LTS for server and agent, published self-contained | User's preference; LTS to Nov 2028; self-contained means no runtime install on cafe PCs | — Pending |
 | Blazor web admin UI served by the local server | Usable from desk PC, tablet or phone on cafe Wi-Fi | — Pending |
 | SQLite database | Zero-admin, single local server, small scale | — Pending |
 | SignalR for server ↔ PC agent | Real-time push, auto-reconnect, first-class .NET client | — Pending |

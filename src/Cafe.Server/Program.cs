@@ -2,6 +2,8 @@ using Cafe.Server.Auth;
 using Cafe.Server.Components;
 using Cafe.Server.Dashboard;
 using Cafe.Server.Data;
+using Cafe.Server.Pricing;
+using Cafe.Server.Sessions;
 using Cafe.Server.Stations;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -30,7 +32,12 @@ builder.Services.AddSingleton<LoginThrottle>();
 builder.Services.AddScoped<AdminPasswordService>();
 builder.Services.AddScoped<StationTypeService>();
 builder.Services.AddScoped<StationService>();
-builder.Services.AddSingleton<IStationStatusProvider, DefaultStationStatusProvider>();
+builder.Services.AddSingleton<DefaultStationStatusProvider>();
+builder.Services.AddSingleton<IStationStatusProvider, SessionAwareStatusProvider>();
+builder.Services.AddSingleton<SessionNotifier>();
+builder.Services.AddSingleton<SessionSettingsService>();
+builder.Services.AddSingleton<PricingConfigService>();
+builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<DashboardService>();
 
 // Single shared admin login: one persistent, sliding 30-day cookie. No Identity users table.

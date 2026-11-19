@@ -9,6 +9,7 @@
 @using Microsoft.AspNetCore.Authentication.Cookies
 @inject AdminPasswordService Passwords
 @inject LoginThrottle Throttle
+@inject TimeProvider Time
 @inject NavigationManager Navigation
 
 <PageTitle>Log in - Cafe Manager</PageTitle>
@@ -97,7 +98,7 @@
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
             new ClaimsPrincipal(identity),
-            new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddDays(30) });
+            new AuthenticationProperties { IsPersistent = true, ExpiresUtc = Time.GetUtcNow().AddDays(30) });
 
         Navigation.NavigateTo(ReturnUrlHelper.Sanitize(ReturnUrl));
     }

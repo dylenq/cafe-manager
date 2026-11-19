@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Time.Testing;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 
@@ -18,19 +20,34 @@ public class CafeWebApplicationFactory : WebApplicationFactory<Program>
     /// <summary>Extra configuration (e.g. Setup:AllowRemote) applied when the host is built.</summary>
     public Dictionary<string, string?> ExtraSettings { get; } = new();
 
+    /// <summary>
+    /// The TimeProvider injected into the server. Starts at the real current instant (whole seconds) so
+    /// absolute-time assertions such as cookie expiry still hold; tests move it with Advance.
+    /// </summary>
+    public FakeTimeProvider Clock { get; } = new(TruncateToSecond(DateTimeOffset.UtcNow));
+
     public string ConnectionString => $"Data Source={_dbPath}";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:Cafe", ConnectionString);
+        builder.UseSetting("Cafe:TimeZone", "UTC");
         foreach (var (key, value) in ExtraSettings)
         {
             builder.UseSetting(key, value);
         }
 
-        builder.ConfigureTestServices(services => services.AddSingleton<IStartupFilter>(new RemoteAddressStartupFilter(this)));
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(Clock);
+            services.AddSingleton<IStartupFilter>(new RemoteAddressStartupFilter(this));
+        });
     }
+
+    private static DateTimeOffset TruncateToSecond(DateTimeOffset value) =>
+        new(value.Ticks - value.Ticks % TimeSpan.TicksPerSecond, value.Offset);
 
     public HttpClient CreateNoRedirectClient() =>
         CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = true });

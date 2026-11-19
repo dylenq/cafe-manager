@@ -45,6 +45,9 @@ public sealed class ServiceResult<T> : ServiceResult
 
     public static new ServiceResult<T> Fail(string error, IReadOnlyDictionary<string, string>? fieldErrors = null) =>
         new() { Kind = FailureKind.Validation, Error = error, FieldErrors = fieldErrors ?? new Dictionary<string, string>() };
+
+    public static new ServiceResult<T> NotFound(string error) =>
+        new() { Kind = FailureKind.NotFound, Error = error };
 }
 
 internal static class InputValidation

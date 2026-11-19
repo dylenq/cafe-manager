@@ -1,7 +1,9 @@
 @page "/"
 @using Cafe.Server.Dashboard
+@using Cafe.Server.Sessions
 @implements IAsyncDisposable
 @inject DashboardService Dashboard
+@inject SessionNotifier Notifier
 @inject ILogger<Home> Logger
 
 <PageTitle>Dashboard</PageTitle>
@@ -40,7 +42,10 @@ else
 
     private readonly CancellationTokenSource _cts = new();
     private PeriodicTimer? _timer;
+    private PeriodicTimer? _tickTimer;
     private Task? _loop;
+    private Task? _tickLoop;
+    private bool _subscribed;
     private List<StationCardModel>? _cards;
     private bool _stale;
 
@@ -52,6 +57,51 @@ else
         {
             _timer = new PeriodicTimer(RefreshInterval);
             _loop = RefreshLoopAsync(_timer, _cts.Token);
+            _tickTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            _tickLoop = TickLoopAsync(_tickTimer, _cts.Token);
+            Notifier.Changed += OnSessionChanged;
+            _subscribed = true;
+        }
+    }
+
+    // A session mutation committed somewhere: re-fetch at once instead of waiting for the 5-second poll.
+    private void OnSessionChanged(int stationId) => _ = RefreshNowAsync();
+
+    private async Task RefreshNowAsync()
+    {
+        try
+        {
+            var cards = await Dashboard.GetCardsAsync(_cts.Token);
+            await InvokeAsync(() =>
+            {
+                _cards = cards;
+                _stale = false;
+                StateHasChanged();
+            });
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+        {
+            // Page left or circuit ended.
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Dashboard refresh after a session change failed; the next poll will retry.");
+        }
+    }
+
+    // Re-render every second so countdowns advance between data refreshes; no data access here.
+    private async Task TickLoopAsync(PeriodicTimer timer, CancellationToken token)
+    {
+        try
+        {
+            while (await timer.WaitForNextTickAsync(token))
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+        {
+            // Page left or circuit ended.
         }
     }
 
@@ -92,6 +142,11 @@ else
 
     public async ValueTask DisposeAsync()
     {
+        if (_subscribed)
+        {
+            Notifier.Changed -= OnSessionChanged;
+        }
+
         await _cts.CancelAsync();
         if (_loop is not null)
         {
@@ -104,7 +159,19 @@ else
             }
         }
 
+        if (_tickLoop is not null)
+        {
+            try
+            {
+                await _tickLoop;
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+            {
+            }
+        }
+
         _timer?.Dispose();
+        _tickTimer?.Dispose();
         _cts.Dispose();
     }
 }

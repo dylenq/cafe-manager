@@ -7,4 +7,7 @@ namespace Cafe.Server.Dashboard;
 public interface IStationStatusProvider
 {
     StationStatus GetStatus(Station station);
+
+    /// <summary>Session-aware overload; providers that only know device state keep the default.</summary>
+    StationStatus GetStatus(Station station, SessionCardModel? session, DateTimeOffset nowUtc) => GetStatus(station);
 }

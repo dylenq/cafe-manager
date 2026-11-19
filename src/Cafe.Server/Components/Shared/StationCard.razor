@@ -1,5 +1,9 @@
 @using Cafe.Server.Dashboard
+@using Cafe.Server.Data
+@using Cafe.Server.Sessions
 @using Cafe.Shared
+@inject SessionService Sessions
+@inject TimeProvider Time
 
 <div class="card h-100 station-card station-@Model.Status.ToString().ToLowerInvariant()">
     <div class="card-body">
@@ -9,9 +13,100 @@
         </div>
         <div class="text-muted small mb-2">@Model.TypeName</div>
         <span class="badge rounded-pill text-bg-light border">@(Model.Kind == StationKind.PC ? "PC" : "Console")</span>
+
+        @if (Model.Session is { } session)
+        {
+            <div class="mt-3">
+                <div class="fs-3 fw-semibold session-countdown">@Countdown(session)</div>
+                <div class="small text-muted">Charge @session.ChargeAmount.ToString("C")</div>
+                <button type="button" class="btn btn-sm btn-outline-danger mt-2" disabled="@_busy"
+                        @onclick="() => StopAsync(session.SessionId)">Stop</button>
+            </div>
+        }
+        else
+        {
+            <div class="mt-3">
+                <button type="button" class="btn btn-sm btn-primary" disabled="@_busy"
+                        @onclick="StartAsync">Start 60 min</button>
+            </div>
+        }
+
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger py-1 px-2 mt-2 mb-0 small" role="alert">@_error</div>
+        }
+
+        @if (_finalCharge is not null)
+        {
+            <div class="alert alert-success alert-dismissible py-1 px-2 mt-2 mb-0 small" role="status">
+                Final charge @_finalCharge
+                <button type="button" class="btn-close" aria-label="Dismiss" @onclick="() => _finalCharge = null"></button>
+            </div>
+        }
     </div>
 </div>
 
 @code {
+    private bool _busy;
+    private string? _error;
+    private string? _finalCharge;
+
     [Parameter, EditorRequired] public StationCardModel Model { get; set; } = null!;
+
+    private string Countdown(SessionCardModel session)
+    {
+        var active = SessionClock.ActiveSeconds(session.ClosedActiveSeconds, session.OpenSegmentStartUtc, Time.GetUtcNow());
+        return session.PurchasedMinutes is { } minutes
+            ? SessionClock.FormatCountdown(SessionClock.RemainingSeconds(minutes, active))
+            : SessionClock.FormatCountdown(active);
+    }
+
+    private async Task StartAsync()
+    {
+        _busy = true;
+        _error = null;
+        _finalCharge = null;
+        try
+        {
+            var result = await Sessions.StartPrepaidAsync(Model.StationId, 60);
+            if (!result.Success)
+            {
+                _error = result.Error;
+            }
+        }
+        catch (Exception)
+        {
+            _error = "Could not start the session. Try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task StopAsync(int sessionId)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var result = await Sessions.StopAsync(sessionId);
+            if (result.Success)
+            {
+                _finalCharge = result.Value.ToString("C");
+            }
+            else
+            {
+                _error = result.Error;
+            }
+        }
+        catch (Exception)
+        {
+            _error = "Could not stop the session. Try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
 }

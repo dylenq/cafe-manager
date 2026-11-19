@@ -1,0 +1,63 @@
+@page "/setup"
+@attribute [ExcludeFromInteractiveRouting]
+@layout PublicLayout
+@using System.ComponentModel.DataAnnotations
+@using Cafe.Server.Auth
+@inject AdminPasswordService Passwords
+@inject NavigationManager Navigation
+
+<PageTitle>Set up Cafe Manager</PageTitle>
+
+<h1 class="h4 mb-3">Welcome to Cafe Manager</h1>
+<p class="text-muted">Choose the admin password staff will use to log in.</p>
+
+<EditForm Model="Model!" FormName="setup" method="post" OnValidSubmit="SubmitAsync">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="text-danger" />
+
+    <div class="mb-3">
+        <label for="password" class="form-label">Password</label>
+        <InputText id="password" type="password" class="form-control" autocomplete="new-password" @bind-Value="Model!.Password" />
+    </div>
+    <div class="mb-3">
+        <label for="confirm" class="form-label">Confirm password</label>
+        <InputText id="confirm" type="password" class="form-control" autocomplete="new-password" @bind-Value="Model!.ConfirmPassword" />
+    </div>
+    <button type="submit" class="btn btn-primary w-100">Save password</button>
+</EditForm>
+
+@code {
+    [SupplyParameterFromForm]
+    private SetupModel? Model { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Model ??= new();
+        if (await Passwords.IsConfiguredAsync())
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        // Setup can never be re-run to reset the password.
+        if (!await Passwords.IsConfiguredAsync())
+        {
+            await Passwords.SetPasswordAsync(Model!.Password);
+        }
+
+        Navigation.NavigateTo("/login");
+    }
+
+    public class SetupModel
+    {
+        // Required also rejects whitespace-only values (AllowEmptyStrings is false).
+        [Required(ErrorMessage = "Password is required and cannot be blank.")]
+        [StringLength(200, MinimumLength = 8, ErrorMessage = "Password must be at least 8 characters.")]
+        public string Password { get; set; } = string.Empty;
+
+        [Compare(nameof(Password), ErrorMessage = "Passwords do not match.")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}

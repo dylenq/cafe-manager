@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+*.user
+cafe.db
+cafe.db-shm
+cafe.db-wal
+cafe-test-*.db*
+smoke.db*
+TestResults/

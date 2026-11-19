@@ -103,6 +103,13 @@ public class StationTypeService(IDbContextFactory<CafeDbContext> dbFactory)
             return ServiceResult.Fail(InUse(entity.Name, count));
         }
 
+        var ruleCount = await db.RateRules.CountAsync(r => r.StationTypeId == id);
+        if (ruleCount > 0)
+        {
+            return ServiceResult.Fail(
+                $"Cannot delete '{entity.Name}': used by {ruleCount} rate rule(s). Delete or change those rules first.");
+        }
+
         db.StationTypes.Remove(entity);
         try
         {
@@ -117,7 +124,14 @@ public class StationTypeService(IDbContextFactory<CafeDbContext> dbFactory)
             // A station was added between the count and the delete; the restrict FK refused it.
             // Any other database failure propagates so it is not reported as "in use".
             var now = await db.Stations.CountAsync(s => s.StationTypeId == id);
-            return ServiceResult.Fail(InUse(entity.Name, Math.Max(now, 1)));
+            if (now == 0)
+            {
+                var rules = await db.RateRules.CountAsync(r => r.StationTypeId == id);
+                return ServiceResult.Fail(
+                    $"Cannot delete '{entity.Name}': used by {Math.Max(rules, 1)} rate rule(s). Delete or change those rules first.");
+            }
+
+            return ServiceResult.Fail(InUse(entity.Name, now));
         }
 
         return ServiceResult.Ok();

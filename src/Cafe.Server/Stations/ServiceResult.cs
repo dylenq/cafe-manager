@@ -80,6 +80,10 @@ internal static class InputValidation
         return string.IsNullOrEmpty(trimmed) ? null : trimmed;
     }
 
+    public static bool IsForeignKeyViolation(Microsoft.EntityFrameworkCore.DbUpdateException ex) =>
+        ex.InnerException is Microsoft.Data.Sqlite.SqliteException { SqliteErrorCode: 19 } sql
+        && sql.Message.Contains("FOREIGN KEY", StringComparison.OrdinalIgnoreCase);
+
     public static bool IsUniqueViolation(Microsoft.EntityFrameworkCore.DbUpdateException ex) =>
         ex.InnerException is Microsoft.Data.Sqlite.SqliteException { SqliteErrorCode: 19 } sql
         && sql.Message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase);

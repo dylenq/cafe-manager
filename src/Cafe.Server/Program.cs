@@ -32,6 +32,7 @@ builder.Services.AddSingleton<LoginThrottle>();
 builder.Services.AddScoped<AdminPasswordService>();
 builder.Services.AddScoped<StationTypeService>();
 builder.Services.AddScoped<StationService>();
+builder.Services.AddScoped<Cafe.Server.Pricing.RateRuleService>();
 builder.Services.AddSingleton<DefaultStationStatusProvider>();
 builder.Services.AddSingleton<IStationStatusProvider, SessionAwareStatusProvider>();
 builder.Services.AddSingleton<SessionNotifier>();

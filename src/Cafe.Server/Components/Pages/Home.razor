@@ -2,10 +2,16 @@
 @using Cafe.Server.Dashboard
 @implements IAsyncDisposable
 @inject DashboardService Dashboard
+@inject ILogger<Home> Logger
 
 <PageTitle>Dashboard</PageTitle>
 
 <h1 class="h3 mb-3">Dashboard</h1>
+
+@if (_stale)
+{
+    <div class="alert alert-warning" role="status">Live data is temporarily out of date. Retrying...</div>
+}
 
 @if (_cards is null)
 {
@@ -36,6 +42,7 @@ else
     private PeriodicTimer? _timer;
     private Task? _loop;
     private List<StationCardModel>? _cards;
+    private bool _stale;
 
     protected override async Task OnInitializedAsync() => _cards = await Dashboard.GetCardsAsync();
 
@@ -54,12 +61,27 @@ else
         {
             while (await timer.WaitForNextTickAsync(token))
             {
-                var cards = await Dashboard.GetCardsAsync(token);
-                await InvokeAsync(() =>
+                try
                 {
-                    _cards = cards;
-                    StateHasChanged();
-                });
+                    var cards = await Dashboard.GetCardsAsync(token);
+                    await InvokeAsync(() =>
+                    {
+                        _cards = cards;
+                        _stale = false;
+                        StateHasChanged();
+                    });
+                }
+                catch (Exception ex) when (ex is not (OperationCanceledException or ObjectDisposedException))
+                {
+                    // A transient failure (e.g. a locked database) must not end live refresh: keep the last
+                    // good data on screen, flag it as stale and try again on the next tick.
+                    Logger.LogWarning(ex, "Dashboard refresh failed; will retry on the next tick.");
+                    await InvokeAsync(() =>
+                    {
+                        _stale = true;
+                        StateHasChanged();
+                    });
+                }
             }
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)

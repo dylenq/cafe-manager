@@ -28,7 +28,7 @@ public sealed class AgentAuthMiddleware(RequestDelegate next, ILogger<AgentAuthM
         if (string.IsNullOrEmpty(supplied) || !KeysMatch(supplied, expected))
         {
             // Never log the supplied key or machine id.
-            logger.LogWarning("Agent hub request rejected (bad or missing key) from {Remote}.", context.Connection.RemoteIpAddress);
+            logger.LogWarning("Agent hub request rejected (authentication failed) from {Remote}.", context.Connection.RemoteIpAddress);
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             return;
         }

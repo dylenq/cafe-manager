@@ -9,10 +9,12 @@ public class CafeWebApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"cafe-test-{Guid.NewGuid():N}.db");
 
+    public string ConnectionString => $"Data Source={_dbPath}";
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-        builder.UseSetting("ConnectionStrings:Cafe", $"Data Source={_dbPath}");
+        builder.UseSetting("ConnectionStrings:Cafe", ConnectionString);
     }
 
     public HttpClient CreateNoRedirectClient() =>

@@ -6,6 +6,8 @@
 @using Cafe.Server.Auth
 @inject AdminPasswordService Passwords
 @inject NavigationManager Navigation
+@inject ILogger<Setup> Logger
+@using Microsoft.EntityFrameworkCore
 
 <PageTitle>Set up Cafe Manager</PageTitle>
 
@@ -15,6 +17,11 @@
 <EditForm Model="Model!" FormName="setup" method="post" OnValidSubmit="SubmitAsync">
     <DataAnnotationsValidator />
     <ValidationSummary class="text-danger" />
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="text-danger mb-3" role="alert">@_error</div>
+    }
 
     <div class="mb-3">
         <label for="password" class="form-label">Password</label>
@@ -28,6 +35,8 @@
 </EditForm>
 
 @code {
+    private string? _error;
+
     [SupplyParameterFromForm]
     private SetupModel? Model { get; set; }
 
@@ -45,7 +54,23 @@
         // Setup can never be re-run to reset the password.
         if (!await Passwords.IsConfiguredAsync())
         {
-            await Passwords.SetPasswordAsync(Model!.Password);
+            bool saved;
+            try
+            {
+                saved = await Passwords.SetPasswordAsync(Model!.Password);
+            }
+            catch (Exception ex) when (ex is DbUpdateException or Microsoft.Data.Sqlite.SqliteException)
+            {
+                Logger.LogError(ex, "Could not save the admin password during setup.");
+                saved = false;
+            }
+
+            // false with nothing stored means a real failure; false with a stored hash means another visitor won the race.
+            if (!saved && !await Passwords.IsConfiguredAsync())
+            {
+                _error = "Could not save the password. Check that the database file is writable, then try again.";
+                return;
+            }
         }
 
         Navigation.NavigateTo("/login");

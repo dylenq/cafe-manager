@@ -4,7 +4,9 @@ using Cafe.Server.Data;
 using Cafe.Tests.Infrastructure;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Cafe.Tests;
 
@@ -139,5 +141,37 @@ public class SetupFlowTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains(message, body);
         Assert.Null(await StoredHashAsync(factory));
+    }
+
+    [Fact]
+    public async Task Service_rethrows_non_constraint_save_failures_instead_of_reporting_already_configured()
+    {
+        using var factory = new CafeWebApplicationFactory();
+        using var client = factory.CreateNoRedirectClient();
+        await client.GetAsync("/setup"); // forces startup + migration
+        var cs = factory.ConnectionString;
+        var service = new AdminPasswordService(new FailingSaveDbContextFactory(cs));
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => service.SetPasswordAsync(StrongPassword));
+    }
+
+    [Fact]
+    public async Task Setup_shows_error_and_stays_on_page_when_password_cannot_be_saved()
+    {
+        using var baseFactory = new CafeWebApplicationFactory();
+        using var factory = baseFactory.WithWebHostBuilder(b => b.ConfigureTestServices(services =>
+        {
+            var cs = baseFactory.ConnectionString;
+            services.RemoveAll<IDbContextFactory<CafeDbContext>>();
+            services.AddSingleton<IDbContextFactory<CafeDbContext>>(new FailingSaveDbContextFactory(cs));
+        }));
+        using var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = true });
+
+        var response = await PostSetup(client, StrongPassword, StrongPassword);
+        var body = WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Could not save the password", body);
+        Assert.Null(await StoredHashAsync(baseFactory));
     }
 }

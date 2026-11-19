@@ -32,9 +32,10 @@ public class AdminPasswordService(IDbContextFactory<CafeDbContext> dbFactory)
         {
             await db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (Stations.InputValidation.IsUniqueViolation(ex))
         {
             // A concurrent request configured the password first (primary key conflict); never overwrite.
+            // Any other failure (locked, read-only or full disk) propagates so it is not mistaken for "already configured".
             return false;
         }
 

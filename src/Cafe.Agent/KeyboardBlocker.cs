@@ -1,5 +1,6 @@
 using Cafe.Agent.Core;
 using Cafe.Agent.Native;
+using Microsoft.Extensions.Logging;
 
 namespace Cafe.Agent;
 
@@ -11,23 +12,37 @@ internal sealed class KeyboardBlocker : IDisposable
 {
     // Kept in a field so the GC cannot collect the delegate while the hook is installed.
     private readonly NativeMethods.LowLevelKeyboardProc _proc;
+    private readonly ILogger? _logger;
     private IntPtr _hook = IntPtr.Zero;
 
-    public KeyboardBlocker()
+    public KeyboardBlocker(ILogger? logger = null)
     {
         _proc = HookCallback;
+        _logger = logger;
     }
 
     public bool IsInstalled => _hook != IntPtr.Zero;
 
-    public void Install()
+    /// <summary>
+    /// Installs the hook (no-op when already installed). Returns false and logs when Windows refused it; the lock
+    /// windows stay topmost and cover every monitor either way, only the chord blocking is lost.
+    /// </summary>
+    public bool Install()
     {
         if (_hook != IntPtr.Zero)
         {
-            return;
+            return true;
         }
 
         _hook = NativeMethods.SetWindowsHookEx(NativeMethods.WH_KEYBOARD_LL, _proc, NativeMethods.GetModuleHandle(null), 0);
+        if (_hook == IntPtr.Zero)
+        {
+            var error = System.Runtime.InteropServices.Marshal.GetLastWin32Error();
+            _logger?.LogError("Could not install the keyboard hook (Win32 error {Error}); the lock screen stays up without key blocking.", error);
+            return false;
+        }
+
+        return true;
     }
 
     public void Uninstall()

@@ -18,7 +18,7 @@ internal sealed class WpfLockScreen : ILockScreen
     private readonly ILogger _logger;
     private readonly string _emergencyHash;
     private readonly Action<bool> _onEmergencyUnlock;
-    private readonly KeyboardBlocker _blocker = new();
+    private readonly KeyboardBlocker _blocker;
     private readonly EmergencyAttemptTracker _attempts = new();
     private readonly List<LockWindow> _windows = [];
     private LockInfo? _info;
@@ -29,6 +29,7 @@ internal sealed class WpfLockScreen : ILockScreen
     {
         _dispatcher = dispatcher;
         _logger = logger;
+        _blocker = new KeyboardBlocker(logger);
         _emergencyHash = emergencyHash;
         _onEmergencyUnlock = onEmergencyUnlock;
     }
@@ -48,6 +49,9 @@ internal sealed class WpfLockScreen : ILockScreen
                 {
                     window.Update(info);
                 }
+
+                // Retry the hook when an earlier install failed (no-op when it is installed).
+                _blocker.Install();
 
                 return;
             }

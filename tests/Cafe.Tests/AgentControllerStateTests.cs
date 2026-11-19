@@ -256,4 +256,33 @@ public class AgentControllerStateTests
 
         Assert.Equal(60, a.Controller.GraceRemainingSeconds);
     }
+
+    [Fact]
+    public async Task Session_updated_never_unlocks_a_locked_pc()
+    {
+        var a = new UnitAgent();
+        await a.Controller.Unlock(a.Prepaid(600));
+        await a.Controller.Lock(new LockInfo("PC-01", "Cafe", "Session paused"));
+
+        await a.Controller.SessionUpdated(a.Prepaid(900));
+
+        Assert.Equal(AgentState.Locked, a.Controller.State);
+        Assert.Null(a.Controller.RemainingSeconds);
+        Assert.Equal("Session paused", a.Lock.LastLock!.Reason);
+
+        await a.Controller.Unlock(a.Prepaid(900));
+        Assert.Equal(AgentState.Unlocked, a.Controller.State);
+    }
+
+    [Fact]
+    public async Task Session_updated_after_the_initial_lock_does_not_open_a_fresh_agent()
+    {
+        var a = new UnitAgent();
+        await a.Controller.StartAsync();
+
+        await a.Controller.SessionUpdated(a.Prepaid(900));
+
+        Assert.Equal(AgentState.Locked, a.Controller.State);
+        await a.Controller.DisposeAsync();
+    }
 }

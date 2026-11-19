@@ -183,6 +183,13 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
     {
         lock (_gate)
         {
+            if (_state == AgentState.Locked)
+            {
+                // Only an explicit Unlock opens a locked PC. A SessionUpdated that arrives after a Lock is a stale
+                // message and must not undo it.
+                return Task.CompletedTask;
+            }
+
             _emergency = false;
             StoreSession(info);
             if (_warningActive && info.RemainingSeconds is { } remaining && remaining > _warningThresholdSeconds)
@@ -191,13 +198,7 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
                 Safe(_warnings.Hide);
             }
 
-            if (_state == AgentState.Locked && !_emergency)
-            {
-                // Server says there is a session but we were locked: it is authoritative.
-                Safe(_lockScreen.Hide);
-                SetState(AgentState.Unlocked);
-            }
-            else if (_state == AgentState.Grace)
+            if (_state == AgentState.Grace)
             {
                 ClearGrace();
                 SetState(AgentState.Unlocked);

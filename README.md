@@ -22,6 +22,9 @@ On an empty database every page redirects to `/setup`, where the owner chooses t
 | `Kestrel:Endpoints:Http:Url` | `http://0.0.0.0:5080` | `Kestrel__Endpoints__Http__Url` |
 | `ConnectionStrings:Cafe` | `Data Source=cafe.db` | `ConnectionStrings__Cafe` |
 | `Setup:AllowRemote` | `false` | `Setup__AllowRemote` |
+| `Cafe:Culture` | empty (server culture) | `Cafe__Culture` |
+
+`Cafe:Culture` is a culture name such as `en-US` or `vi-VN`. It decides how amounts are formatted (currency symbol, separators) on every screen; leave it empty to use the server's own culture, and an unknown name logs a warning and falls back to that.
 
 `ASPNETCORE_URLS` and the `--urls` argument also override the listen address. The schema is created and updated automatically at startup through EF Core migrations.
 

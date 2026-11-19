@@ -70,6 +70,9 @@ builder.Services.AddCascadingAuthenticationState();
 
 var app = builder.Build();
 
+// Currency and number formatting follows Cafe:Culture (empty = the server's culture).
+CafeCulture.Apply(CafeCulture.Resolve(app.Configuration[CafeCulture.Key], app.Logger));
+
 using (var scope = app.Services.CreateScope())
 {
     var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<CafeDbContext>>();

@@ -1,0 +1,185 @@
+@page "/station-types"
+@using Cafe.Server.Data
+@using Cafe.Server.Stations
+@inject StationTypeService TypeService
+
+<PageTitle>Station types - Cafe Manager</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Station types</h1>
+    @if (!showForm)
+    {
+        <button type="button" class="btn btn-primary" @onclick="StartAdd">Add station type</button>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" aria-label="Close" @onclick="DismissError"></button>
+    </div>
+}
+
+@if (showForm)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">@(editingId is null ? "Add station type" : "Edit station type")</h2>
+            <EditForm Model="input" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="type-name">Name</label>
+                        <InputText id="type-name" class="form-control" @bind-Value="input.Name" />
+                        <ValidationMessage For="() => input.Name" class="text-danger" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="type-rate">Base hourly rate</label>
+                        <InputNumber id="type-rate" class="form-control" @bind-Value="input.HourlyRate" />
+                        <ValidationMessage For="() => input.HourlyRate" class="text-danger" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="type-sort">Sort order</label>
+                        <InputNumber id="type-sort" class="form-control" @bind-Value="input.SortOrder" />
+                        <ValidationMessage For="() => input.SortOrder" class="text-danger" />
+                    </div>
+                </div>
+                <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
+                    <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (types is null)
+{
+    <p>Loading...</p>
+}
+else if (types.Count == 0)
+{
+    <p class="text-muted">No station types yet. Add one to get started.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th class="text-end">Hourly rate</th>
+                    <th class="text-end">Sort order</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var type in types)
+                {
+                    <tr>
+                        <td>@type.Name</td>
+                        <td class="text-end">@type.HourlyRate.ToString("N2")</td>
+                        <td class="text-end">@type.SortOrder</td>
+                        <td class="text-end">
+                            <div class="d-flex flex-column flex-sm-row gap-2 justify-content-end">
+                                @if (confirmingDeleteId == type.Id)
+                                {
+                                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(type.Id)">Confirm delete</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => confirmingDeleteId = null">Cancel</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(type)">Edit</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => confirmingDeleteId = type.Id">Delete</button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<StationType>? types;
+    private StationTypeInput input = new();
+    private int? editingId;
+    private int? confirmingDeleteId;
+    private bool showForm;
+    private bool saving;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => types = await TypeService.ListAsync();
+
+    private void StartAdd()
+    {
+        input = new StationTypeInput();
+        editingId = null;
+        errorMessage = null;
+        showForm = true;
+    }
+
+    private void StartEdit(StationType type)
+    {
+        input = new StationTypeInput { Name = type.Name, HourlyRate = type.HourlyRate, SortOrder = type.SortOrder };
+        editingId = type.Id;
+        confirmingDeleteId = null;
+        errorMessage = null;
+        showForm = true;
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        editingId = null;
+        errorMessage = null;
+    }
+
+    private void DismissError() => errorMessage = null;
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        try
+        {
+            ServiceResult result = editingId is { } id
+                ? await TypeService.UpdateAsync(id, input)
+                : await TypeService.CreateAsync(input);
+
+            if (!result.Success)
+            {
+                errorMessage = result.Error;
+                if (editingId is not null && result.Error?.Contains("no longer exists") == true)
+                {
+                    // Someone else removed it: close the form and refresh so the list is truthful.
+                    showForm = false;
+                    editingId = null;
+                    await LoadAsync();
+                }
+
+                return;
+            }
+
+            errorMessage = null;
+            showForm = false;
+            editingId = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        confirmingDeleteId = null;
+        var result = await TypeService.DeleteAsync(id);
+        errorMessage = result.Success ? null : result.Error;
+        await LoadAsync();
+    }
+}

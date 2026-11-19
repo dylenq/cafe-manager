@@ -188,6 +188,87 @@ public class AuthTests
     }
 
     [Fact]
+    public async Task Login_before_setup_redirects_to_setup()
+    {
+        using var factory = new CafeWebApplicationFactory();
+        using var client = factory.CreateNoRedirectClient();
+
+        var response = await client.GetAsync("/login");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/setup", PathOf(response));
+    }
+
+    [Fact]
+    public async Task Full_journey_setup_login_logout()
+    {
+        using var factory = new CafeWebApplicationFactory();
+        using var client = factory.CreateNoRedirectClient();
+
+        var first = await client.GetAsync("/");
+        Assert.Equal("/setup", PathOf(first));
+
+        var setup = await FormPostHelper.PostFormAsync(client, "/setup",
+            new Dictionary<string, string> { ["Password"] = Password, ["ConfirmPassword"] = Password });
+        Assert.Equal("/login", PathOf(setup));
+
+        var wrong = await PostLogin(client, "wrong-password-1");
+        Assert.Equal(HttpStatusCode.OK, wrong.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/")).StatusCode);
+
+        var right = await PostLogin(client, Password);
+        Assert.Equal(HttpStatusCode.Redirect, right.StatusCode);
+
+        var home = await client.GetAsync("/");
+        Assert.Equal(HttpStatusCode.OK, home.StatusCode);
+        Assert.Contains("Station Types", await home.Content.ReadAsStringAsync());
+
+        var logout = await FormPostHelper.PostFormAsync(client, "/", new Dictionary<string, string>(), "/logout");
+        Assert.Equal(HttpStatusCode.Redirect, logout.StatusCode);
+
+        var after = await client.GetAsync("/");
+        Assert.Equal(HttpStatusCode.Redirect, after.StatusCode);
+        Assert.Contains("/login", PathOf(after));
+    }
+
+    [Fact]
+    public async Task Static_assets_and_framework_paths_do_not_need_a_cookie_when_configured()
+    {
+        using var factory = await ConfiguredFactoryAsync();
+        using var client = factory.CreateNoRedirectClient();
+
+        var css = await client.GetAsync("/lib/bootstrap/dist/css/bootstrap.min.css");
+        Assert.Equal(HttpStatusCode.OK, css.StatusCode);
+
+        // The Testing environment does not map framework static assets (they resolve in Development/published
+        // builds), so only assert the request is never bounced to /login or /setup.
+        var framework = await client.GetAsync("/_framework/blazor.web.js");
+        Assert.NotEqual(HttpStatusCode.Redirect, framework.StatusCode);
+    }
+
+    [Fact]
+    public async Task Authenticated_session_survives_repeated_requests()
+    {
+        using var factory = new CafeWebApplicationFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync();
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Authenticated_user_visiting_login_is_sent_home()
+    {
+        using var factory = new CafeWebApplicationFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync();
+
+        var response = await client.GetAsync("/login");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/", PathOf(response));
+    }
+
+    [Fact]
     public async Task Logout_without_token_is_rejected()
     {
         using var factory = new CafeWebApplicationFactory();

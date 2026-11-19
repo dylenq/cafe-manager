@@ -207,6 +207,51 @@ public class SessionLifecycleTests : SessionTestBase
     }
 
     [Fact]
+    public async Task Stop_bound_to_a_quote_succeeds_when_nothing_changed()
+    {
+        var open = await OpenEndedAsync(await StationAsync("B"));
+        Advance(45 * Min);
+        var quote = (await SvcAsync(s => s.QuoteStopAsync(open.Id))).Value!;
+
+        var stop = await SvcAsync(s => s.StopAsync(open.Id, quote.Version, quote.Amount));
+
+        Assert.True(stop.Success, stop.Error);
+        Assert.Equal(quote.Amount, stop.Value);
+    }
+
+    [Fact]
+    public async Task Stop_bound_to_a_quote_is_refused_when_the_session_version_changed()
+    {
+        var prepaid = await PrepaidAsync(await StationAsync("A"), 60);
+        var quote = (await SvcAsync(s => s.QuoteStopAsync(prepaid.Id))).Value!;
+        Assert.True((await SvcAsync(s => s.ExtendAsync(prepaid.Id, 30))).Success);
+
+        var stop = await SvcAsync(s => s.StopAsync(prepaid.Id, quote.Version, quote.Amount));
+
+        Assert.False(stop.Success);
+        Assert.Equal(SessionService.ChangedMessage, stop.Error);
+        Assert.Equal(SessionStatus.Active, (await LoadAsync(prepaid.Id)).Status);
+    }
+
+    [Fact]
+    public async Task Stop_bound_to_a_quote_is_refused_when_an_open_ended_charge_moved_on()
+    {
+        var open = await OpenEndedAsync(await StationAsync("B"));
+        Advance(45 * Min);
+        var quote = (await SvcAsync(s => s.QuoteStopAsync(open.Id))).Value!;
+        Advance(10 * Min);
+
+        var stop = await SvcAsync(s => s.StopAsync(open.Id, quote.Version, quote.Amount));
+
+        Assert.Equal(SessionService.ChangedMessage, stop.Error);
+        var saved = await LoadAsync(open.Id);
+        Assert.Equal(SessionStatus.Active, saved.Status);
+        Assert.Null(Assert.Single(saved.Segments).EndUtc);
+        var requote = (await SvcAsync(s => s.QuoteStopAsync(open.Id))).Value!;
+        Assert.True((await SvcAsync(s => s.StopAsync(open.Id, requote.Version, requote.Amount))).Success);
+    }
+
+    [Fact]
     public async Task Stop_quote_matches_stop_and_does_not_mutate()
     {
         var a = await StationAsync("A");

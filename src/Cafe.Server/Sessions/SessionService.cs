@@ -6,6 +6,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Cafe.Server.Sessions;
 
+/// <summary>What a stop would charge right now, bound to the session state it was computed for.</summary>
+public sealed record StopQuote(int SessionId, int Version, decimal Amount);
+
 /// <summary>All session mutations. Every mutation writes a SessionEvent in the same transaction and raises the notifier.</summary>
 public class SessionService(
     IDbContextFactory<CafeDbContext> dbFactory,
@@ -21,6 +24,9 @@ public class SessionService(
     private const string Stale = "This session was changed by someone else. Refresh and try again.";
     private const string TimeUp = "Time is up. Extend or stop the session.";
     private const string Gone = "That session no longer exists. Refresh the dashboard.";
+    /// <summary>Returned by StopAsync when the session or its charge changed after the quote was shown.</summary>
+    public const string ChangedMessage = "Session changed — review the new charge";
+
     private const string AlreadyEnded = "That session has already ended.";
 
     /// <summary>Test seam: runs just before SaveChanges so a test can make the loaded session stale.</summary>
@@ -231,17 +237,35 @@ public class SessionService(
             return ServiceResult<Session>.Ok(session);
         }, cancellationToken);
 
-    /// <summary>Ends the session and returns its final charge. Prepaid charges stay as quoted (no automatic refund).</summary>
-    public Task<ServiceResult<decimal>> StopAsync(int sessionId, CancellationToken cancellationToken = default) =>
+    /// <summary>
+    /// Ends the session and returns its final charge. Prepaid charges stay as quoted (no automatic refund).
+    /// When <paramref name="expectedVersion"/> / <paramref name="expectedAmount"/> are given (from the quote the
+    /// operator confirmed) the stop is refused with <see cref="ChangedMessage"/> if the session changed since or the
+    /// charge computed now differs, so nobody is billed an amount they did not see.
+    /// </summary>
+    public Task<ServiceResult<decimal>> StopAsync(
+        int sessionId,
+        int? expectedVersion = null,
+        decimal? expectedAmount = null,
+        CancellationToken cancellationToken = default) =>
         MutateAsync<decimal>(sessionId, async ctx =>
         {
             var session = ctx.Session;
-            CloseOpenSegments(session, ctx.Now);
-            if (session.Mode == SessionMode.OpenEnded)
+            if (expectedVersion is { } version && session.Version != version)
             {
-                session.ChargedAmount = await charges.OpenEndedAsync(ctx.Db, session.Segments, ctx.Now, cancellationToken: ctx.Cancellation);
+                return ServiceResult<decimal>.Fail(ChangedMessage);
             }
 
+            CloseOpenSegments(session, ctx.Now);
+            var charge = session.Mode == SessionMode.OpenEnded
+                ? await charges.OpenEndedAsync(ctx.Db, session.Segments, ctx.Now, cancellationToken: ctx.Cancellation)
+                : session.ChargedAmount;
+            if (expectedAmount is { } amount && amount != charge)
+            {
+                return ServiceResult<decimal>.Fail(ChangedMessage);
+            }
+
+            session.ChargedAmount = charge;
             session.Status = SessionStatus.Ended;
             session.EndReason = SessionEndReason.Stopped;
             session.EndedAtUtc = ctx.Now;
@@ -253,25 +277,33 @@ public class SessionService(
     /// <summary>The charge StopAsync would return right now. Reads only: no events, no status change.</summary>
     public async Task<ServiceResult<decimal>> GetStopQuoteAsync(int sessionId, CancellationToken cancellationToken = default)
     {
+        var quote = await QuoteStopAsync(sessionId, cancellationToken);
+        return quote.Success ? ServiceResult<decimal>.Ok(quote.Value!.Amount) : Forward(quote);
+    }
+
+    /// <summary>Like <see cref="GetStopQuoteAsync"/> but also returns the session version the quote belongs to.</summary>
+    public async Task<ServiceResult<StopQuote>> QuoteStopAsync(int sessionId, CancellationToken cancellationToken = default)
+    {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var session = await db.Sessions.AsNoTracking().Include(s => s.Segments).FirstOrDefaultAsync(s => s.Id == sessionId, cancellationToken);
         if (session is null)
         {
-            return ServiceResult<decimal>.NotFound(Gone);
+            return ServiceResult<StopQuote>.NotFound(Gone);
         }
 
         if (session.Status == SessionStatus.Ended)
         {
-            return ServiceResult<decimal>.Fail(AlreadyEnded);
+            return ServiceResult<StopQuote>.Fail(AlreadyEnded);
         }
 
-        if (session.Mode == SessionMode.Prepaid)
-        {
-            return ServiceResult<decimal>.Ok(session.ChargedAmount);
-        }
-
-        return ServiceResult<decimal>.Ok(await charges.OpenEndedAsync(db, session.Segments, time.GetUtcNow(), cancellationToken: cancellationToken));
+        var amount = session.Mode == SessionMode.Prepaid
+            ? session.ChargedAmount
+            : await charges.OpenEndedAsync(db, session.Segments, time.GetUtcNow(), cancellationToken: cancellationToken);
+        return ServiceResult<StopQuote>.Ok(new StopQuote(session.Id, session.Version, amount));
     }
+
+    private static ServiceResult<decimal> Forward(ServiceResult failed) =>
+        failed.Kind == FailureKind.NotFound ? ServiceResult<decimal>.NotFound(failed.Error!) : ServiceResult<decimal>.Fail(failed.Error!);
 
     private sealed class MutationContext(CafeDbContext db, Session session, DateTimeOffset now, CancellationToken cancellation)
     {

@@ -41,14 +41,14 @@
                 }
                 <div class="small text-muted">@(isPrepaid ? "Charge" : "Charge est.") @session.ChargeAmount.ToString("C")</div>
 
-                @if (_confirmQuote is { } quote)
+                @if (_confirmQuote is { } quote && _confirmSessionId == session.SessionId)
                 {
                     <div class="border rounded p-2 mt-2 stop-confirm">
                         <div class="fw-semibold">Final charge: @quote.ToString("C")</div>
                         <button type="button" class="btn btn-sm btn-danger mt-1" disabled="@_busy"
                                 @onclick="() => ConfirmStopAsync(session.SessionId)">Confirm stop</button>
                         <button type="button" class="btn btn-sm btn-outline-secondary mt-1" disabled="@_busy"
-                                @onclick="() => _confirmQuote = null">Cancel</button>
+                                @onclick="ClearConfirm">Cancel</button>
                     </div>
                 }
                 else
@@ -139,6 +139,8 @@
     private bool _busy;
     private string? _error;
     private decimal? _confirmQuote;
+    private int? _confirmSessionId;
+    private int _confirmVersion;
     private int? _customStart;
     private int? _customExtend;
     private int _moveTarget;
@@ -150,6 +152,22 @@
     [Parameter] public bool Acknowledged { get; set; }
 
     [Parameter] public EventCallback<string> OnNotice { get; set; }
+
+    // The stop confirmation belongs to the session (and version) it was quoted for: drop it when the card shows
+    // a different session or none, so a stale "Final charge" panel can never confirm a stop on another session.
+    protected override void OnParametersSet()
+    {
+        if (_confirmQuote is not null && Model.Session?.SessionId != _confirmSessionId)
+        {
+            ClearConfirm();
+        }
+    }
+
+    private void ClearConfirm()
+    {
+        _confirmQuote = null;
+        _confirmSessionId = null;
+    }
 
     private string LevelClass => Model.Session is { } s
         ? SessionAlerts.GetLevel(s, Time.GetUtcNow()) switch
@@ -200,10 +218,10 @@
         _error = null;
         try
         {
-            var quote = await Sessions.GetStopQuoteAsync(sessionId);
+            var quote = await Sessions.QuoteStopAsync(sessionId);
             if (quote.Success)
             {
-                _confirmQuote = quote.Value;
+                ShowQuote(quote.Value!);
             }
             else
             {
@@ -221,22 +239,46 @@
         }
     }
 
+    private void ShowQuote(StopQuote quote)
+    {
+        _confirmQuote = quote.Amount;
+        _confirmSessionId = quote.SessionId;
+        _confirmVersion = quote.Version;
+    }
+
     private async Task ConfirmStopAsync(int sessionId)
     {
+        if (_confirmSessionId != sessionId || _confirmQuote is not { } shown)
+        {
+            ClearConfirm();
+            return;
+        }
+
         _busy = true;
         _error = null;
         try
         {
-            var result = await Sessions.StopAsync(sessionId);
+            var result = await Sessions.StopAsync(sessionId, _confirmVersion, shown);
             if (result.Success)
             {
-                _confirmQuote = null;
+                ClearConfirm();
                 await OnNotice.InvokeAsync($"{Model.Name} stopped. Final charge: {result.Value.ToString("C")}");
+            }
+            else if (result.Error == SessionService.ChangedMessage)
+            {
+                // Show the new charge and require another confirmation.
+                ClearConfirm();
+                _error = result.Error;
+                var fresh = await Sessions.QuoteStopAsync(sessionId);
+                if (fresh.Success)
+                {
+                    ShowQuote(fresh.Value!);
+                }
             }
             else
             {
                 _error = result.Error;
-                _confirmQuote = null;
+                ClearConfirm();
             }
         }
         catch (Exception ex)

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +25,8 @@ builder.Services.AddDbContextFactory<CafeDbContext>((sp, options) =>
                            ?? "Data Source=cafe.db";
     options.UseSqlite(connectionString);
 });
+builder.Services.TryAddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<LoginThrottle>();
 builder.Services.AddScoped<AdminPasswordService>();
 builder.Services.AddScoped<StationTypeService>();
 builder.Services.AddScoped<StationService>();

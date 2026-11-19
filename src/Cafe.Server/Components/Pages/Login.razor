@@ -8,6 +8,7 @@
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Authentication.Cookies
 @inject AdminPasswordService Passwords
+@inject LoginThrottle Throttle
 @inject NavigationManager Navigation
 
 <PageTitle>Log in - Cafe Manager</PageTitle>
@@ -22,6 +23,12 @@
     {
         <div class="text-danger mb-3" role="alert">Incorrect password.</div>
     }
+    @if (_lockedMinutes is { } minutes)
+    {
+        <div class="text-danger mb-3" role="alert">
+            Too many failed attempts. Try again in @minutes minute@(minutes == 1 ? "" : "s").
+        </div>
+    }
 
     <div class="mb-3">
         <label for="password" class="form-label">Password</label>
@@ -32,6 +39,7 @@
 
 @code {
     private bool _failed;
+    private int? _lockedMinutes;
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
@@ -59,11 +67,30 @@
             return;
         }
 
-        if (!await Passwords.VerifyAsync(Model!.Password))
+        // Plain HTTP on the LAN: key on the remote address so one noisy device cannot lock out the others.
+        var clientKey = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        if (Throttle.IsLockedOut(clientKey, out var remaining))
         {
-            _failed = true;
+            _lockedMinutes = Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes));
             return;
         }
+
+        if (!await Passwords.VerifyAsync(Model!.Password))
+        {
+            Throttle.RecordFailure(clientKey);
+            if (Throttle.IsLockedOut(clientKey, out remaining))
+            {
+                _lockedMinutes = Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes));
+            }
+            else
+            {
+                _failed = true;
+            }
+
+            return;
+        }
+
+        Throttle.Reset(clientKey);
 
         var identity = new ClaimsIdentity(
             [new Claim(ClaimTypes.Name, "admin")], CookieAuthenticationDefaults.AuthenticationScheme);

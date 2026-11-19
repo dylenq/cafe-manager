@@ -26,7 +26,7 @@ On an empty database every page redirects to `/setup`, where the owner chooses t
 
 ## Security note
 
-v1 serves plain HTTP on the LAN with no TLS. The admin password and the auth cookie travel in clear text on the cafe network, so keep the cafe network private.
+v1 serves plain HTTP on the LAN with no TLS. The admin password and the auth cookie travel in clear text on the cafe network, so keep the cafe network private. The login is throttled in memory: after 5 failed attempts from one address within 5 minutes, that address is refused for 5 minutes (a server restart clears the counters).
 
 ## Tests
 

@@ -33,6 +33,7 @@ public enum SessionEventType
     Expired = 7,
     GraceElapsed = 8,
     ExpiryActionFired = 9,
+    ExpiryActionFailed = 10,
 }
 
 public enum RateRuleKind

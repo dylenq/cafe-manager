@@ -28,6 +28,14 @@ public class ExpiryEvaluatorTests : SessionTestBase
             throw new InvalidOperationException("device offline");
     }
 
+    private sealed class FlakyHandler(int failures, string message = "flaky") : IExpiryActionHandler
+    {
+        public int Calls { get; private set; }
+
+        public Task ExecuteAsync(Station station, CancellationToken cancellationToken) =>
+            ++Calls <= failures ? throw new InvalidOperationException(message) : Task.CompletedTask;
+    }
+
     private readonly RecordingHandler _handler = new();
 
     private ExpiryEvaluator Evaluator(params IExpiryActionHandler[] handlers)
@@ -326,7 +334,7 @@ public class ExpiryEvaluatorTests : SessionTestBase
     }
 
     [Fact]
-    public async Task A_throwing_handler_does_not_stop_the_next_one_or_the_session_ending()
+    public async Task A_throwing_handler_does_not_stop_the_next_one_or_the_session_ending_and_is_recorded_as_failed()
     {
         var session = await PrepaidAsync(await StationAsync(), 30);
         Advance(TimeSpan.FromHours(1));
@@ -336,9 +344,99 @@ public class ExpiryEvaluatorTests : SessionTestBase
         var saved = await LoadAsync(session.Id);
         Assert.Equal(SessionStatus.Ended, saved.Status);
         Assert.Single(_handler.Calls);
+        Assert.Empty(await EventsAsync(session.Id, SessionEventType.ExpiryActionFired));
+        var failed = Assert.Single(await EventsAsync(session.Id, SessionEventType.ExpiryActionFailed));
+        Assert.Contains("failed", failed.Details);
+        Assert.Contains("device offline", failed.Details);
+    }
+
+    [Fact]
+    public async Task Handlers_missed_by_a_crash_after_the_Ended_commit_run_on_the_next_pass()
+    {
+        var session = await PrepaidAsync(await StationAsync("PC-07"), 30);
+        Advance(TimeSpan.FromHours(1));
+        await EvalAsync();
+        Assert.Equal(["PC-07"], _handler.Calls);
+
+        // Simulate the process dying after the Ended commit but before the marker was written.
+        await using (var db = await DbAsync())
+        {
+            await db.SessionEvents.Where(e => e.SessionId == session.Id && e.Type == SessionEventType.ExpiryActionFired).ExecuteDeleteAsync();
+        }
+
+        await EvalAsync();
+        await EvalAsync();
+
+        Assert.Equal(["PC-07", "PC-07"], _handler.Calls);
+        Assert.Single(await EventsAsync(session.Id, SessionEventType.ExpiryActionFired));
+    }
+
+    [Fact]
+    public async Task A_failed_run_is_retried_after_the_delay_and_stops_once_it_succeeds()
+    {
+        var session = await PrepaidAsync(await StationAsync(), 30);
+        Advance(TimeSpan.FromHours(1));
+        var flaky = new FlakyHandler(failures: 2);
+        var evaluator = Evaluator(flaky);
+
+        await EvalAsync(evaluator);
+        await EvalAsync(evaluator);
+        Assert.Equal(1, flaky.Calls);
+
+        Advance(ExpiryEvaluator.ActionRetryDelay);
+        await EvalAsync(evaluator);
+        Advance(ExpiryEvaluator.ActionRetryDelay);
+        await EvalAsync(evaluator);
+        await EvalAsync(evaluator);
+
+        Assert.Equal(3, flaky.Calls);
+        Assert.Equal(2, (await EventsAsync(session.Id, SessionEventType.ExpiryActionFailed)).Count);
+        Assert.Single(await EventsAsync(session.Id, SessionEventType.ExpiryActionFired));
+    }
+
+    [Fact]
+    public async Task Retries_stop_after_the_maximum_attempts_with_a_gave_up_marker()
+    {
+        var session = await PrepaidAsync(await StationAsync(), 30);
+        Advance(TimeSpan.FromHours(1));
+        var evaluator = Evaluator(new ThrowingHandler());
+
+        for (var i = 0; i < ExpiryEvaluator.MaxActionAttempts + 3; i++)
+        {
+            await EvalAsync(evaluator);
+            Advance(ExpiryEvaluator.ActionRetryDelay);
+        }
+
+        Assert.Equal(ExpiryEvaluator.MaxActionAttempts, (await EventsAsync(session.Id, SessionEventType.ExpiryActionFailed)).Count);
         var fired = Assert.Single(await EventsAsync(session.Id, SessionEventType.ExpiryActionFired));
-        Assert.Contains("failed", fired.Details);
-        Assert.Contains("device offline", fired.Details);
+        Assert.Contains("gave up", fired.Details);
+    }
+
+    [Fact]
+    public async Task Failure_details_are_truncated_to_the_column_length()
+    {
+        var session = await PrepaidAsync(await StationAsync(), 30);
+        Advance(TimeSpan.FromHours(1));
+
+        await EvalAsync(Evaluator(new FlakyHandler(failures: 1, message: new string('x', 1000))));
+
+        var failed = Assert.Single(await EventsAsync(session.Id, SessionEventType.ExpiryActionFailed));
+        Assert.Equal(300, failed.Details.Length);
+    }
+
+    [Fact]
+    public async Task Sessions_that_expired_more_than_a_day_ago_are_not_revisited()
+    {
+        var session = await PrepaidAsync(await StationAsync(), 30);
+        Advance(TimeSpan.FromHours(1));
+        await EvalAsync(Evaluator(new FlakyHandler(failures: 100)));
+        Assert.Single(await EventsAsync(session.Id, SessionEventType.ExpiryActionFailed));
+
+        Advance(TimeSpan.FromHours(25));
+        var late = new RecordingHandler();
+        await EvalAsync(Evaluator(late));
+
+        Assert.Empty(late.Calls);
     }
 
     [Fact]

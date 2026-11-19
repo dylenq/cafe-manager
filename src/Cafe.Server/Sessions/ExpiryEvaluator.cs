@@ -22,6 +22,18 @@ public class ExpiryEvaluator(
     IEnumerable<IExpiryActionHandler> handlers,
     ILogger<ExpiryEvaluator> logger) : IExpiryEvaluator
 {
+    /// <summary>Only sessions that expired within this window get their expiry actions (re)run.</summary>
+    public static readonly TimeSpan ActionLookback = TimeSpan.FromHours(24);
+
+    /// <summary>A failed run is retried at most this many times in total; then the session is marked as given up.</summary>
+    public const int MaxActionAttempts = 5;
+
+    /// <summary>Minimum wait between two attempts for the same session.</summary>
+    public static readonly TimeSpan ActionRetryDelay = TimeSpan.FromSeconds(15);
+
+    /// <summary>Matches the SessionEvent.Details column length.</summary>
+    private const int DetailsMaxLength = 300;
+
     /// <summary>Test seam: runs just before a session's SaveChanges (to make it stale or to fail).</summary>
     internal Func<Task>? BeforeSave { get; set; }
 
@@ -55,9 +67,49 @@ public class ExpiryEvaluator(
                 logger.LogError(ex, "Expiry evaluation failed for session {SessionId}.", id);
             }
         }
+
+        await RunPendingActionsAsync(now, cancellationToken);
     }
 
-    private async Task ProcessAsync(int sessionId, DateTimeOffset now, SessionSettings settings, CancellationToken ct)
+    /// <summary>
+    /// At-least-once expiry actions: every pass (including the first one at startup) also picks up sessions that
+    /// expired within the last <see cref="ActionLookback"/> and have no ExpiryActionFired marker yet, whether they
+    /// just ended in this pass or were left behind by a crash, a restart or failed handlers.
+    /// </summary>
+    private async Task RunPendingActionsAsync(DateTimeOffset now, CancellationToken ct)
+    {
+        List<int> pending;
+        var cutoff = now - ActionLookback;
+        await using (var db = await dbFactory.CreateDbContextAsync(ct))
+        {
+            pending = await db.Sessions.AsNoTracking()
+                .Where(s => s.Status == SessionStatus.Ended && s.EndReason == SessionEndReason.Expired
+                    && s.EndedAtUtc >= cutoff
+                    && !s.Events.Any(e => e.Type == SessionEventType.ExpiryActionFired))
+                .OrderBy(s => s.Id)
+                .Select(s => s.Id)
+                .ToListAsync(ct);
+        }
+
+        foreach (var id in pending)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                await RunActionsAsync(id, now, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Expiry actions failed for session {SessionId}.", id);
+            }
+        }
+    }
+
+    private async Task<bool> ProcessAsync(int sessionId, DateTimeOffset now, SessionSettings settings, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var session = await db.Sessions
@@ -67,7 +119,7 @@ public class ExpiryEvaluator(
             .FirstOrDefaultAsync(s => s.Id == sessionId, ct);
         if (session is null || session.Mode != SessionMode.Prepaid || session.PurchasedMinutes is not { } purchased)
         {
-            return;
+            return false;
         }
 
         var changed = false;
@@ -125,7 +177,7 @@ public class ExpiryEvaluator(
 
         if (!changed)
         {
-            return;
+            return false;
         }
 
         session.Version++;
@@ -141,20 +193,37 @@ public class ExpiryEvaluator(
         catch (DbUpdateConcurrencyException)
         {
             logger.LogDebug("Session {SessionId} changed concurrently; skipped, the next tick re-evaluates.", sessionId);
-            return;
+            return false;
         }
 
         notifier.Raise(session.StationId);
-
-        if (ended)
-        {
-            await FireHandlersAsync(db, session, now, ct);
-        }
+        return ended;
     }
 
-    /// <summary>Runs after the Ended commit, so handlers run at most once per session.</summary>
-    private async Task FireHandlersAsync(CafeDbContext db, Session session, DateTimeOffset now, CancellationToken ct)
+    /// <summary>
+    /// Runs the handlers for one expired session and records the outcome. ExpiryActionFired is written only after
+    /// the handlers ran and all succeeded (or the attempts are used up); failures are recorded as ExpiryActionFailed
+    /// and retried on later passes. Cancellation (shutdown) records nothing, so the next start retries.
+    /// </summary>
+    private async Task RunActionsAsync(int sessionId, DateTimeOffset now, CancellationToken ct)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var session = await db.Sessions
+            .Include(s => s.Events)
+            .Include(s => s.Station)
+            .FirstOrDefaultAsync(s => s.Id == sessionId, ct);
+        if (session is null || session.Events.Any(e => e.Type == SessionEventType.ExpiryActionFired))
+        {
+            return;
+        }
+
+        var failed = session.Events.Where(e => e.Type == SessionEventType.ExpiryActionFailed).ToList();
+        if (failed.Count > 0 && failed.Max(e => e.AtUtc) + ActionRetryDelay > now)
+        {
+            return;
+        }
+
+        var attempt = failed.Count + 1;
         var failures = new List<string>();
         var list = handlers.ToList();
         foreach (var handler in list)
@@ -174,13 +243,31 @@ public class ExpiryEvaluator(
             }
         }
 
-        var details = failures.Count == 0
-            ? string.Create(CultureInfo.InvariantCulture, $"{list.Count} handler(s) ok")
-            : string.Create(CultureInfo.InvariantCulture, $"{list.Count} handler(s), {failures.Count} failed: {string.Join("; ", failures)}");
-        AddEvent(session, SessionEventType.ExpiryActionFired, now, details);
+        if (failures.Count == 0)
+        {
+            AddEvent(session, SessionEventType.ExpiryActionFired, now,
+                Truncate(string.Create(CultureInfo.InvariantCulture, $"{list.Count} handler(s) ok (attempt {attempt})")));
+        }
+        else
+        {
+            var summary = string.Create(CultureInfo.InvariantCulture,
+                $"attempt {attempt}/{MaxActionAttempts}, {failures.Count} of {list.Count} failed: {string.Join("; ", failures)}");
+            AddEvent(session, SessionEventType.ExpiryActionFailed, now, Truncate(summary));
+            if (attempt >= MaxActionAttempts)
+            {
+                logger.LogError("Expiry actions for station {Station} failed {Attempts} times; giving up.", session.Station.Name, attempt);
+                AddEvent(session, SessionEventType.ExpiryActionFired, now,
+                    Truncate(string.Create(CultureInfo.InvariantCulture, $"gave up after {attempt} failed attempts")));
+            }
+        }
+
+        // Not cancellable: the marker must land even if shutdown starts right after the handlers ran.
         await db.SaveChangesAsync(CancellationToken.None);
         notifier.Raise(session.StationId);
     }
+
+    private static string Truncate(string text) =>
+        text.Length <= DetailsMaxLength ? text : string.Concat(text.AsSpan(0, DetailsMaxLength - 3), "...");
 
     private static void AddEvent(Session session, SessionEventType type, DateTimeOffset at, string details) =>
         session.Events.Add(new SessionEvent { StationId = session.StationId, Type = type, AtUtc = at, Details = details });

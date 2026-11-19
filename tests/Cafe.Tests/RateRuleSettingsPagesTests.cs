@@ -1,6 +1,7 @@
 using System.Net;
 using Cafe.Server.Data;
 using Cafe.Server.Pricing;
+using Cafe.Server.Sessions;
 using Cafe.Tests.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -14,6 +15,7 @@ public class RateRuleSettingsPagesTests : IDisposable
 
     [Theory]
     [InlineData("/rate-rules")]
+    [InlineData("/settings")]
     public async Task Anonymous_request_redirects_to_login(string path)
     {
         using var auth = await _factory.CreateAuthenticatedClientAsync();
@@ -56,10 +58,41 @@ public class RateRuleSettingsPagesTests : IDisposable
     }
 
     [Fact]
-    public async Task Nav_menu_links_to_rate_rules()
+    public async Task Nav_menu_links_to_rate_rules_and_settings()
     {
         using var client = await _factory.CreateAuthenticatedClientAsync();
         var body = await (await client.GetAsync("/rate-rules")).Content.ReadAsStringAsync();
         Assert.Contains("href=\"rate-rules\"", body);
+        Assert.Contains("href=\"settings\"", body);
+    }
+
+    [Fact]
+    public async Task Settings_page_renders_defaults()
+    {
+        using var client = await _factory.CreateAuthenticatedClientAsync();
+
+        var response = await client.GetAsync("/settings");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Grace period", body);
+        Assert.Contains("10,5,1", body);
+    }
+
+    [Fact]
+    public async Task Settings_page_shows_saved_values()
+    {
+        using var client = await _factory.CreateAuthenticatedClientAsync();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var saved = await scope.ServiceProvider.GetRequiredService<SessionSettingsService>()
+                .SaveAsync(new SessionSettingsInput { GracePeriodMinutes = 7, WarningMinutes = "20,3" });
+            Assert.True(saved.Success, saved.Error);
+        }
+
+        var body = await (await client.GetAsync("/settings")).Content.ReadAsStringAsync();
+
+        Assert.Contains("20,3", body);
+        Assert.Contains("value=\"7\"", body);
     }
 }

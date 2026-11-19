@@ -17,6 +17,7 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
 ## Phase Details
 
 ### Phase 1: Foundation
+
 **Goal**: Staff can log in to a running admin app and configure the cafe's station types and stations
 **Mode:** mvp
 **Depends on**: Nothing (first phase)
@@ -26,10 +27,17 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
   2. Staff can create, edit and delete station types, each with a base hourly rate
   3. Staff can create, edit and delete stations with name, type, kind (PC/Console) and agent machine ID or TV IP/MAC
   4. The dashboard shows a grid of all stations with a status badge (idle, in session, paused, expiring, offline)
+
 **Plans**: TBD
+- [x] 01-01-PLAN.md
+- [ ] 01-02-PLAN.md
+- [ ] 01-03-PLAN.md
+- [ ] 01-04-PLAN.md
+
 **UI hint**: yes
 
 ### Phase 2: Session Engine & Pricing
+
 **Goal**: Staff can run and bill timed sessions on any station, with accurate pricing, desk alerts and automatic expiry handling
 **Mode:** mvp
 **Depends on**: Phase 1
@@ -40,10 +48,12 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
   3. Staff can define time-of-day/day-of-week rate rules and a session crossing a rule boundary is charged at the correct split rates
   4. The desk UI shows a visible and audible alert as a station enters its warning window or passes expiry, and after the configured grace period the station's expiry action fires automatically
   5. Every session action (start, pause, resume, extend, move, stop, expire) appears in an audit trail
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 3: PC Agent
+
 **Goal**: Gaming PCs lock and unlock themselves based on session state and staff can control them from the desk
 **Mode:** mvp
 **Depends on**: Phase 2
@@ -54,10 +64,12 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
   3. Starting a session unlocks the PC; stopping or expiring it (after grace) locks it again, with countdown warnings at 10, 5 and 1 minutes and during grace
   4. Staff can send lock, unlock, message, shutdown and restart to a PC from the dashboard
   5. When the server is unreachable the agent stays locked and reconnects automatically; the simulator can run N fake agents to exercise the whole flow without Windows machines
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 4: Samsung TV Control
+
 **Goal**: Console stations stop being usable when paid time runs out and start up when a session begins
 **Mode:** mvp
 **Depends on**: Phase 2
@@ -67,10 +79,12 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
   2. When a console session expires and grace ends, the TV powers off automatically
   3. Starting a console session wakes the TV with Wake-on-LAN
   4. The dashboard shows each TV's reachability/power state and staff can power it on or off manually
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 5: Customers & Packages
+
 **Goal**: Staff can look up customers, apply member pricing and sell and use prepaid time packages
 **Mode:** mvp
 **Depends on**: Phase 2
@@ -80,10 +94,12 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
   2. Staff can define time packages (minutes, price, optional station-type limit) and sell one to a customer, adding minutes to their balance and recording the payment
   3. Staff can start a session that draws time from a customer's minute balance
   4. A session linked to a member is charged the member rate and a guest session is charged the guest rate
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 6: POS & Receipts
+
 **Goal**: Staff can sell food and drinks, record payments and print receipts
 **Mode:** mvp
 **Depends on**: Phase 5
@@ -92,10 +108,12 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
   1. Staff can manage products (name, category, price, active) and ring up an order attached to a session, a customer or a walk-in
   2. Staff can record a payment (cash or card, amount) for session charges, orders and packages
   3. Staff can print a receipt on a network ESC/POS thermal printer, falling back to a Windows printer when it is unavailable
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 7: Reports & Deployment
+
 **Goal**: The owner can see revenue and the system installs on the cafe's real Windows machines
 **Mode:** mvp
 **Depends on**: Phase 6
@@ -105,6 +123,7 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
   2. Staff can view revenue broken down by station type, by product and by payment method
   3. The server installs and runs as a Windows service on the front-desk PC and the admin UI is reachable from other devices on the LAN
   4. Running the installer script on a gaming PC sets up the logon scheduled task, Task Manager policy and server URL config so the agent starts locked at logon
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -112,7 +131,7 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/TBD | Not started | - |
+| 1. Foundation | 1/4 | In Progress | - |
 | 2. Session Engine & Pricing | 0/TBD | Not started | - |
 | 3. PC Agent | 0/TBD | Not started | - |
 | 4. Samsung TV Control | 0/TBD | Not started | - |

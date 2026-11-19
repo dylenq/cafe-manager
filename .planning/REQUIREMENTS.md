@@ -7,9 +7,9 @@
 
 ### Foundation & Admin
 
-- [ ] **ADMN-01**: Staff set the admin password on first run and log in with it from any browser on the LAN; the login persists across refreshes
-- [ ] **ADMN-02**: Staff can create, edit and delete station types with a base hourly rate
-- [ ] **ADMN-03**: Staff can create, edit and delete stations (name, type, kind PC/Console, agent machine ID or TV IP/MAC)
+- [x] **ADMN-01**: Staff set the admin password on first run and log in with it from any browser on the LAN; the login persists across refreshes
+- [x] **ADMN-02**: Staff can create, edit and delete station types with a base hourly rate
+- [x] **ADMN-03**: Staff can create, edit and delete stations (name, type, kind PC/Console, agent machine ID or TV IP/MAC)
 - [ ] **ADMN-04**: Staff see a dashboard grid of all stations with live status (idle, in session, paused, expiring, offline)
 
 ### Sessions
@@ -98,9 +98,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ADMN-01 | Phase 1 | Pending |
-| ADMN-02 | Phase 1 | Pending |
-| ADMN-03 | Phase 1 | Pending |
+| ADMN-01 | Phase 1 | Complete |
+| ADMN-02 | Phase 1 | Complete |
+| ADMN-03 | Phase 1 | Complete |
 | ADMN-04 | Phase 1 | Pending |
 | SESS-01 | Phase 2 | Pending |
 | SESS-02 | Phase 2 | Pending |

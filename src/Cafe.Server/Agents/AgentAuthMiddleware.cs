@@ -34,13 +34,22 @@ public sealed class AgentAuthMiddleware(RequestDelegate next, ILogger<AgentAuthM
         }
 
         var machineId = context.Request.Headers[AgentProtocol.MachineIdHeader].FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(machineId))
+        if (!IsValidMachineId(machineId))
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             return;
         }
 
         await next(context);
+    }
+
+    /// <summary>Trimmed length 1 to 100 with no control characters.</summary>
+    internal static bool IsValidMachineId(string? machineId)
+    {
+        var trimmed = machineId?.Trim();
+        return !string.IsNullOrEmpty(trimmed)
+            && trimmed.Length <= AgentProtocol.MaxMachineIdLength
+            && !trimmed.Any(c => c < 0x20 || c == 0x7F);
     }
 
     private static bool KeysMatch(string supplied, string expected) =>

@@ -9,6 +9,7 @@ public static class AgentServiceCollectionExtensions
         services.AddSignalR();
         services.AddSingleton<AgentRegistry>();
         services.AddSingleton<AgentSettingsService>();
+        services.AddSingleton<AgentAdminService>();
         services.AddSingleton<AgentCommandService>();
         services.AddSingleton<ISessionEventSink>(sp => sp.GetRequiredService<AgentCommandService>());
         services.AddSingleton<SessionSignalPublisher>();

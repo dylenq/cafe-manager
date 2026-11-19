@@ -49,6 +49,30 @@ public sealed class AgentSettingsService(IDbContextFactory<CafeDbContext> dbFact
         return value;
     }
 
+    /// <summary>Replaces the key and disconnects every connected agent; they must be reconfigured with the new key.</summary>
+    public async Task<string> RegenerateSharedKeyAsync(CancellationToken cancellationToken = default)
+    {
+        var key = NewKey();
+        await using (var db = await dbFactory.CreateDbContextAsync(cancellationToken))
+        {
+            var row = await db.Settings.FirstOrDefaultAsync(s => s.Key == SharedKeyKey, cancellationToken);
+            if (row is null)
+            {
+                db.Settings.Add(new Setting { Key = SharedKeyKey, Value = key });
+            }
+            else
+            {
+                row.Value = key;
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        _cachedKey = key;
+        registry.DisconnectAll();
+        return key;
+    }
+
     public async Task<string> GetCafeNameAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);

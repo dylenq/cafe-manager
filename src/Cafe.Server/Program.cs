@@ -40,6 +40,7 @@ builder.Services.AddSingleton<SessionSettingsService>();
 builder.Services.AddSingleton<PricingConfigService>();
 builder.Services.AddSingleton<SessionCharges>();
 builder.Services.AddScoped<SessionService>();
+builder.Services.AddScoped<SessionHistoryService>();
 builder.Services.AddScoped<DashboardService>();
 
 // Single shared admin login: one persistent, sliding 30-day cookie. No Identity users table.

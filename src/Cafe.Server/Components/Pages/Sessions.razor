@@ -1,0 +1,169 @@
+@page "/sessions"
+@attribute [Authorize]
+@using System.Globalization
+@using Cafe.Server.Data
+@using Cafe.Server.Pricing
+@using Cafe.Server.Sessions
+@using Cafe.Server.Stations
+@inject SessionHistoryService History
+@inject StationService StationSvc
+@inject PricingConfigService Pricing
+@inject ILogger<Sessions> Logger
+
+<PageTitle>Sessions - Cafe Manager</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Sessions</h1>
+    <div class="d-flex align-items-center gap-2">
+        <label class="form-label mb-0" for="station-filter">Station</label>
+        <select id="station-filter" class="form-select w-auto" value="@filterId" @onchange="OnFilterChanged">
+            <option value="">All stations</option>
+            @foreach (var station in stations)
+            {
+                <option value="@station.Id">@station.Name</option>
+            }
+        </select>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (rows is null)
+{
+    <p>Loading...</p>
+}
+else if (rows.Count == 0)
+{
+    <p class="text-muted">No sessions yet.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Station</th>
+                    <th>Mode</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>End reason</th>
+                    <th class="text-end">Active time</th>
+                    <th class="text-end">Charge</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in rows)
+                {
+                    <tr @key="row.SessionId">
+                        <td>@row.StationName</td>
+                        <td>@(row.Mode == SessionMode.Prepaid ? "Prepaid" : "Open-ended")</td>
+                        <td>@Local(row.StartedAtUtc)</td>
+                        <td>@(row.EndedAtUtc is { } end ? Local(end) : "")</td>
+                        <td>@EndReasonText(row)</td>
+                        <td class="text-end">@Duration(row.ActiveSeconds)</td>
+                        <td class="text-end">@row.ChargedAmount.ToString("C")</td>
+                        <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Toggle(row.SessionId)">
+                                @(expanded.Contains(row.SessionId) ? "Hide" : "Events")
+                            </button>
+                        </td>
+                    </tr>
+                    @if (expanded.Contains(row.SessionId))
+                    {
+                        <tr>
+                            <td colspan="8" class="bg-body-tertiary">
+                                @if (row.Events.Count == 0)
+                                {
+                                    <span class="text-muted">No events.</span>
+                                }
+                                else
+                                {
+                                    <ul class="list-unstyled mb-0 small">
+                                        @foreach (var evt in row.Events)
+                                        {
+                                            <li>@Local(evt.AtUtc) - @evt.Type - @evt.Details</li>
+                                        }
+                                    </ul>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<SessionHistoryRow>? rows;
+    private List<Station> stations = [];
+    private readonly HashSet<int> expanded = [];
+    private string filterId = string.Empty;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            stations = await StationSvc.ListAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load stations for the session filter.");
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            int? station = int.TryParse(filterId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) ? id : null;
+            rows = await History.GetRecentAsync(station);
+            errorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load session history.");
+            rows ??= [];
+            errorMessage = "Could not load sessions. Refresh the page and try again.";
+        }
+    }
+
+    private async Task OnFilterChanged(ChangeEventArgs e)
+    {
+        filterId = e.Value?.ToString() ?? string.Empty;
+        expanded.Clear();
+        await LoadAsync();
+    }
+
+    private void Toggle(int sessionId)
+    {
+        if (!expanded.Remove(sessionId))
+        {
+            expanded.Add(sessionId);
+        }
+    }
+
+    private string Local(DateTimeOffset utc) =>
+        TimeZoneInfo.ConvertTime(utc, Pricing.TimeZone).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+
+    private static string EndReasonText(SessionHistoryRow row) => row.Status switch
+    {
+        SessionStatus.Active => "Active",
+        SessionStatus.Paused => "Paused",
+        SessionStatus.Grace => "Grace",
+        _ => row.EndReason?.ToString() ?? string.Empty,
+    };
+
+    private static string Duration(long seconds)
+    {
+        var t = TimeSpan.FromSeconds(Math.Max(0, seconds));
+        return $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}";
+    }
+}

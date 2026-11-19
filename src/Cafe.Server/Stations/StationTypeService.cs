@@ -112,9 +112,10 @@ public class StationTypeService(IDbContextFactory<CafeDbContext> dbFactory)
         {
             return ServiceResult.NotFound(Gone);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (ex.InnerException is Microsoft.Data.Sqlite.SqliteException { SqliteErrorCode: 19 })
         {
             // A station was added between the count and the delete; the restrict FK refused it.
+            // Any other database failure propagates so it is not reported as "in use".
             var now = await db.Stations.CountAsync(s => s.StationTypeId == id);
             return ServiceResult.Fail(InUse(entity.Name, Math.Max(now, 1)));
         }

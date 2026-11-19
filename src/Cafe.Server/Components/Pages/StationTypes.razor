@@ -2,6 +2,7 @@
 @using Cafe.Server.Data
 @using Cafe.Server.Stations
 @inject StationTypeService TypeService
+@inject ILogger<StationTypes> Logger
 
 <PageTitle>Station types - Cafe Manager</PageTitle>
 
@@ -113,7 +114,19 @@ else
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
-    private async Task LoadAsync() => types = await TypeService.ListAsync();
+    private async Task LoadAsync()
+    {
+        try
+        {
+            types = await TypeService.ListAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load station types.");
+            types ??= [];
+            errorMessage = "Could not load the list. Refresh the page and try again.";
+        }
+    }
 
     private void StartAdd()
     {
@@ -169,6 +182,11 @@ else
             editingId = null;
             await LoadAsync();
         }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not save station type.");
+            errorMessage = "Something went wrong. Try again.";
+        }
         finally
         {
             saving = false;
@@ -178,8 +196,17 @@ else
     private async Task DeleteAsync(int id)
     {
         confirmingDeleteId = null;
-        var result = await TypeService.DeleteAsync(id);
-        errorMessage = result.Success ? null : result.Error;
+        try
+        {
+            var result = await TypeService.DeleteAsync(id);
+            errorMessage = result.Success ? null : result.Error;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not delete station type {TypeId}.", id);
+            errorMessage = "Something went wrong. Try again.";
+        }
+
         await LoadAsync();
     }
 }

@@ -165,4 +165,15 @@ public class StationTypeServiceTests : IDisposable
         var names = (await types.ListAsync()).Select(t => t.Name).ToArray();
         Assert.Equal(["Apple", "beta", "zeta", "Alpha"], names);
     }
+
+    [Fact]
+    public async Task Delete_propagates_non_constraint_database_failures_instead_of_reporting_in_use()
+    {
+        var (scope, types, _) = Services();
+        using var _s = scope;
+        var id = (await types.CreateAsync(Input("Doomed"))).Value!.Id;
+        var failing = new StationTypeService(new FailingSaveDbContextFactory(_factory.ConnectionString));
+
+        await Assert.ThrowsAsync<Microsoft.EntityFrameworkCore.DbUpdateException>(() => failing.DeleteAsync(id));
+    }
 }

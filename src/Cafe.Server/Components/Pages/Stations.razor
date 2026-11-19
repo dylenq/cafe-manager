@@ -4,6 +4,7 @@
 @using Cafe.Shared
 @inject StationService StationSvc
 @inject StationTypeService TypeSvc
+@inject ILogger<Stations> Logger
 
 <PageTitle>Stations - Cafe Manager</PageTitle>
 
@@ -172,8 +173,18 @@ else
 
     private async Task LoadAsync()
     {
-        types = await TypeSvc.ListAsync();
-        stations = await StationSvc.ListAsync();
+        try
+        {
+            types = await TypeSvc.ListAsync();
+            stations = await StationSvc.ListAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load stations.");
+            types ??= [];
+            stations ??= [];
+            errorMessage = "Could not load the list. Refresh the page and try again.";
+        }
     }
 
     private void StartAdd()
@@ -254,6 +265,11 @@ else
             editingId = null;
             await LoadAsync();
         }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not save station.");
+            errorMessage = "Something went wrong. Try again.";
+        }
         finally
         {
             saving = false;
@@ -263,8 +279,17 @@ else
     private async Task DeleteAsync(int id)
     {
         confirmingDeleteId = null;
-        var result = await StationSvc.DeleteAsync(id);
-        errorMessage = result.Success ? null : result.Error;
+        try
+        {
+            var result = await StationSvc.DeleteAsync(id);
+            errorMessage = result.Success ? null : result.Error;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not delete station {StationId}.", id);
+            errorMessage = "Something went wrong. Try again.";
+        }
+
         await LoadAsync();
     }
 }

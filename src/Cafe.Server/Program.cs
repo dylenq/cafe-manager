@@ -38,6 +38,7 @@ builder.Services.AddSingleton<IStationStatusProvider, SessionAwareStatusProvider
 builder.Services.AddSingleton<SessionNotifier>();
 builder.Services.AddSingleton<SessionSettingsService>();
 builder.Services.AddSingleton<PricingConfigService>();
+builder.Services.AddSingleton<SessionCharges>();
 builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<DashboardService>();
 

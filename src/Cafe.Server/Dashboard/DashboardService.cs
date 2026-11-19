@@ -8,6 +8,8 @@ public class DashboardService(
     IDbContextFactory<CafeDbContext> dbFactory,
     IStationStatusProvider statusProvider,
     SessionSettingsService settingsService,
+    SessionCharges charges,
+    Cafe.Server.Pricing.PricingConfigService pricing,
     TimeProvider time)
 {
     public async Task<List<StationCardModel>> GetCardsAsync(CancellationToken cancellationToken = default)
@@ -31,14 +33,31 @@ public class DashboardService(
         var settings = await settingsService.GetAsync(cancellationToken);
         var now = time.GetUtcNow();
 
-        return stations.Select(s =>
+        IReadOnlyList<RateRule>? rules = null;
+        var cards = new List<StationCardModel>(stations.Count);
+        foreach (var s in stations)
         {
-            var session = byStation.TryGetValue(s.Id, out var entity) ? ToModel(entity, settings, now) : null;
-            return new StationCardModel(s.Id, s.Name, s.StationType.Name, s.Kind, statusProvider.GetStatus(s, session, now), session);
-        }).ToList();
+            SessionCardModel? session = null;
+            if (byStation.TryGetValue(s.Id, out var entity))
+            {
+                decimal? estimate = null;
+                if (entity.Mode == SessionMode.OpenEnded)
+                {
+                    // Same computation as StopAsync, so the card shows what a stop right now would charge.
+                    rules ??= await pricing.GetEnabledRulesAsync(db, cancellationToken);
+                    estimate = await charges.OpenEndedAsync(db, entity.Segments, now, rules, cancellationToken);
+                }
+
+                session = ToModel(entity, settings, now, estimate);
+            }
+
+            cards.Add(new StationCardModel(s.Id, s.Name, s.StationType.Name, s.Kind, statusProvider.GetStatus(s, session, now), session));
+        }
+
+        return cards;
     }
 
-    private static SessionCardModel ToModel(Session session, SessionSettings settings, DateTimeOffset now)
+    private static SessionCardModel ToModel(Session session, SessionSettings settings, DateTimeOffset now, decimal? estimate)
     {
         var closed = session.Segments.Where(x => x.EndUtc is not null).Sum(x => (long)(x.EndUtc!.Value - x.StartUtc).TotalSeconds);
         var open = session.Segments.FirstOrDefault(x => x.EndUtc is null)?.StartUtc;
@@ -52,7 +71,7 @@ public class DashboardService(
             session.GraceStartedAtUtc,
             settings.GracePeriodMinutes,
             settings.MaxWarningMinutes * 60,
-            session.ChargedAmount,
+            estimate ?? session.ChargedAmount,
             now);
     }
 }

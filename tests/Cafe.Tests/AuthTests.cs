@@ -160,6 +160,34 @@ public class AuthTests
     }
 
     [Fact]
+    public async Task Nav_shows_links_and_logout_form_for_signed_in_user()
+    {
+        using var factory = new CafeWebApplicationFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync();
+
+        var html = await (await client.GetAsync("/")).Content.ReadAsStringAsync();
+
+        Assert.Contains("Dashboard", html);
+        Assert.Contains("href=\"stations\"", html);
+        Assert.Contains("Station Types", html);
+        Assert.Contains("action=\"/logout\"", html);
+    }
+
+    [Fact]
+    public async Task Logout_with_token_clears_cookie_and_locks_out_again()
+    {
+        using var factory = new CafeWebApplicationFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync();
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/")).StatusCode);
+
+        var response = await FormPostHelper.PostFormAsync(client, "/", new Dictionary<string, string>(), "/logout");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/login", PathOf(response));
+        Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/")).StatusCode);
+    }
+
+    [Fact]
     public async Task Logout_without_token_is_rejected()
     {
         using var factory = new CafeWebApplicationFactory();

@@ -1,0 +1,374 @@
+@using Cafe.Server.Agents
+@using Cafe.Server.Data
+@using Cafe.Server.Pricing
+@using Cafe.Server.Stations
+@using Cafe.Shared.Agents
+@implements IDisposable
+@inject AgentAdminService Admin
+@inject AgentSettingsService AgentSettings
+@inject AgentRegistry Registry
+@inject StationTypeService TypeSvc
+@inject PricingConfigService Pricing
+@inject NavigationManager Nav
+@inject IJSRuntime Js
+@inject ILogger<AgentsPanel> Logger
+
+@* The shared key is shown only to the logged-in admin: the page and this panel inherit [Authorize]. It is masked by default and never logged. *@
+<div class="card mb-4" id="pc-agents">
+    <div class="card-body">
+        <h2 class="h5 card-title">PC agents</h2>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger alert-dismissible" role="alert">
+                @_error
+                <button type="button" class="btn-close" aria-label="Close" @onclick="() => _error = null"></button>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(_notice))
+        {
+            <div class="alert alert-success py-2" role="status">@_notice</div>
+        }
+
+        <h3 class="h6">Shared key</h3>
+        <div class="input-group mb-1">
+            <input id="agent-key" class="form-control font-monospace" readonly type="@(_showKey ? "text" : "password")" value="@_key" aria-label="Shared agent key" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="() => _showKey = !_showKey">@(_showKey ? "Hide" : "Show")</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="CopyAsync">Copy</button>
+            <button type="button" class="btn btn-outline-danger" @onclick="() => _confirmRegenerate = true" disabled="@_confirmRegenerate">Regenerate</button>
+        </div>
+        <div class="form-text mb-2">
+            Put this key in <code>agentsettings.json</code> on every PC, with the server address <code>@ConnectUrl</code>.
+        </div>
+        @if (!string.IsNullOrEmpty(_copyMessage))
+        {
+            <div class="text-danger small mb-2" role="status">@_copyMessage</div>
+        }
+
+        @if (_confirmRegenerate)
+        {
+            <div class="alert alert-warning" role="alert">
+                <p class="mb-2">All connected agents will disconnect and need the new key in agentsettings.json.</p>
+                <button type="button" class="btn btn-danger btn-sm me-2" @onclick="RegenerateAsync" disabled="@_busy">Regenerate key</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => _confirmRegenerate = false">Cancel</button>
+            </div>
+        }
+
+        <h3 class="h6 mt-4">Connected agents</h3>
+        @if (_connected.Count == 0)
+        {
+            <p class="text-muted mb-0">No agents are connected.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr><th>Machine ID</th><th>Station</th><th>Version</th><th>Connected since</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var agent in _connected)
+                        {
+                            <tr @key="agent.Connection.MachineId">
+                                <td>@agent.Connection.MachineId</td>
+                                <td>@(agent.StationName ?? "Unregistered")</td>
+                                <td>@agent.Connection.Version</td>
+                                <td>@FormatLocal(agent.Connection.ConnectedAtUtc)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <h3 class="h6 mt-4">Unregistered agents</h3>
+        @if (_unregistered.Count == 0)
+        {
+            <p class="text-muted mb-0">No unregistered agents. A PC whose Machine ID matches no station appears here.</p>
+        }
+        else
+        {
+            @foreach (var agent in _unregistered)
+            {
+                var row = RowFor(agent.MachineId);
+                <div class="border rounded p-2 mb-2" @key="agent.MachineId">
+                    <div class="fw-semibold mb-2">@agent.MachineId <span class="text-muted small fw-normal">@agent.Version</span></div>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-lg-6">
+                            <div class="row g-2">
+                                <div class="col-12 col-sm-5">
+                                    <label class="form-label small mb-0" for="@($"type-{agent.MachineId}")">Station type</label>
+                                    <select id="@($"type-{agent.MachineId}")" class="form-select form-select-sm" @bind="row.TypeId">
+                                        <option value="0">Choose...</option>
+                                        @foreach (var type in _types)
+                                        {
+                                            <option value="@type.Id">@type.Name</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-12 col-sm-7">
+                                    <label class="form-label small mb-0" for="@($"name-{agent.MachineId}")">Station name</label>
+                                    <div class="input-group input-group-sm">
+                                        <input id="@($"name-{agent.MachineId}")" class="form-control" @bind="row.Name" maxlength="100" />
+                                        <button type="button" class="btn btn-primary" @onclick="() => CreateAsync(agent.MachineId)" disabled="@_busy">Create station</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label small mb-0" for="@($"assign-{agent.MachineId}")">Or assign to an existing PC station</label>
+                            <div class="input-group input-group-sm">
+                                <select id="@($"assign-{agent.MachineId}")" class="form-select" @bind="row.StationId">
+                                    <option value="0">Choose...</option>
+                                    @foreach (var station in _pcStations)
+                                    {
+                                        <option value="@station.Id">@station.Name</option>
+                                    }
+                                </select>
+                                <button type="button" class="btn btn-outline-primary" @onclick="() => AssignAsync(agent.MachineId)" disabled="@_busy">Assign</button>
+                            </div>
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrEmpty(row.Error))
+                    {
+                        <div class="text-danger small mt-1" role="alert">@row.Error</div>
+                    }
+                </div>
+            }
+        }
+
+        <h3 class="h6 mt-4">Cafe name on lock screens</h3>
+        <div class="input-group">
+            <input id="cafe-name" class="form-control" @bind="_cafeName" maxlength="@AgentSettingsService.CafeNameMaxLength" aria-label="Cafe name" />
+            <button type="button" class="btn btn-primary" @onclick="SaveCafeNameAsync" disabled="@_busy">Save</button>
+        </div>
+        @if (!string.IsNullOrEmpty(_cafeNameError))
+        {
+            <div class="text-danger small mt-1" role="alert">@_cafeNameError</div>
+        }
+    </div>
+</div>
+
+@code {
+    private sealed class RowState
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public int TypeId { get; set; }
+
+        public int StationId { get; set; }
+
+        public string? Error { get; set; }
+    }
+
+    private const string Generic = "Something went wrong. Try again.";
+
+    private readonly Dictionary<string, RowState> _rows = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyList<ConnectedAgent> _connected = [];
+    private IReadOnlyList<AgentConnectionInfo> _unregistered = [];
+    private IReadOnlyList<StationType> _types = [];
+    private IReadOnlyList<Station> _pcStations = [];
+    private string _key = string.Empty;
+    private string _cafeName = string.Empty;
+    private bool _showKey;
+    private bool _confirmRegenerate;
+    private bool _busy;
+    private bool _subscribed;
+    private string? _error;
+    private string? _notice;
+    private string? _copyMessage;
+    private string? _cafeNameError;
+
+    private string ConnectUrl => new Uri(new Uri(Nav.BaseUri), AgentProtocol.HubPath).ToString();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _key = await SafeAsync(() => AgentSettings.GetOrCreateSharedKeyAsync(), string.Empty);
+        _cafeName = await SafeAsync(() => AgentSettings.GetCafeNameAsync(), string.Empty);
+        await LoadAsync();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && RendererInfo.IsInteractive)
+        {
+            Registry.Changed += OnRegistryChanged;
+            _subscribed = true;
+        }
+    }
+
+    // Raised on connect and disconnect from a hub thread: marshal to the renderer before touching state.
+    private void OnRegistryChanged(string machineId) => _ = InvokeAsync(async () =>
+    {
+        try
+        {
+            await LoadAsync();
+            StateHasChanged();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The circuit ended.
+        }
+    });
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _connected = await Admin.GetConnectedAsync();
+            _unregistered = await Admin.GetUnregisteredAsync();
+            _pcStations = await Admin.ListPcStationsAsync();
+            _types = await TypeSvc.ListAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load the PC agents section.");
+            _error = "Could not load the agents. Refresh the page and try again.";
+        }
+    }
+
+    private async Task<T> SafeAsync<T>(Func<Task<T>> load, T fallback)
+    {
+        try
+        {
+            return await load();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load the PC agents section.");
+            _error = "Could not load the agents. Refresh the page and try again.";
+            return fallback;
+        }
+    }
+
+    private RowState RowFor(string machineId)
+    {
+        if (!_rows.TryGetValue(machineId, out var row))
+        {
+            row = new RowState { Name = machineId };
+            _rows[machineId] = row;
+        }
+
+        return row;
+    }
+
+    private string FormatLocal(DateTimeOffset utc) =>
+        TimeZoneInfo.ConvertTime(utc, Pricing.TimeZone).ToString("yyyy-MM-dd HH:mm");
+
+    private async Task CopyAsync()
+    {
+        _copyMessage = null;
+        try
+        {
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", _key);
+            _notice = "Key copied.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Clipboard unavailable.");
+            _notice = null;
+            _copyMessage = "Copy failed, select the key and copy manually";
+        }
+    }
+
+    private async Task RegenerateAsync()
+    {
+        await RunAsync(async () =>
+        {
+            _key = await AgentSettings.RegenerateSharedKeyAsync();
+            _confirmRegenerate = false;
+            _showKey = true;
+            _notice = "New key created. Agents were disconnected; update agentsettings.json on each PC.";
+            _copyMessage = null;
+        });
+    }
+
+    private async Task CreateAsync(string machineId)
+    {
+        var row = RowFor(machineId);
+        await RunAsync(async () =>
+        {
+            row.Error = null;
+            var result = await Admin.CreateStationFromAgentAsync(machineId, row.Name, row.TypeId);
+            if (!result.Success)
+            {
+                row.Error = result.Error;
+                return;
+            }
+
+            _rows.Remove(machineId);
+            _notice = $"Station {result.Value!.Name} created for {machineId}.";
+            await LoadAsync();
+        });
+    }
+
+    private async Task AssignAsync(string machineId)
+    {
+        var row = RowFor(machineId);
+        await RunAsync(async () =>
+        {
+            row.Error = null;
+            if (row.StationId == 0)
+            {
+                row.Error = "Choose a PC station to assign.";
+                return;
+            }
+
+            var result = await Admin.AssignAgentToStationAsync(machineId, row.StationId);
+            if (!result.Success)
+            {
+                row.Error = result.Error;
+                return;
+            }
+
+            _rows.Remove(machineId);
+            _notice = $"{machineId} assigned.";
+            await LoadAsync();
+        });
+    }
+
+    private async Task SaveCafeNameAsync()
+    {
+        await RunAsync(async () =>
+        {
+            _cafeNameError = null;
+            var result = await AgentSettings.SaveCafeNameAsync(_cafeName);
+            if (!result.Success)
+            {
+                _cafeNameError = result.Error;
+                return;
+            }
+
+            _cafeName = await AgentSettings.GetCafeNameAsync();
+            _notice = "Cafe name saved.";
+        });
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        _notice = null;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "PC agents action failed.");
+            _error = Generic;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_subscribed)
+        {
+            Registry.Changed -= OnRegistryChanged;
+        }
+    }
+}

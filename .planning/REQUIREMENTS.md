@@ -22,7 +22,7 @@
 - [ ] **SESS-06**: Staff can stop a session and see the final charge
 - [ ] **SESS-07**: The dashboard shows a live countdown (or elapsed time for open-ended sessions) per station
 - [ ] **SESS-08**: The desk UI shows a visible and audible alert when a station is within the warning window or past expiry
-- [ ] **SESS-09**: After expiry a configurable grace period runs, then the station's expiry action fires automatically
+- [x] **SESS-09**: After expiry a configurable grace period runs, then the station's expiry action fires automatically
 - [x] **SESS-10**: Every session action (start, pause, resume, extend, move, stop, expire) is recorded in an audit trail
 
 ### Pricing
@@ -110,7 +110,7 @@
 | SESS-06 | Phase 2 | Pending |
 | SESS-07 | Phase 2 | Pending |
 | SESS-08 | Phase 2 | Pending |
-| SESS-09 | Phase 2 | Pending |
+| SESS-09 | Phase 2 | Complete |
 | SESS-10 | Phase 2 | Complete |
 | PRIC-01 | Phase 2 | Complete |
 | PRIC-02 | Phase 2 | Complete |

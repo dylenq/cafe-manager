@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: Session Engine & Pricing
 status: executing
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-11-19T19:33:49.794Z"
+stopped_at: Completed 02-04-PLAN.md
+last_updated: "2026-11-19T19:37:55.258Z"
 last_activity: 2026-11-20
 last_activity_desc: Phase 2 execution started
-state_head: c8d9c1af4aff2a37bc836e917a3496d4e31335f9
+state_head: 943c052a85567c331046ab8f7da6132c092541a8
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 2 (Session Engine & Pricing) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-11-20 — Phase 2 execution started
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 2 P01 | 40min | 2 tasks | 32 files |
 | Phase 2 P02-02 | 25min | 3 tasks | 17 files |
 | Phase 2 P03 | ~25m | 3 tasks | 14 files |
+| Phase 2 P02-04 | 30min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,7 @@ Recent decisions affecting current work:
 - [Phase 2]: Rate rule and settings validation lives in services; pages only render FieldErrors
 - [Phase 2]: ExtendAsync returns the extension quote; new total stays in ChargedAmount
 - [Phase 2]: Open-ended pricing shared via SessionCharges so card estimate equals stop charge
+- [Phase 2]: 02-04: expiry handlers run after Ended commit (at most once); ExpiryActionFired is a second save; IExpiryEvaluator interface and Sessions:RunTicker flag (default true, off in test factory)
 
 ### Pending Todos
 
@@ -102,6 +104,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-19T19:33:49.781Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-11-19T19:37:55.245Z
+Stopped at: Completed 02-04-PLAN.md
 Resume file: None

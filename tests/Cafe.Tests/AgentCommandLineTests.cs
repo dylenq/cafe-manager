@@ -7,8 +7,8 @@ public class AgentCommandLineTests
     [Fact]
     public void HashCode_with_value_is_parsed()
     {
-        var result = AgentCommandLine.Parse(["--hash-code", "1234"]);
-        Assert.Equal(new AgentCommand.HashCode("1234"), result);
+        var result = AgentCommandLine.Parse(["--hash-code", "123456"]);
+        Assert.Equal(new AgentCommand.HashCode("123456"), result);
     }
 
     [Fact]
@@ -45,5 +45,15 @@ public class AgentCommandLineTests
     {
         Assert.IsType<AgentCommand.Error>(AgentCommandLine.Parse(["--hash-code", new string('x', 201)]));
         Assert.IsType<AgentCommand.HashCode>(AgentCommandLine.Parse(["--hash-code", new string('x', 200)]));
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("12345")]
+    public void Short_code_is_rejected(string code)
+    {
+        var error = Assert.IsType<AgentCommand.Error>(AgentCommandLine.Parse(["--hash-code", code]));
+        Assert.Contains("at least", error.Message);
+        Assert.IsType<AgentCommand.HashCode>(AgentCommandLine.Parse(["--hash-code", new string('x', AgentCommandLine.MinCodeLength)]));
     }
 }

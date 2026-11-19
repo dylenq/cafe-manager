@@ -14,6 +14,8 @@ public abstract record AgentCommand
 /// <summary>Parses the agent command line. Never throws.</summary>
 public static class AgentCommandLine
 {
+    public const int MinCodeLength = 6;
+
     public const int MaxCodeLength = 200;
 
     public const string Usage =
@@ -22,6 +24,7 @@ public static class AgentCommandLine
 
           (no arguments)       Run the agent (lock screen and server connection)
           --hash-code <code>   Print the hash to paste into agentsettings.json as EmergencyUnlockCodeHash, then exit
+                               (at least 6 characters; restrict agentsettings.json to administrators)
           --help               Show this help
         """;
 
@@ -51,6 +54,11 @@ public static class AgentCommandLine
                 if (string.IsNullOrWhiteSpace(value))
                 {
                     return new AgentCommand.Error("The code must not be blank.");
+                }
+
+                if (value.Length < MinCodeLength)
+                {
+                    return new AgentCommand.Error($"The code must be at least {MinCodeLength} characters.");
                 }
 
                 if (value.Length > MaxCodeLength)

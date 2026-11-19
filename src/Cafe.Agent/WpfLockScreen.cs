@@ -19,7 +19,7 @@ internal sealed class WpfLockScreen : ILockScreen
     private readonly string _emergencyHash;
     private readonly Action<bool> _onEmergencyUnlock;
     private readonly KeyboardBlocker _blocker;
-    private readonly EmergencyAttemptTracker _attempts = new();
+    private readonly EmergencyAttemptTracker _attempts;
     private readonly List<LockWindow> _windows = [];
     private LockInfo? _info;
     private bool _subscribed;
@@ -30,6 +30,7 @@ internal sealed class WpfLockScreen : ILockScreen
         _dispatcher = dispatcher;
         _logger = logger;
         _blocker = new KeyboardBlocker(logger);
+        _attempts = EmergencyAttemptTracker.CreateDefault(logger);
         _emergencyHash = emergencyHash;
         _onEmergencyUnlock = onEmergencyUnlock;
     }

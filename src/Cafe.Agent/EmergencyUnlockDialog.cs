@@ -5,40 +5,9 @@ using Cafe.Agent.Core;
 
 namespace Cafe.Agent;
 
-/// <summary>Remembers wrong attempts across dialog instances so closing and reopening the prompt cannot skip the lockout.</summary>
-internal sealed class EmergencyAttemptTracker
-{
-    public const int MaxAttempts = 3;
-    public static readonly TimeSpan LockoutDuration = TimeSpan.FromSeconds(30);
-
-    private int _failures;
-    private DateTime _lockedUntilUtc = DateTime.MinValue;
-
-    public TimeSpan RemainingLockout
-    {
-        get
-        {
-            var left = _lockedUntilUtc - DateTime.UtcNow;
-            return left > TimeSpan.Zero ? left : TimeSpan.Zero;
-        }
-    }
-
-    public void RecordFailure()
-    {
-        _failures++;
-        if (_failures >= MaxAttempts)
-        {
-            _failures = 0;
-            _lockedUntilUtc = DateTime.UtcNow + LockoutDuration;
-        }
-    }
-
-    public void Reset() => _failures = 0;
-}
-
 /// <summary>
 /// Modal prompt for the emergency unlock code. The entered code is never echoed or logged; it is verified with
-/// EmergencyCodeHasher against the configured hash. 3 wrong codes impose a 30 second lockout.
+/// EmergencyCodeHasher against the configured hash. 3 wrong codes impose an escalating lockout that survives an agent restart (see EmergencyAttemptTracker).
 /// </summary>
 internal sealed class EmergencyUnlockDialog : Window
 {

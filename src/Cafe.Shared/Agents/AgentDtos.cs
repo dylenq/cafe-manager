@@ -1,6 +1,10 @@
 namespace Cafe.Shared.Agents;
 
-public record LockInfo(string StationName, string CafeName, string Reason);
+/// <summary>
+/// Sequence is a server-side monotonic counter per message (0 means unsequenced). The agent ignores a Lock, Unlock or
+/// SessionUpdated whose sequence is not newer than the last one it applied, so a late stale message cannot undo a newer one.
+/// </summary>
+public record LockInfo(string StationName, string CafeName, string Reason, long Sequence = 0);
 
 /// <summary>Named to avoid clashing with the server's own SessionMode.</summary>
 public enum AgentSessionMode
@@ -15,4 +19,5 @@ public record SessionInfo(
     long? RemainingSeconds,
     long ElapsedSeconds,
     string StationName,
-    DateTimeOffset ServerUtcNow);
+    DateTimeOffset ServerUtcNow,
+    long Sequence = 0);

@@ -41,6 +41,9 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
     private int _attempt;
     private long _connectedAtMono;
 
+    // Highest server sequence applied on this connection (0 = none yet). Guarded by _gate.
+    private long _lastSequence;
+
     public AgentController(
         AgentConnectionOptions options,
         ILockScreen lockScreen,
@@ -157,6 +160,11 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
     {
         lock (_gate)
         {
+            if (IsStale(info.Sequence))
+            {
+                return Task.CompletedTask;
+            }
+
             ApplyLockCore(info);
         }
 
@@ -167,6 +175,11 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
     {
         lock (_gate)
         {
+            if (IsStale(info.Sequence))
+            {
+                return Task.CompletedTask;
+            }
+
             _emergency = false;
             ClearWarning();
             ClearGrace();
@@ -183,6 +196,11 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
     {
         lock (_gate)
         {
+            if (IsStale(info.Sequence))
+            {
+                return Task.CompletedTask;
+            }
+
             if (_state == AgentState.Locked)
             {
                 // Only an explicit Unlock opens a locked PC. A SessionUpdated that arrives after a Lock is a stale
@@ -325,6 +343,7 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
         {
             changed = _connected;
             _connected = false;
+            _lastSequence = 0; // The next connection starts with a fresh state push.
         }
 
         if (changed)
@@ -336,6 +355,24 @@ public sealed class AgentController : IAgentClient, IAsyncDisposable
     }
 
     // ---- internals (call under _gate) ----
+
+    /// <summary>True for a sequenced message that is not newer than the last applied one; otherwise records it.</summary>
+    private bool IsStale(long sequence)
+    {
+        if (sequence == 0)
+        {
+            return false; // Unsequenced sender (older server or a direct command): always applied.
+        }
+
+        if (sequence <= _lastSequence)
+        {
+            _logger.LogDebug("Ignoring stale server message (sequence {Sequence} <= {Last}).", sequence, _lastSequence);
+            return true;
+        }
+
+        _lastSequence = sequence;
+        return false;
+    }
 
     private void ApplyLockCore(LockInfo info)
     {

@@ -20,7 +20,8 @@ public class ExpiryEvaluator(
     SessionSettingsService settingsService,
     SessionNotifier notifier,
     IEnumerable<IExpiryActionHandler> handlers,
-    ILogger<ExpiryEvaluator> logger) : IExpiryEvaluator
+    ILogger<ExpiryEvaluator> logger,
+    SessionSignalPublisher? signals = null) : IExpiryEvaluator
 {
     /// <summary>Only sessions that expired within this window get their expiry actions (re)run.</summary>
     public static readonly TimeSpan ActionLookback = TimeSpan.FromHours(24);
@@ -139,6 +140,8 @@ public class ExpiryEvaluator(
 
         var changed = false;
         var ended = false;
+        var firedWarnings = new List<int>();
+        var enteredGrace = false;
 
         if (session.Status == SessionStatus.Active)
         {
@@ -154,6 +157,7 @@ public class ExpiryEvaluator(
                 if (remaining <= minutes * 60L && !fired)
                 {
                     AddEvent(session, SessionEventType.WarningReached, now, details);
+                    firedWarnings.Add(minutes);
                     changed = true;
                 }
             }
@@ -171,6 +175,7 @@ public class ExpiryEvaluator(
                 session.Status = SessionStatus.Grace;
                 session.GraceStartedAtUtc = expiry;
                 AddEvent(session, SessionEventType.Expired, expiry, "Time ran out");
+                enteredGrace = true;
                 changed = true;
             }
         }
@@ -212,7 +217,42 @@ public class ExpiryEvaluator(
         }
 
         notifier.Raise(session.StationId);
+        await PublishSignalsAsync(session, settings, now, firedWarnings, enteredGrace, ended, ct);
         return ended;
+    }
+
+    /// <summary>
+    /// Tells the PC agent what this pass did, after the commit. A late pass that fires several warning thresholds
+    /// sends only the smallest one, and only while the session is still Active; GraceStarted is sent only when the
+    /// session entered Grace in this pass, did not already end, and has grace time left.
+    /// </summary>
+    private async Task PublishSignalsAsync(
+        Session session, SessionSettings settings, DateTimeOffset now, List<int> firedWarnings, bool enteredGrace, bool ended, CancellationToken ct)
+    {
+        if (signals is null)
+        {
+            return;
+        }
+
+        var outgoing = new List<SessionSignal>();
+        if (session.Status == SessionStatus.Active && firedWarnings.Count > 0)
+        {
+            outgoing.Add(new SessionSignal(SessionSignalKind.WarningReached, session.StationId, session.Id, Minutes: firedWarnings.Min()));
+        }
+
+        if (enteredGrace && !ended && session.Status == SessionStatus.Grace && session.GraceStartedAtUtc is { } graceStart)
+        {
+            var left = (long)Math.Ceiling((graceStart.AddMinutes(settings.GracePeriodMinutes) - now).TotalSeconds);
+            if (left > 0)
+            {
+                outgoing.Add(new SessionSignal(SessionSignalKind.GraceStarted, session.StationId, session.Id, GraceSeconds: (int)left));
+            }
+        }
+
+        if (outgoing.Count > 0)
+        {
+            await signals.PublishAsync(outgoing, ct);
+        }
     }
 
     /// <summary>

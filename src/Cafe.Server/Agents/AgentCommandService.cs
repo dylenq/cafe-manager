@@ -14,6 +14,7 @@ public sealed class AgentCommandService(
     IDbContextFactory<CafeDbContext> dbFactory,
     TimeProvider time,
     AgentSettingsService settings,
+    SessionSettingsService sessionSettingsService,
     ILogger<AgentCommandService> logger) : ISessionEventSink
 {
     private static readonly TimeSpan SendTimeout = TimeSpan.FromSeconds(5);
@@ -21,7 +22,13 @@ public sealed class AgentCommandService(
     public const string DefaultLockReason = "Please see the front desk to start a session";
     public const string UnknownMachineReason = "This PC is not set up yet. Please see the front desk.";
 
-    /// <summary>Sends the state the machine should be in right now: Unlock with an Active session, otherwise Lock.</summary>
+    public const string PausedReason = "Session paused";
+    public const string EndedReason = "Session ended. Please see the front desk.";
+
+    /// <summary>
+    /// Sends the state the machine should be in right now: Unlock (plus a warning when already inside a warning
+    /// window) with an Active session, GraceStarted with the remaining grace in Grace, otherwise Lock.
+    /// </summary>
     public async Task PushStateAsync(string machineId, CancellationToken cancellationToken = default)
     {
         try
@@ -42,14 +49,36 @@ public sealed class AgentCommandService(
 
             var session = await db.Sessions.AsNoTracking().Include(s => s.Segments)
                 .FirstOrDefaultAsync(s => s.StationId == station.Id && s.Status != SessionStatus.Ended, cancellationToken);
-            if (session is { Status: SessionStatus.Active })
+            var sessionSettings = await sessionSettingsService.GetAsync(cancellationToken);
+            switch (session?.Status)
             {
-                var info = BuildSessionInfo(session, station.Name);
-                await SendAsync(connectionId, c => c.Unlock(info));
-                return;
+                case SessionStatus.Active:
+                {
+                    var info = BuildSessionInfo(session, station.Name);
+                    await SendAsync(connectionId, c => c.Unlock(info));
+                    if (info.RemainingSeconds is { } remaining
+                        && sessionSettings.WarningMinutes.Where(m => remaining <= m * 60L).DefaultIfEmpty(0).Min() is var window and > 0)
+                    {
+                        await SendAsync(connectionId, c => c.ShowWarning(window));
+                    }
+
+                    return;
+                }
+
+                case SessionStatus.Grace:
+                {
+                    var left = RemainingGraceSeconds(session, sessionSettings);
+                    if (left > 0)
+                    {
+                        await SendAsync(connectionId, c => c.GraceStarted(left));
+                        return;
+                    }
+
+                    break;
+                }
             }
 
-            var reason = session is { Status: SessionStatus.Paused } ? "Session paused" : DefaultLockReason;
+            var reason = session is { Status: SessionStatus.Paused } ? PausedReason : DefaultLockReason;
             await SendAsync(connectionId, c => c.Lock(new LockInfo(station.Name, cafeName, reason)));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -58,27 +87,174 @@ public sealed class AgentCommandService(
         }
     }
 
+    /// <summary>Locks the PC of a station with the given reason. A quiet no-op when it is not a connected PC agent.</summary>
+    public async Task LockStationAsync(Station station, string reason, CancellationToken cancellationToken = default)
+    {
+        if (station.Kind != StationKind.PC || string.IsNullOrWhiteSpace(station.AgentMachineId)
+            || !registry.TryGetConnectionId(station.AgentMachineId, out var connectionId))
+        {
+            return;
+        }
+
+        var cafeName = await settings.GetCafeNameAsync(cancellationToken);
+        await SendAsync(connectionId, c => c.Lock(new LockInfo(station.Name, cafeName, reason)));
+    }
+
     public async Task OnSessionSignalAsync(SessionSignal signal, CancellationToken cancellationToken)
     {
-        if (signal.Kind is not (SessionSignalKind.Started or SessionSignalKind.Stopped))
+        try
         {
-            return; // The remaining kinds are completed by plan 03-02.
+            switch (signal.Kind)
+            {
+                case SessionSignalKind.Started:
+                case SessionSignalKind.Resumed:
+                    await WithSessionAsync(signal.StationId, signal.SessionId, cancellationToken, async (target, session) =>
+                    {
+                        if (session.Status == SessionStatus.Active)
+                        {
+                            var info = BuildSessionInfo(session, target.Station.Name);
+                            await SendAsync(target.ConnectionId, c => c.Unlock(info));
+                        }
+                    });
+                    break;
+
+                case SessionSignalKind.Paused:
+                    await LockByIdAsync(signal.StationId, PausedReason, cancellationToken);
+                    break;
+
+                case SessionSignalKind.Stopped:
+                    await LockByIdAsync(signal.StationId, EndedReason, cancellationToken);
+                    break;
+
+                case SessionSignalKind.Extended:
+                    await WithSessionAsync(signal.StationId, signal.SessionId, cancellationToken, async (target, session) =>
+                    {
+                        if (session.Status is not (SessionStatus.Active or SessionStatus.Grace))
+                        {
+                            return; // Paused stays locked.
+                        }
+
+                        var info = BuildSessionInfo(session, target.Station.Name);
+                        if (signal.ExtendedFromGrace)
+                        {
+                            await SendAsync(target.ConnectionId, c => c.Unlock(info));
+                        }
+
+                        await SendAsync(target.ConnectionId, c => c.SessionUpdated(info));
+                    });
+                    break;
+
+                case SessionSignalKind.Moved:
+                    await OnMovedAsync(signal, cancellationToken);
+                    break;
+
+                case SessionSignalKind.WarningReached:
+                    await WithSessionAsync(signal.StationId, signal.SessionId, cancellationToken, async (target, session) =>
+                    {
+                        if (session.Status == SessionStatus.Active && signal.Minutes is { } minutes)
+                        {
+                            await SendAsync(target.ConnectionId, c => c.ShowWarning(minutes));
+                        }
+                    });
+                    break;
+
+                case SessionSignalKind.GraceStarted:
+                    if (signal.GraceSeconds is { } seconds and > 0)
+                    {
+                        var target = await ResolveAsync(signal.StationId, cancellationToken);
+                        if (target is not null)
+                        {
+                            await SendAsync(target.ConnectionId, c => c.GraceStarted(seconds));
+                        }
+                    }
+
+                    break;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Could not deliver {Kind} signal to agent.", signal.Kind);
+        }
+    }
+
+    private async Task OnMovedAsync(SessionSignal signal, CancellationToken ct)
+    {
+        string targetName;
+        await using (var db = await dbFactory.CreateDbContextAsync(ct))
+        {
+            targetName = await db.Stations.AsNoTracking().Where(s => s.Id == signal.StationId).Select(s => s.Name).FirstOrDefaultAsync(ct) ?? "another station";
         }
 
-        string? machineId;
-        await using (var db = await dbFactory.CreateDbContextAsync(cancellationToken))
+        if (signal.FromStationId is { } from)
         {
-            var station = await db.Stations.AsNoTracking()
-                .Where(s => s.Id == signal.StationId && s.Kind == StationKind.PC)
-                .Select(s => new { s.AgentMachineId })
-                .FirstOrDefaultAsync(cancellationToken);
-            machineId = station?.AgentMachineId;
+            await LockByIdAsync(from, $"Session moved to {targetName}", ct);
         }
 
-        if (!string.IsNullOrEmpty(machineId))
+        await WithSessionAsync(signal.StationId, signal.SessionId, ct, async (target, session) =>
         {
-            await PushStateAsync(machineId, cancellationToken);
+            if (session.Status == SessionStatus.Active)
+            {
+                var info = BuildSessionInfo(session, target.Station.Name);
+                await SendAsync(target.ConnectionId, c => c.Unlock(info));
+            }
+            else if (session.Status == SessionStatus.Paused)
+            {
+                var cafeName = await settings.GetCafeNameAsync(ct);
+                await SendAsync(target.ConnectionId, c => c.Lock(new LockInfo(target.Station.Name, cafeName, PausedReason)));
+            }
+        });
+    }
+
+    private sealed record Target(Station Station, string ConnectionId);
+
+    /// <summary>The PC station and live connection for a station id, or null when it is not a connected PC agent.</summary>
+    private async Task<Target?> ResolveAsync(int stationId, CancellationToken ct)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var station = await db.Stations.AsNoTracking().FirstOrDefaultAsync(s => s.Id == stationId && s.Kind == StationKind.PC, ct);
+        if (station is null || string.IsNullOrWhiteSpace(station.AgentMachineId)
+            || !registry.TryGetConnectionId(station.AgentMachineId, out var connectionId))
+        {
+            return null;
         }
+
+        return new Target(station, connectionId);
+    }
+
+    private async Task LockByIdAsync(int stationId, string reason, CancellationToken ct)
+    {
+        var target = await ResolveAsync(stationId, ct);
+        if (target is not null)
+        {
+            await LockStationAsync(target.Station, reason, ct);
+        }
+    }
+
+    private async Task WithSessionAsync(int stationId, int sessionId, CancellationToken ct, Func<Target, Session, Task> action)
+    {
+        var target = await ResolveAsync(stationId, ct);
+        if (target is null)
+        {
+            return;
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var session = await db.Sessions.AsNoTracking().Include(s => s.Segments).FirstOrDefaultAsync(s => s.Id == sessionId, ct);
+        if (session is not null)
+        {
+            await action(target, session);
+        }
+    }
+
+    private int RemainingGraceSeconds(Session session, SessionSettings sessionSettings)
+    {
+        if (session.GraceStartedAtUtc is not { } start)
+        {
+            return 0;
+        }
+
+        var left = (start.AddMinutes(sessionSettings.GracePeriodMinutes) - time.GetUtcNow()).TotalSeconds;
+        return left <= 0 ? 0 : (int)Math.Ceiling(left);
     }
 
     private SessionInfo BuildSessionInfo(Session session, string stationName)

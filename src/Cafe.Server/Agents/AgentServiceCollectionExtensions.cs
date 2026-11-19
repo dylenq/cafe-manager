@@ -12,6 +12,7 @@ public static class AgentServiceCollectionExtensions
         services.AddSingleton<AgentAdminService>();
         services.AddSingleton<AgentCommandService>();
         services.AddSingleton<ISessionEventSink>(sp => sp.GetRequiredService<AgentCommandService>());
+        services.AddSingleton<IExpiryActionHandler, PcLockExpiryActionHandler>();
         services.AddSingleton<SessionSignalPublisher>();
         return services;
     }

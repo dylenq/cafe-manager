@@ -139,6 +139,7 @@ public class SessionService(
             CloseOpenSegments(session, ctx.Now);
             session.Status = SessionStatus.Paused;
             AddEvent(session, SessionEventType.Paused, session.StationId, ctx.Now, "Paused");
+            ctx.Signals.Add(new SessionSignal(SessionSignalKind.Paused, session.StationId, session.Id));
             return Task.FromResult(ServiceResult<Session>.Ok(session));
         }, cancellationToken);
     }
@@ -170,6 +171,7 @@ public class SessionService(
             session.Segments.Add(new SessionSegment { StationId = session.StationId, StartUtc = ctx.Now });
             session.Status = SessionStatus.Active;
             AddEvent(session, SessionEventType.Resumed, session.StationId, ctx.Now, "Resumed");
+            ctx.Signals.Add(new SessionSignal(SessionSignalKind.Resumed, session.StationId, session.Id));
             return Task.FromResult(ServiceResult<Session>.Ok(session));
         }, cancellationToken);
 
@@ -210,6 +212,7 @@ public class SessionService(
                 rules,
                 pricing.TimeZone)).Total;
 
+            var wasGrace = session.Status == SessionStatus.Grace;
             session.PurchasedMinutes = purchased + minutes;
             session.ChargedAmount += quote;
 
@@ -222,6 +225,8 @@ public class SessionService(
 
             AddEvent(session, SessionEventType.Extended, session.StationId, ctx.Now,
                 string.Create(CultureInfo.InvariantCulture, $"Extended by {minutes} min, +{quote:0.00}"));
+            ctx.Signals.Add(new SessionSignal(SessionSignalKind.Extended, session.StationId, session.Id,
+                Minutes: minutes, ExtendedFromGrace: wasGrace && session.Status == SessionStatus.Active));
             return ServiceResult<decimal>.Ok(quote);
         }, cancellationToken);
     }
@@ -279,6 +284,7 @@ public class SessionService(
             session.Station = target;
             ctx.Affected.Add(target.Id);
             AddEvent(session, SessionEventType.Moved, target.Id, ctx.Now, $"Moved {from.Name} -> {target.Name}");
+            ctx.Signals.Add(new SessionSignal(SessionSignalKind.Moved, target.Id, session.Id, FromStationId: from.Id));
             return ServiceResult<Session>.Ok(session);
         }, cancellationToken);
     }

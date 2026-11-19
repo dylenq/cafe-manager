@@ -1,0 +1,255 @@
+@page "/stations"
+@using Cafe.Server.Data
+@using Cafe.Server.Stations
+@using Cafe.Shared
+@inject StationService StationSvc
+@inject StationTypeService TypeSvc
+
+<PageTitle>Stations - Cafe Manager</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Stations</h1>
+    @if (!showForm)
+    {
+        <button type="button" class="btn btn-primary" @onclick="StartAdd">Add station</button>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" aria-label="Close" @onclick="DismissError"></button>
+    </div>
+}
+
+@if (types is { Count: 0 })
+{
+    <div class="alert alert-warning" role="alert">
+        There are no station types yet. Create one on the <a href="/station-types">station types</a> page first.
+    </div>
+}
+
+@if (showForm)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">@(editingId is null ? "Add station" : "Edit station")</h2>
+            <EditForm Model="input" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="station-name">Name</label>
+                        <InputText id="station-name" class="form-control" @bind-Value="input.Name" />
+                        <ValidationMessage For="() => input.Name" class="text-danger" />
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="station-type">Station type</label>
+                        <InputSelect id="station-type" class="form-select" @bind-Value="input.StationTypeId">
+                            <option value="0">Choose a type...</option>
+                            @foreach (var type in types ?? [])
+                            {
+                                <option value="@type.Id">@type.Name</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="() => input.StationTypeId" class="text-danger" />
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <label class="form-label" for="station-kind">Kind</label>
+                        <InputSelect id="station-kind" class="form-select" @bind-Value="input.Kind">
+                            <option value="@StationKind.PC">PC</option>
+                            <option value="@StationKind.Console">Console</option>
+                        </InputSelect>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <label class="form-label" for="station-sort">Sort order</label>
+                        <InputNumber id="station-sort" class="form-control" @bind-Value="input.SortOrder" />
+                        <ValidationMessage For="() => input.SortOrder" class="text-danger" />
+                    </div>
+                    <div class="col-12 col-md-4 d-flex align-items-end">
+                        <div class="form-check">
+                            <InputCheckbox id="station-enabled" class="form-check-input" @bind-Value="input.IsEnabled" />
+                            <label class="form-check-label" for="station-enabled">Enabled</label>
+                        </div>
+                    </div>
+
+                    @if (input.Kind == StationKind.PC)
+                    {
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="station-machine">Agent machine ID</label>
+                            <InputText id="station-machine" class="form-control" @bind-Value="input.AgentMachineId" />
+                            <ValidationMessage For="() => input.AgentMachineId" class="text-danger" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="station-ip">TV IP address</label>
+                            <InputText id="station-ip" class="form-control" @bind-Value="input.TvIpAddress" placeholder="192.168.1.50" />
+                            <ValidationMessage For="() => input.TvIpAddress" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="station-mac">TV MAC address</label>
+                            <InputText id="station-mac" class="form-control" @bind-Value="input.TvMacAddress" placeholder="AA:BB:CC:DD:EE:FF" />
+                            <ValidationMessage For="() => input.TvMacAddress" class="text-danger" />
+                        </div>
+                    }
+                </div>
+                <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
+                    <button type="submit" class="btn btn-primary" disabled="@(saving || types is not { Count: > 0 })">Save</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (stations is null)
+{
+    <p>Loading...</p>
+}
+else if (stations.Count == 0)
+{
+    <p class="text-muted">No stations yet. Add one to get started.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Kind</th>
+                    <th>Endpoint</th>
+                    <th>Enabled</th>
+                    <th class="text-end">Sort order</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var station in stations)
+                {
+                    <tr>
+                        <td>@station.Name</td>
+                        <td>@station.StationType.Name</td>
+                        <td>@station.Kind</td>
+                        <td>@(station.Kind == StationKind.PC ? station.AgentMachineId : station.TvIpAddress)</td>
+                        <td>@(station.IsEnabled ? "Yes" : "No")</td>
+                        <td class="text-end">@station.SortOrder</td>
+                        <td class="text-end">
+                            <div class="d-flex flex-column flex-sm-row gap-2 justify-content-end">
+                                @if (confirmingDeleteId == station.Id)
+                                {
+                                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(station.Id)">Confirm delete</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => confirmingDeleteId = null">Cancel</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(station)">Edit</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => confirmingDeleteId = station.Id">Delete</button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<Station>? stations;
+    private List<StationType>? types;
+    private StationInput input = new();
+    private int? editingId;
+    private int? confirmingDeleteId;
+    private bool showForm;
+    private bool saving;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        types = await TypeSvc.ListAsync();
+        stations = await StationSvc.ListAsync();
+    }
+
+    private void StartAdd()
+    {
+        input = new StationInput { StationTypeId = types?.FirstOrDefault()?.Id ?? 0 };
+        editingId = null;
+        errorMessage = null;
+        showForm = true;
+    }
+
+    private void StartEdit(Station station)
+    {
+        input = new StationInput
+        {
+            Name = station.Name,
+            StationTypeId = station.StationTypeId,
+            Kind = station.Kind,
+            AgentMachineId = station.AgentMachineId,
+            TvIpAddress = station.TvIpAddress,
+            TvMacAddress = station.TvMacAddress,
+            SortOrder = station.SortOrder,
+            IsEnabled = station.IsEnabled
+        };
+        editingId = station.Id;
+        confirmingDeleteId = null;
+        errorMessage = null;
+        showForm = true;
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        editingId = null;
+        errorMessage = null;
+    }
+
+    private void DismissError() => errorMessage = null;
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        try
+        {
+            ServiceResult result = editingId is { } id
+                ? await StationSvc.UpdateAsync(id, input)
+                : await StationSvc.CreateAsync(input);
+
+            if (!result.Success)
+            {
+                errorMessage = result.Error;
+                if (editingId is not null && result.Error?.Contains("no longer exists") == true)
+                {
+                    showForm = false;
+                    editingId = null;
+                    await LoadAsync();
+                }
+
+                return;
+            }
+
+            errorMessage = null;
+            showForm = false;
+            editingId = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        confirmingDeleteId = null;
+        var result = await StationSvc.DeleteAsync(id);
+        errorMessage = result.Success ? null : result.Error;
+        await LoadAsync();
+    }
+}

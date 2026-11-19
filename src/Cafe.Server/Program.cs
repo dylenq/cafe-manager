@@ -1,6 +1,7 @@
 using Cafe.Server.Auth;
 using Cafe.Server.Components;
 using Cafe.Server.Data;
+using Cafe.Server.Stations;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
@@ -23,6 +24,8 @@ builder.Services.AddDbContextFactory<CafeDbContext>((sp, options) =>
     options.UseSqlite(connectionString);
 });
 builder.Services.AddScoped<AdminPasswordService>();
+builder.Services.AddScoped<StationTypeService>();
+builder.Services.AddScoped<StationService>();
 
 // Single shared admin login: one persistent, sliding 30-day cookie. No Identity users table.
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

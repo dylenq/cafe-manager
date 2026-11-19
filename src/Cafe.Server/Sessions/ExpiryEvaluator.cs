@@ -31,6 +31,9 @@ public class ExpiryEvaluator(
     /// <summary>Minimum wait between two attempts for the same session.</summary>
     public static readonly TimeSpan ActionRetryDelay = TimeSpan.FromSeconds(15);
 
+    /// <summary>Upper bound for one handler call; a handler that exceeds it counts as failed and is retried later.</summary>
+    internal TimeSpan HandlerTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
     /// <summary>Matches the SessionEvent.Details column length.</summary>
     private const int DetailsMaxLength = 300;
 
@@ -91,9 +94,10 @@ public class ExpiryEvaluator(
                 .ToListAsync(ct);
         }
 
-        foreach (var id in pending)
+        // Sessions run concurrently, so one unreachable device only delays its own session (handlers are also
+        // individually time-limited, see HandlerTimeout).
+        await Task.WhenAll(pending.Select(async id =>
         {
-            ct.ThrowIfCancellationRequested();
             try
             {
                 await RunActionsAsync(id, now, ct);
@@ -106,7 +110,7 @@ public class ExpiryEvaluator(
             {
                 logger.LogError(ex, "Expiry actions failed for session {SessionId}.", id);
             }
-        }
+        }));
     }
 
     private async Task<bool> ProcessAsync(int sessionId, DateTimeOffset now, SessionSettings settings, CancellationToken ct)
@@ -230,11 +234,19 @@ public class ExpiryEvaluator(
         {
             try
             {
-                await handler.ExecuteAsync(session.Station, ct);
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeout.CancelAfter(HandlerTimeout);
+                // WaitAsync also frees us from a handler that ignores its token.
+                await handler.ExecuteAsync(session.Station, timeout.Token).WaitAsync(HandlerTimeout, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
                 throw;
+            }
+            catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
+            {
+                logger.LogError("Expiry action handler {Handler} timed out for station {Station}.", handler.GetType().Name, session.Station.Name);
+                failures.Add($"{handler.GetType().Name}: timed out after {HandlerTimeout.TotalSeconds:0.#}s");
             }
             catch (Exception ex)
             {

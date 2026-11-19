@@ -350,6 +350,31 @@ public class ExpiryEvaluatorTests : SessionTestBase
         Assert.Contains("device offline", failed.Details);
     }
 
+    private sealed class HangingHandler : IExpiryActionHandler
+    {
+        public Task ExecuteAsync(Station station, CancellationToken cancellationToken) =>
+            new TaskCompletionSource().Task; // ignores the token on purpose
+    }
+
+    [Fact]
+    public async Task A_hung_handler_times_out_and_does_not_block_other_sessions()
+    {
+        var hung = await PrepaidAsync(await StationAsync("A"), 30);
+        var other = await PrepaidAsync(await StationAsync("B"), 30);
+        Advance(TimeSpan.FromHours(1));
+        var evaluator = Evaluator(new HangingHandler(), _handler);
+        evaluator.HandlerTimeout = TimeSpan.FromMilliseconds(200);
+
+        var started = DateTime.UtcNow;
+        await EvalAsync(evaluator);
+
+        Assert.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(5));
+        Assert.Equal(SessionStatus.Ended, (await LoadAsync(other.Id)).Status);
+        Assert.Equal(SessionStatus.Ended, (await LoadAsync(hung.Id)).Status);
+        Assert.Contains("timed out", Assert.Single(await EventsAsync(hung.Id, SessionEventType.ExpiryActionFailed)).Details);
+        Assert.Equal(2, _handler.Calls.Count);
+    }
+
     [Fact]
     public async Task Handlers_missed_by_a_crash_after_the_Ended_commit_run_on_the_next_pass()
     {

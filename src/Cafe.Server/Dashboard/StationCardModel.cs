@@ -24,3 +24,6 @@ public sealed record SessionCardModel(
     int WarningWindowSeconds,
     decimal ChargeAmount,
     DateTimeOffset SnapshotUtc);
+
+/// <summary>An enabled station with no session, offered as a Move target.</summary>
+public sealed record IdleStation(int Id, string Name);

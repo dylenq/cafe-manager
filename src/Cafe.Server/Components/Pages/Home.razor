@@ -15,6 +15,14 @@
     <div class="alert alert-warning" role="status">Live data is temporarily out of date. Retrying...</div>
 }
 
+@foreach (var notice in _notices)
+{
+    <div class="alert alert-success alert-dismissible py-2" role="status" @key="notice.Id">
+        @notice.Text
+        <button type="button" class="btn-close" aria-label="Dismiss" @onclick="() => _notices.Remove(notice)"></button>
+    </div>
+}
+
 @if (_cards is null)
 {
     <p>Loading...</p>
@@ -31,7 +39,7 @@ else
         @foreach (var card in _cards)
         {
             <div class="col" @key="card.StationId">
-                <StationCard Model="card" />
+                <StationCard Model="card" IdleStations="IdleStations" OnNotice="AddNotice" />
             </div>
         }
     </div>
@@ -48,6 +56,15 @@ else
     private bool _subscribed;
     private List<StationCardModel>? _cards;
     private bool _stale;
+    private readonly List<Notice> _notices = [];
+    private int _noticeId;
+
+    private sealed record Notice(int Id, string Text);
+
+    private IReadOnlyList<IdleStation> IdleStations =>
+        _cards?.Where(c => c.Session is null).Select(c => new IdleStation(c.StationId, c.Name)).ToList() ?? [];
+
+    private void AddNotice(string text) => _notices.Insert(0, new Notice(++_noticeId, text));
 
     protected override async Task OnInitializedAsync() => _cards = await Dashboard.GetCardsAsync();
 

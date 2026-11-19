@@ -1,11 +1,13 @@
 @using Cafe.Server.Dashboard
 @using Cafe.Server.Data
 @using Cafe.Server.Sessions
+@using Cafe.Server.Stations
 @using Cafe.Shared
 @inject SessionService Sessions
 @inject TimeProvider Time
+@inject ILogger<StationCard> Logger
 
-<div class="card h-100 station-card station-@Model.Status.ToString().ToLowerInvariant()">
+<div class="card h-100 station-card station-@Model.Status.ToString().ToLowerInvariant() @LevelClass">
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-start gap-2">
             <h2 class="card-title h5 mb-1">@Model.Name</h2>
@@ -16,18 +18,110 @@
 
         @if (Model.Session is { } session)
         {
+            var now = Time.GetUtcNow();
+            var level = SessionAlerts.GetLevel(session, now);
+            var isPrepaid = session.Mode == SessionMode.Prepaid;
             <div class="mt-3">
-                <div class="fs-3 fw-semibold session-countdown">@Countdown(session)</div>
-                <div class="small text-muted">Charge @session.ChargeAmount.ToString("C")</div>
-                <button type="button" class="btn btn-sm btn-outline-danger mt-2" disabled="@_busy"
-                        @onclick="() => StopAsync(session.SessionId)">Stop</button>
+                <div class="small text-muted">@(isPrepaid ? "Prepaid" : "Open-ended")</div>
+                @if (level == AlertLevel.TimeUp)
+                {
+                    <div class="fs-4 fw-bold text-danger time-up">TIME UP</div>
+                    @if (session.Status == SessionStatus.Grace)
+                    {
+                        <div class="fs-5 session-grace">Grace @SessionClock.FormatCountdown(SessionAlerts.GraceRemainingSeconds(session, now))</div>
+                    }
+                }
+                else
+                {
+                    <div class="fs-3 fw-semibold session-countdown">@Countdown(session, now)</div>
+                }
+                @if (Acknowledged)
+                {
+                    <div class="small text-muted">Alert acknowledged</div>
+                }
+                <div class="small text-muted">@(isPrepaid ? "Charge" : "Charge est.") @session.ChargeAmount.ToString("C")</div>
+
+                @if (_confirmQuote is { } quote)
+                {
+                    <div class="border rounded p-2 mt-2 stop-confirm">
+                        <div class="fw-semibold">Final charge: @quote.ToString("C")</div>
+                        <button type="button" class="btn btn-sm btn-danger mt-1" disabled="@_busy"
+                                @onclick="() => ConfirmStopAsync(session.SessionId)">Confirm stop</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary mt-1" disabled="@_busy"
+                                @onclick="() => _confirmQuote = null">Cancel</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap gap-1 mt-2">
+                        @if (session.Status == SessionStatus.Active)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-warning" disabled="@_busy"
+                                    @onclick="() => PauseAsync(session.SessionId)">Pause</button>
+                        }
+                        @if (session.Status == SessionStatus.Paused)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-success" disabled="@_busy"
+                                    @onclick="() => ResumeAsync(session.SessionId)">Resume</button>
+                        }
+                        <button type="button" class="btn btn-sm btn-outline-danger" disabled="@_busy"
+                                @onclick="() => BeginStopAsync(session.SessionId)">Stop</button>
+                    </div>
+
+                    @if (isPrepaid)
+                    {
+                        <div class="mt-2 small">
+                            <span class="text-muted">Extend</span>
+                            <div class="d-flex flex-wrap gap-1 align-items-center">
+                                @foreach (var m in ExtendPicks)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-primary" disabled="@_busy"
+                                            @onclick="() => ExtendAsync(session.SessionId, m)">+@m</button>
+                                }
+                                <input type="number" class="form-control form-control-sm custom-minutes" min="1" max="1440"
+                                       placeholder="min" aria-label="Custom extend minutes" @bind="_customExtend" />
+                                <button type="button" class="btn btn-sm btn-outline-primary" disabled="@(_busy || _customExtend is null)"
+                                        @onclick="() => ExtendAsync(session.SessionId, _customExtend ?? 0)">Extend</button>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="mt-2 small">
+                        <span class="text-muted">Move</span>
+                        <div class="d-flex gap-1">
+                            <select class="form-select form-select-sm" aria-label="Move to station"
+                                    disabled="@(session.Status == SessionStatus.Grace || _busy)" @bind="_moveTarget">
+                                <option value="0">Move to...</option>
+                                @foreach (var target in IdleStations)
+                                {
+                                    <option value="@target.Id">@target.Name</option>
+                                }
+                            </select>
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    disabled="@(session.Status == SessionStatus.Grace || _busy || _moveTarget == 0)"
+                                    @onclick="() => MoveAsync(session.SessionId)">Move</button>
+                        </div>
+                    </div>
+                }
             </div>
         }
         else
         {
             <div class="mt-3">
-                <button type="button" class="btn btn-sm btn-primary" disabled="@_busy"
-                        @onclick="StartAsync">Start 60 min</button>
+                <span class="small text-muted">Start prepaid</span>
+                <div class="d-flex flex-wrap gap-1 align-items-center">
+                    @foreach (var m in StartPicks)
+                    {
+                        <button type="button" class="btn btn-sm btn-primary" disabled="@_busy"
+                                @onclick="() => StartPrepaidAsync(m)">@m</button>
+                    }
+                    <input type="number" class="form-control form-control-sm custom-minutes" min="1" max="1440"
+                           placeholder="min" aria-label="Custom prepaid minutes" @bind="_customStart" />
+                    <button type="button" class="btn btn-sm btn-primary" disabled="@(_busy || _customStart is null)"
+                            @onclick="() => StartPrepaidAsync(_customStart ?? 0)">Start</button>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary mt-2" disabled="@_busy"
+                        @onclick="StartOpenEndedAsync">Start open-ended</button>
             </div>
         }
 
@@ -35,48 +129,91 @@
         {
             <div class="alert alert-danger py-1 px-2 mt-2 mb-0 small" role="alert">@_error</div>
         }
-
-        @if (_finalCharge is not null)
-        {
-            <div class="alert alert-success alert-dismissible py-1 px-2 mt-2 mb-0 small" role="status">
-                Final charge @_finalCharge
-                <button type="button" class="btn-close" aria-label="Dismiss" @onclick="() => _finalCharge = null"></button>
-            </div>
-        }
     </div>
 </div>
 
 @code {
+    private static readonly int[] StartPicks = [30, 60, 120, 180];
+    private static readonly int[] ExtendPicks = [15, 30, 60];
+
     private bool _busy;
     private string? _error;
-    private string? _finalCharge;
+    private decimal? _confirmQuote;
+    private int? _customStart;
+    private int? _customExtend;
+    private int _moveTarget;
 
     [Parameter, EditorRequired] public StationCardModel Model { get; set; } = null!;
 
-    private string Countdown(SessionCardModel session)
+    [Parameter] public IReadOnlyList<IdleStation> IdleStations { get; set; } = [];
+
+    [Parameter] public bool Acknowledged { get; set; }
+
+    [Parameter] public EventCallback<string> OnNotice { get; set; }
+
+    private string LevelClass => Model.Session is { } s
+        ? SessionAlerts.GetLevel(s, Time.GetUtcNow()) switch
+        {
+            AlertLevel.TimeUp => "alert-timeup-level" + (Acknowledged ? " alert-acknowledged" : ""),
+            AlertLevel.Warning => "alert-warning-level" + (Acknowledged ? " alert-acknowledged" : ""),
+            _ => "",
+        }
+        : "";
+
+    private static string Countdown(SessionCardModel session, DateTimeOffset now)
     {
-        var active = SessionClock.ActiveSeconds(session.ClosedActiveSeconds, session.OpenSegmentStartUtc, Time.GetUtcNow());
+        var active = SessionClock.ActiveSeconds(session.ClosedActiveSeconds, session.OpenSegmentStartUtc, now);
         return session.PurchasedMinutes is { } minutes
             ? SessionClock.FormatCountdown(SessionClock.RemainingSeconds(minutes, active))
             : SessionClock.FormatCountdown(active);
     }
 
-    private async Task StartAsync()
+    private Task StartPrepaidAsync(int minutes) =>
+        RunAsync(() => Sessions.StartPrepaidAsync(Model.StationId, minutes), "start the session");
+
+    private Task StartOpenEndedAsync() =>
+        RunAsync(() => Sessions.StartOpenEndedAsync(Model.StationId), "start the session");
+
+    private Task PauseAsync(int sessionId) => RunAsync(() => Sessions.PauseAsync(sessionId), "pause the session");
+
+    private Task ResumeAsync(int sessionId) => RunAsync(() => Sessions.ResumeAsync(sessionId), "resume the session");
+
+    private async Task ExtendAsync(int sessionId, int minutes)
+    {
+        if (await RunAsync(() => Sessions.ExtendAsync(sessionId, minutes), "extend the session"))
+        {
+            _customExtend = null;
+        }
+    }
+
+    private async Task MoveAsync(int sessionId)
+    {
+        if (await RunAsync(() => Sessions.MoveAsync(sessionId, _moveTarget), "move the session"))
+        {
+            _moveTarget = 0;
+        }
+    }
+
+    private async Task BeginStopAsync(int sessionId)
     {
         _busy = true;
         _error = null;
-        _finalCharge = null;
         try
         {
-            var result = await Sessions.StartPrepaidAsync(Model.StationId, 60);
-            if (!result.Success)
+            var quote = await Sessions.GetStopQuoteAsync(sessionId);
+            if (quote.Success)
             {
-                _error = result.Error;
+                _confirmQuote = quote.Value;
+            }
+            else
+            {
+                _error = quote.Error;
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            _error = "Could not start the session. Try again.";
+            Logger.LogError(ex, "Could not quote the stop of session {SessionId}.", sessionId);
+            _error = "Something went wrong. Try again.";
         }
         finally
         {
@@ -84,7 +221,7 @@
         }
     }
 
-    private async Task StopAsync(int sessionId)
+    private async Task ConfirmStopAsync(int sessionId)
     {
         _busy = true;
         _error = null;
@@ -93,16 +230,51 @@
             var result = await Sessions.StopAsync(sessionId);
             if (result.Success)
             {
-                _finalCharge = result.Value.ToString("C");
+                _confirmQuote = null;
+                await OnNotice.InvokeAsync($"{Model.Name} stopped. Final charge: {result.Value.ToString("C")}");
             }
             else
             {
                 _error = result.Error;
+                _confirmQuote = null;
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            _error = "Could not stop the session. Try again.";
+            Logger.LogError(ex, "Could not stop session {SessionId}.", sessionId);
+            _error = "Something went wrong. Try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // Runs one service call with in-flight protection; the notifier refreshes the dashboard on success.
+    private async Task<bool> RunAsync<T>(Func<Task<ServiceResult<T>>> action, string what)
+    {
+        if (_busy)
+        {
+            return false;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            var result = await action();
+            if (!result.Success)
+            {
+                _error = result.Error;
+            }
+
+            return result.Success;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not {Action} for station {StationId}.", what, Model.StationId);
+            _error = "Something went wrong. Try again.";
+            return false;
         }
         finally
         {

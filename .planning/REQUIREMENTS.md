@@ -98,11 +98,54 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| ADMN-01 | Phase 1 | Pending |
+| ADMN-02 | Phase 1 | Pending |
+| ADMN-03 | Phase 1 | Pending |
+| ADMN-04 | Phase 1 | Pending |
+| SESS-01 | Phase 2 | Pending |
+| SESS-02 | Phase 2 | Pending |
+| SESS-03 | Phase 2 | Pending |
+| SESS-04 | Phase 2 | Pending |
+| SESS-05 | Phase 2 | Pending |
+| SESS-06 | Phase 2 | Pending |
+| SESS-07 | Phase 2 | Pending |
+| SESS-08 | Phase 2 | Pending |
+| SESS-09 | Phase 2 | Pending |
+| SESS-10 | Phase 2 | Pending |
+| PRIC-01 | Phase 2 | Pending |
+| PRIC-02 | Phase 2 | Pending |
+| AGNT-01 | Phase 3 | Pending |
+| AGNT-02 | Phase 3 | Pending |
+| AGNT-03 | Phase 3 | Pending |
+| AGNT-04 | Phase 3 | Pending |
+| AGNT-05 | Phase 3 | Pending |
+| AGNT-06 | Phase 3 | Pending |
+| AGNT-07 | Phase 3 | Pending |
+| TVCT-01 | Phase 4 | Pending |
+| TVCT-02 | Phase 4 | Pending |
+| TVCT-03 | Phase 4 | Pending |
+| TVCT-04 | Phase 4 | Pending |
+| CUST-01 | Phase 5 | Pending |
+| CUST-02 | Phase 5 | Pending |
+| CUST-03 | Phase 5 | Pending |
+| CUST-04 | Phase 5 | Pending |
+| CUST-05 | Phase 5 | Pending |
+| CUST-06 | Phase 5 | Pending |
+| PRIC-03 | Phase 5 | Pending |
+| POS-01 | Phase 6 | Pending |
+| POS-02 | Phase 6 | Pending |
+| POS-03 | Phase 6 | Pending |
+| POS-04 | Phase 6 | Pending |
+| REPT-01 | Phase 7 | Pending |
+| REPT-02 | Phase 7 | Pending |
+| DEPL-01 | Phase 7 | Pending |
+| DEPL-02 | Phase 7 | Pending |
 
 **Coverage:**
-- v1 requirements: 41 total
-- Mapped to phases: 0 (filled by roadmap)
+- v1 requirements: 42 total
+- Mapped to phases: 42
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-11-19*
-*Last updated: 2026-11-19 after initial definition*
+*Last updated: 2026-11-19 after roadmap creation*

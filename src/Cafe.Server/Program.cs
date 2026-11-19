@@ -1,4 +1,6 @@
+using Cafe.Server.Agents;
 using Cafe.Server.Auth;
+using Cafe.Shared.Agents;
 using Cafe.Server.Components;
 using Cafe.Server.Dashboard;
 using Cafe.Server.Data;
@@ -48,6 +50,7 @@ if (SessionTicker.IsEnabled(builder.Configuration))
     builder.Services.AddHostedService<SessionTicker>();
 }
 
+builder.Services.AddAgentServices();
 builder.Services.AddScoped<SessionHistoryService>();
 builder.Services.AddScoped<DashboardService>();
 
@@ -92,6 +95,7 @@ app.UseWhen(
     branch => branch.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
 app.MapStaticAssets();
 app.UseMiddleware<SetupGateMiddleware>();
+app.UseMiddleware<AgentAuthMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
@@ -103,6 +107,8 @@ app.MapPost("/logout", async (HttpContext context, [FromForm] string? returnUrl)
     await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     return Results.Redirect("/login");
 }).AllowAnonymous();
+
+app.MapHub<AgentHub>(AgentProtocol.HubPath).AllowAnonymous();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

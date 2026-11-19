@@ -65,7 +65,9 @@ public class SetupGateMiddleware(RequestDelegate next, IConfiguration configurat
         if (path.StartsWithSegments("/setup", StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/_framework", StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/_blazor", StringComparison.OrdinalIgnoreCase)
-            || path.StartsWithSegments("/_content", StringComparison.OrdinalIgnoreCase))
+            || path.StartsWithSegments("/_content", StringComparison.OrdinalIgnoreCase)
+            // PC agents authenticate with the shared key and must connect before admin setup finishes.
+            || path.StartsWithSegments("/hubs", StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }

@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Cafe.Server\Cafe.Server.csproj" />
+    <ProjectReference Include="..\..\src\Cafe.Agent.Core\Cafe.Agent.Core.csproj" />
   </ItemGroup>
 
 </Project>

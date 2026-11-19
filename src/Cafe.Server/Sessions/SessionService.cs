@@ -16,7 +16,8 @@ public class SessionService(
     PricingConfigService pricing,
     SessionCharges charges,
     SessionNotifier notifier,
-    ExpiryEvaluator expiry)
+    ExpiryEvaluator expiry,
+    SessionSignalPublisher signals)
 {
     public const int MinMinutes = 1;
     public const int MaxMinutes = 1440;
@@ -103,6 +104,7 @@ public class SessionService(
         }
 
         notifier.Raise(stationId);
+        await signals.PublishAsync([new SessionSignal(SessionSignalKind.Started, stationId, session.Id)]);
         return ServiceResult<Session>.Ok(session);
     }
 
@@ -315,6 +317,7 @@ public class SessionService(
             session.EndedAtUtc = ctx.Now;
             AddEvent(session, SessionEventType.Stopped, session.StationId, ctx.Now,
                 string.Create(CultureInfo.InvariantCulture, $"Charge {session.ChargedAmount:0.00}"));
+            ctx.Signals.Add(new SessionSignal(SessionSignalKind.Stopped, session.StationId, session.Id));
             return ServiceResult<decimal>.Ok(session.ChargedAmount);
         }, cancellationToken);
 
@@ -360,6 +363,8 @@ public class SessionService(
         public CancellationToken Cancellation { get; } = cancellation;
 
         public HashSet<int> Affected { get; } = [session.StationId];
+
+        public List<SessionSignal> Signals { get; } = [];
     }
 
     /// <summary>
@@ -417,6 +422,7 @@ public class SessionService(
             notifier.Raise(stationId);
         }
 
+        await signals.PublishAsync(ctx.Signals);
         return result;
     }
 

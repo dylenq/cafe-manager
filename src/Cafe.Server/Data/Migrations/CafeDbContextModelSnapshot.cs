@@ -29,6 +29,99 @@ namespace Cafe.Server.Data.Migrations
 
                     b.ToTable("Settings");
                 });
+
+            modelBuilder.Entity("Cafe.Server.Data.Station", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AgentMachineId")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .UseCollation("NOCASE");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("StationTypeId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TvIpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TvMacAddress")
+                        .HasMaxLength(17)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TvToken")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("StationTypeId");
+
+                    b.ToTable("Stations");
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.StationType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("HourlyRate")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .UseCollation("NOCASE");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("StationTypes");
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.Station", b =>
+                {
+                    b.HasOne("Cafe.Server.Data.StationType", "StationType")
+                        .WithMany("Stations")
+                        .HasForeignKey("StationTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("StationType");
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.StationType", b =>
+                {
+                    b.Navigation("Stations");
+                });
 #pragma warning restore 612, 618
         }
     }

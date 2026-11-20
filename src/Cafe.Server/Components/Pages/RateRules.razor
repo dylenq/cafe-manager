@@ -95,6 +95,15 @@
                         <ValidationMessage For="() => input.Priority" class="text-danger" />
                         @FieldError(nameof(RateRuleInput.Priority))
                     </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="rule-audience">Applies to</label>
+                        <InputSelect id="rule-audience" class="form-select" @bind-Value="input.AppliesTo">
+                            <option value="@RateRuleAudience.Everyone">Everyone</option>
+                            <option value="@RateRuleAudience.MembersOnly">Members only</option>
+                            <option value="@RateRuleAudience.GuestsOnly">Guests only</option>
+                        </InputSelect>
+                        @FieldError(nameof(RateRuleInput.AppliesTo))
+                    </div>
                     <div class="col-6 col-md-3 d-flex align-items-end">
                         <div class="form-check">
                             <InputCheckbox id="rule-enabled" class="form-check-input" @bind-Value="input.IsEnabled" />
@@ -130,6 +139,7 @@ else
                     <th>Days</th>
                     <th>Window</th>
                     <th>Rate</th>
+                    <th>Applies to</th>
                     <th class="text-end">Priority</th>
                     <th>Enabled</th>
                     <th></th>
@@ -150,6 +160,7 @@ else
                             }
                         </td>
                         <td>@ValueText(rule)</td>
+                        <td>@AudienceText(rule.AppliesTo)</td>
                         <td class="text-end">@rule.Priority</td>
                         <td>
                             <button type="button" class="btn btn-sm @(rule.IsEnabled ? "btn-success" : "btn-outline-secondary")"
@@ -229,6 +240,13 @@ else
         ? "x" + rule.Value.ToString("0.##", CultureInfo.CurrentCulture)
         : rule.Value.ToString("C", CultureInfo.CurrentCulture) + "/h";
 
+    private static string AudienceText(RateRuleAudience audience) => audience switch
+    {
+        RateRuleAudience.MembersOnly => "Members only",
+        RateRuleAudience.GuestsOnly => "Guests only",
+        _ => "Everyone",
+    };
+
     private static string DaysText(DaysOfWeekFlags flags)
     {
         if (flags == DaysOfWeekFlags.All)
@@ -281,6 +299,7 @@ else
             Kind = rule.Kind,
             Value = rule.Value,
             Priority = rule.Priority,
+            AppliesTo = rule.AppliesTo,
             IsEnabled = rule.IsEnabled,
         };
         editingId = rule.Id;

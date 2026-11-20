@@ -131,6 +131,7 @@ public class RateRuleService(IDbContextFactory<CafeDbContext> dbFactory)
         entity.Kind = input.Kind;
         entity.Value = input.Value;
         entity.Priority = input.Priority;
+        entity.AppliesTo = input.AppliesTo;
         entity.IsEnabled = input.IsEnabled;
     }
 
@@ -161,6 +162,11 @@ public class RateRuleService(IDbContextFactory<CafeDbContext> dbFactory)
         if (!Enum.IsDefined(input.Kind))
         {
             errors.TryAdd(nameof(RateRuleInput.Kind), "Pick a rule kind.");
+        }
+
+        if (!Enum.IsDefined(input.AppliesTo))
+        {
+            errors.TryAdd(nameof(RateRuleInput.AppliesTo), "Pick who the rule applies to.");
         }
 
         if (input.StationTypeId is { } typeId && !await db.StationTypes.AnyAsync(t => t.Id == typeId))

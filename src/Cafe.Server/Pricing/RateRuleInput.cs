@@ -25,5 +25,8 @@ public class RateRuleInput
     [Range(0, 1000, ErrorMessage = "Priority must be between 0 and 1000.")]
     public int Priority { get; set; }
 
+    /// <summary>Who the rule applies to; defaults to everyone.</summary>
+    public RateRuleAudience AppliesTo { get; set; } = RateRuleAudience.Everyone;
+
     public bool IsEnabled { get; set; } = true;
 }

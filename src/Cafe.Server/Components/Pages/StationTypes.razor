@@ -41,6 +41,11 @@
                         <ValidationMessage For="() => input.HourlyRate" class="text-danger" />
                     </div>
                     <div class="col-6 col-md-3">
+                        <label class="form-label" for="type-member-rate">Member hourly rate (optional)</label>
+                        <InputNumber id="type-member-rate" class="form-control" @bind-Value="input.MemberHourlyRate" />
+                        <ValidationMessage For="() => input.MemberHourlyRate" class="text-danger" />
+                    </div>
+                    <div class="col-6 col-md-3">
                         <label class="form-label" for="type-sort">Sort order</label>
                         <InputNumber id="type-sort" class="form-control" @bind-Value="input.SortOrder" />
                         <ValidationMessage For="() => input.SortOrder" class="text-danger" />
@@ -71,6 +76,7 @@ else
                 <tr>
                     <th>Name</th>
                     <th class="text-end">Hourly rate</th>
+                    <th class="text-end">Member rate</th>
                     <th class="text-end">Sort order</th>
                     <th></th>
                 </tr>
@@ -81,6 +87,7 @@ else
                     <tr>
                         <td>@type.Name</td>
                         <td class="text-end">@type.HourlyRate.ToString("N2")</td>
+                        <td class="text-end">@(type.MemberHourlyRate is { } member ? member.ToString("N2") : "Same as base")</td>
                         <td class="text-end">@type.SortOrder</td>
                         <td class="text-end">
                             <div class="d-flex flex-column flex-sm-row gap-2 justify-content-end">
@@ -138,7 +145,7 @@ else
 
     private void StartEdit(StationType type)
     {
-        input = new StationTypeInput { Name = type.Name, HourlyRate = type.HourlyRate, SortOrder = type.SortOrder };
+        input = new StationTypeInput { Name = type.Name, HourlyRate = type.HourlyRate, MemberHourlyRate = type.MemberHourlyRate, SortOrder = type.SortOrder };
         editingId = type.Id;
         confirmingDeleteId = null;
         errorMessage = null;

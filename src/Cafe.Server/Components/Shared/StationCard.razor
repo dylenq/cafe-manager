@@ -260,6 +260,7 @@
     private int? _customExtend;
     private int _moveTarget;
     private int _confirmRefund;
+    private StopSettleQuote? _shownQuote;
     private IReadOnlyList<OutstandingItem> _confirmOrders = [];
     private decimal _confirmTotalDue;
     private bool _settleOpen;
@@ -308,6 +309,7 @@
         _confirmQuote = null;
         _confirmSessionId = null;
         _confirmRefund = 0;
+        _shownQuote = null;
         _confirmOrders = [];
         _confirmTotalDue = 0m;
         _settleOpen = false;
@@ -518,6 +520,7 @@
     private void ShowQuote(StopSettleQuote quote)
     {
         var stop = quote.Stop;
+        _shownQuote = quote;
         _confirmQuote = stop.Amount;
         _confirmRefund = stop.RefundMinutes;
         _confirmSessionId = stop.SessionId;
@@ -559,13 +562,11 @@
             return new PaymentDialogResult(false, "Close this window and try again.", null);
         }
 
-        // Re-read what is owed first: if an order was added or paid since the quote, refuse before stopping anything.
+        // Re-read what is owed first: if something changed since the quote, refuse before stopping anything.
         var current = await Checkout.QuoteStopAndSettleAsync(sessionId);
         if (current.Success && (current.Value!.TotalDue != _confirmTotalDue || current.Value.Stop.Version != _confirmVersion))
         {
-            _settleChanged = true;
-            _settleChangedMessage = SettlementService.ChangedMessage;
-            return new PaymentDialogResult(false, SettlementService.ChangedMessage, null);
+            return await ChangedAsync(current.Value);
         }
 
         var result = await Checkout.StopAndSettleAsync(sessionId, _confirmVersion, charge, tenders, _confirmTotalDue);
@@ -573,6 +574,13 @@
         {
             if (result.Error == SessionService.ChangedMessage || result.Error == SettlementService.ChangedMessage)
             {
+                // A minute boundary can pass between the re-read above and the stop: look again before giving up.
+                var again = await Checkout.QuoteStopAndSettleAsync(sessionId);
+                if (again.Success)
+                {
+                    return await ChangedAsync(again.Value!);
+                }
+
                 _settleChanged = true;
                 _settleChangedMessage = result.Error;
             }
@@ -588,6 +596,26 @@
         }
 
         return new PaymentDialogResult(true, null, result.Value.Settlement);
+    }
+
+    // An open-ended charge grows with the clock, so when only that changed, show the new total in the dialog and ask
+    // staff to confirm it once more. Any other change (orders, version, prepaid/balance) closes the dialog and re-quotes.
+    private async Task<PaymentDialogResult> ChangedAsync(StopSettleQuote current)
+    {
+        var openEnded = Model.Session?.Mode == SessionMode.OpenEnded;
+        if (_shownQuote is { } shown && CheckoutService.OnlyElapsedChargeChanged(shown, current, openEnded))
+        {
+            var before = _confirmTotalDue;
+            ShowQuote(current);
+            await InvokeAsync(StateHasChanged);
+            return new PaymentDialogResult(false,
+                $"The session charge rose from {before.ToString("C")} to {_confirmTotalDue.ToString("C")} as time passed. Check the payment, then press Record payment to confirm the new amount.",
+                null);
+        }
+
+        _settleChanged = true;
+        _settleChangedMessage = SettlementService.ChangedMessage;
+        return new PaymentDialogResult(false, SettlementService.ChangedMessage, null);
     }
 
     private async Task SettleClosedAsync(bool recorded)

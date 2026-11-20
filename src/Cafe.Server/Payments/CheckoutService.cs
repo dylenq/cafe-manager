@@ -34,6 +34,20 @@ public class CheckoutService(
     }
 
     /// <summary>
+    /// True when a fresh quote differs from the one shown only because an open-ended session's elapsed minutes raised the
+    /// session charge: same session version, same open orders and amounts, a different session charge. The UI then
+    /// updates the total and asks for one more confirmation instead of failing. Prepaid and balance sessions never
+    /// qualify (their charge only moves with a version bump), so those stay strict.
+    /// </summary>
+    public static bool OnlyElapsedChargeChanged(StopSettleQuote shown, StopSettleQuote current, bool openEnded) =>
+        openEnded
+        && shown.Stop.SessionId == current.Stop.SessionId
+        && shown.Stop.Version == current.Stop.Version
+        && shown.Stop.Amount != current.Stop.Amount
+        && shown.OpenOrders.Count == current.OpenOrders.Count
+        && shown.OpenOrders.Zip(current.OpenOrders).All(p => p.First.Type == p.Second.Type && p.First.Id == p.Second.Id && p.First.Outstanding == p.Second.Outstanding);
+
+    /// <summary>
     /// Stops the session then pays the session charge and every open order on it. Under <see cref="SettlementLock"/> and
     /// before anything is stopped the full due (session charge plus open orders) is compared with
     /// <paramref name="expectedDue"/>: a mismatch returns <see cref="SettlementService.ChangedMessage"/> and the session

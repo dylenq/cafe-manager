@@ -175,4 +175,44 @@ public class StopSettleFlowTests : PosTestBase
         await using var db = await DbAsync();
         Assert.Equal(0, await db.Payments.CountAsync());
     }
+
+    // ---- WR-01: open-ended charge grows with the clock ----
+
+    [Fact]
+    public async Task Open_ended_charge_that_grew_with_time_is_recognised_as_elapsed_only_and_the_service_refuses_without_stopping()
+    {
+        var stationId = await StationAsync("PC-04");
+        var session = await OpenEndedAsync(stationId);
+        Advance(TimeSpan.FromMinutes(10));
+        var shown = await QuoteAsync(session.Id);
+        Advance(TimeSpan.FromMinutes(5));
+        var fresh = await QuoteAsync(session.Id);
+
+        Assert.True(fresh.TotalDue > shown.TotalDue);
+        Assert.True(CheckoutService.OnlyElapsedChargeChanged(shown, fresh, openEnded: true));
+
+        var stale = await SettleAsync(session.Id, shown, shown.TotalDue, new TenderLine(PaymentMethod.Cash, shown.TotalDue));
+        Assert.False(stale.Success);
+        Assert.NotEqual(SessionStatus.Ended, (await LoadAsync(session.Id)).Status);
+
+        var confirmed = await SettleAsync(session.Id, fresh, fresh.TotalDue, new TenderLine(PaymentMethod.Cash, fresh.TotalDue));
+        Assert.True(confirmed.Success, confirmed.Error);
+        Assert.Null(confirmed.Value!.PaymentError);
+        Assert.Equal(SessionStatus.Ended, (await LoadAsync(session.Id)).Status);
+    }
+
+    [Fact]
+    public async Task Elapsed_only_rule_stays_strict_for_prepaid_sessions_and_for_changed_orders()
+    {
+        var (sessionId, _, _) = await PrepaidWithTwoOrdersAsync();
+        var shown = await QuoteAsync(sessionId);
+        var higherCharge = shown with { Stop = shown.Stop with { Amount = shown.Stop.Amount + 100m } };
+        var oneMoreOrder = shown with { OpenOrders = [.. shown.OpenOrders, shown.OpenOrders[0]] };
+
+        Assert.False(CheckoutService.OnlyElapsedChargeChanged(shown, higherCharge, openEnded: false));
+        Assert.True(CheckoutService.OnlyElapsedChargeChanged(shown, higherCharge, openEnded: true));
+        Assert.False(CheckoutService.OnlyElapsedChargeChanged(shown, higherCharge with { OpenOrders = oneMoreOrder.OpenOrders }, openEnded: true));
+        Assert.False(CheckoutService.OnlyElapsedChargeChanged(shown, higherCharge with { Stop = higherCharge.Stop with { Version = shown.Stop.Version + 1 } }, openEnded: true));
+        Assert.False(CheckoutService.OnlyElapsedChargeChanged(shown, shown, openEnded: true));
+    }
 }

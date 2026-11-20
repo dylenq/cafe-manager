@@ -1,10 +1,12 @@
 using Cafe.Server.Data;
 using Cafe.Server.Stations;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Cafe.Server.Customers;
 
-public class PackageService(IDbContextFactory<CafeDbContext> dbFactory, TimeProvider time, BalanceLock balanceLock)
+public class PackageService(
+    IDbContextFactory<CafeDbContext> dbFactory, TimeProvider time, BalanceLock balanceLock, ILogger<PackageService>? logger = null)
 {
     public async Task<List<TimePackage>> ListAsync(bool includeInactive = true, CancellationToken cancellationToken = default)
     {
@@ -126,9 +128,11 @@ public class PackageService(IDbContextFactory<CafeDbContext> dbFactory, TimeProv
 
     /// <summary>
     /// Sells a package: the PackageSale, the Payment and the ledger credit are added to one context and saved with a
-    /// single SaveChanges, so SQLite commits all three or none (CUST-04).
+    /// single SaveChanges, so SQLite commits all three or none (CUST-04). When <paramref name="expectedPrice"/> is given
+    /// (the price the cashier saw) and the package price has changed since, nothing is sold.
     /// </summary>
-    public async Task<ServiceResult<PackageSale>> SellAsync(int customerId, int packageId, PaymentMethod method, CancellationToken cancellationToken = default)
+    public async Task<ServiceResult<PackageSale>> SellAsync(
+        int customerId, int packageId, PaymentMethod method, decimal? expectedPrice = null, CancellationToken cancellationToken = default)
     {
         using var _ = await balanceLock.AcquireAsync(cancellationToken);
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
@@ -150,6 +154,11 @@ public class PackageService(IDbContextFactory<CafeDbContext> dbFactory, TimeProv
         if (!package.IsActive)
         {
             return ServiceResult<PackageSale>.Fail("That package is no longer on sale.");
+        }
+
+        if (expectedPrice is { } expected && expected != package.Price)
+        {
+            return ServiceResult<PackageSale>.Fail("Price changed — review the package and try again.");
         }
 
         var now = time.GetUtcNow();
@@ -178,9 +187,10 @@ public class PackageService(IDbContextFactory<CafeDbContext> dbFactory, TimeProv
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex)
         {
             // One SaveChanges is one transaction: nothing was written. Report it instead of leaking the exception.
+            logger?.LogError(ex, "Package sale could not be saved (customer {CustomerId}, package {PackageId}).", customerId, packageId);
             return ServiceResult<PackageSale>.Fail("The sale could not be saved, so nothing was recorded. Try again.");
         }
 

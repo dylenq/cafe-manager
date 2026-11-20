@@ -122,7 +122,7 @@ else
                                 <option value="@PaymentMethod.Card">Card</option>
                             </select>
                         </div>
-                        <button type="button" class="btn btn-primary" disabled="@(busy || sellPackageId == 0)" @onclick="SellAsync">Sell package</button>
+                        <button type="button" class="btn btn-primary" disabled="@(busy || sellPackageId == 0 || !ShowsCurrentCustomer)" @onclick="SellAsync">Sell package</button>
                     }
                 </div>
             </div>
@@ -151,7 +151,7 @@ else
                         <input id="adj-note" type="text" class="form-control" maxlength="300" @bind="adjustNote" />
                         @FieldError("Note")
                     </div>
-                    <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="AdjustAsync">Adjust balance</button>
+                    <button type="button" class="btn btn-outline-primary" disabled="@(busy || !ShowsCurrentCustomer)" @onclick="AdjustAsync">Adjust balance</button>
                 </div>
             </div>
         </div>
@@ -251,6 +251,9 @@ else
     private bool loaded;
     private bool busy;
     private string? errorMessage;
+
+    /// <summary>True only when the loaded detail belongs to the customer in the URL; sell/adjust are disabled otherwise.</summary>
+    private bool ShowsCurrentCustomer => detail is not null && detail.Customer.Id == Id;
     private string? notice;
     private int sellPackageId;
     private PaymentMethod sellMethod = PaymentMethod.Cash;
@@ -260,7 +263,25 @@ else
 
     [Parameter] public int Id { get; set; }
 
-    protected override async Task OnParametersSetAsync() => await LoadAsync();
+    protected override async Task OnParametersSetAsync()
+    {
+        if (detail?.Customer.Id != Id)
+        {
+            // Navigated to another customer in the same circuit: drop the previous customer's data and any stale
+            // message so nothing from the old page can be shown or acted on.
+            detail = null;
+            loaded = false;
+            errorMessage = null;
+            notice = null;
+            fieldErrors = new Dictionary<string, string>();
+            sellPackageId = 0;
+            adjustBucket = 0;
+            adjustMinutes = 0;
+            adjustNote = null;
+        }
+
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {
@@ -279,6 +300,7 @@ else
         catch (Exception ex)
         {
             Logger.LogError(ex, "Could not load customer {CustomerId}.", Id);
+            detail = null;
             errorMessage = "Something went wrong. Refresh the page and try again.";
         }
         finally
@@ -303,7 +325,7 @@ else
 
     private async Task SellAsync()
     {
-        if (busy || sellPackageId == 0)
+        if (busy || sellPackageId == 0 || !ShowsCurrentCustomer)
         {
             return;
         }
@@ -314,7 +336,9 @@ else
         fieldErrors = new Dictionary<string, string>();
         try
         {
-            var result = await PackageSvc.SellAsync(Id, sellPackageId, sellMethod);
+            // Pass the price shown in the picker so a concurrent price edit cannot charge an unseen amount.
+            var shownPrice = packages.FirstOrDefault(p => p.Id == sellPackageId)?.Price;
+            var result = await PackageSvc.SellAsync(Id, sellPackageId, sellMethod, shownPrice);
             if (result.Success)
             {
                 notice = $"Sold: {result.Value!.Minutes} min added to the balance.";
@@ -340,7 +364,7 @@ else
 
     private async Task AdjustAsync()
     {
-        if (busy)
+        if (busy || !ShowsCurrentCustomer)
         {
             return;
         }

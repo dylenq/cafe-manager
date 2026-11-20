@@ -154,6 +154,43 @@ public class StationTypeServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Delete_type_used_by_a_package_names_the_package_not_a_rate_rule()
+    {
+        var (scope, types, _) = Services();
+        using var _s = scope;
+        var typeId = (await types.CreateAsync(Input("Console"))).Value!.Id;
+        var packages = scope.ServiceProvider.GetRequiredService<Cafe.Server.Customers.PackageService>();
+        var created = await packages.CreateAsync(new Cafe.Server.Customers.TimePackageInput { Name = "Console hour", Minutes = 60, Price = 10m, StationTypeId = typeId });
+        Assert.True(created.Success, created.Error);
+
+        var result = await types.DeleteAsync(typeId);
+
+        Assert.False(result.Success);
+        Assert.Contains("time package", result.Error);
+        Assert.DoesNotContain("rate rule", result.Error);
+        Assert.NotNull(await types.GetAsync(typeId));
+    }
+
+    [Fact]
+    public async Task Delete_type_with_customer_balance_rows_explains_the_reference()
+    {
+        var (scope, types, _) = Services();
+        using var _s = scope;
+        var typeId = (await types.CreateAsync(Input("Console"))).Value!.Id;
+        var customers = scope.ServiceProvider.GetRequiredService<Cafe.Server.Customers.CustomerService>();
+        var customer = (await customers.CreateAsync(new Cafe.Server.Customers.CustomerInput { Name = "Bob" })).Value!;
+        var balance = scope.ServiceProvider.GetRequiredService<Cafe.Server.Customers.BalanceService>();
+        var adjusted = await balance.AdjustAsync(customer.Id, typeId, 30, "seed");
+        Assert.True(adjusted.Success, adjusted.Error);
+
+        var result = await types.DeleteAsync(typeId);
+
+        Assert.False(result.Success);
+        Assert.Contains("prepaid minutes", result.Error);
+        Assert.DoesNotContain("rate rule", result.Error);
+    }
+
+    [Fact]
     public async Task List_orders_by_sort_order_then_name_ignoring_case()
     {
         var (scope, types, _) = Services();

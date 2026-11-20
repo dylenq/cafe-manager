@@ -72,7 +72,9 @@ public sealed class FakeSamsungTv : IAsyncDisposable
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
-        builder.Configuration["urls"] = "http://127.0.0.1:0";
+        // The test output folder carries the server's appsettings.json (a fixed Kestrel port on the Http endpoint);
+        // point that endpoint at a free loopback port so parallel test classes cannot collide.
+        builder.Configuration["Kestrel:Endpoints:Http:Url"] = "http://127.0.0.1:0";
         var app = builder.Build();
         FakeSamsungTv? tv = null;
         app.UseWebSockets();

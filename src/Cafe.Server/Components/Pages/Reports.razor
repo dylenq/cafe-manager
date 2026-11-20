@@ -12,241 +12,225 @@
 
 <PageTitle>Reports - Cafe Manager</PageTitle>
 
-<h1 class="h3 mb-3">Reports</h1>
+<SectionContent SectionName="page-title">Reports</SectionContent>
 
-<div class="card mb-3">
-    <div class="card-body">
-        <div class="row g-2 align-items-end">
-            <div class="col-12 col-md-3">
-                <label class="form-label" for="report-preset">Range</label>
-                <select id="report-preset" class="form-select" @bind="selectedPreset" @bind:after="OnPresetChanged">
-                    @foreach (var preset in Presets)
-                    {
-                        <option value="@preset.Value">@preset.Label</option>
-                    }
-                </select>
-            </div>
-            @if (selectedPreset == ReportPreset.Custom)
-            {
-                <div class="col-6 col-md-3">
-                    <label class="form-label" for="report-from">From</label>
-                    <input id="report-from" type="date" class="form-control" value="@fromText" @onchange="e => fromText = e.Value?.ToString() ?? string.Empty" />
-                </div>
-                <div class="col-6 col-md-3">
-                    <label class="form-label" for="report-to">To</label>
-                    <input id="report-to" type="date" class="form-control" value="@toText" @onchange="e => toText = e.Value?.ToString() ?? string.Empty" />
-                </div>
-            }
-            <div class="col-12 col-md-auto">
-                <button type="button" class="btn btn-primary" @onclick="Apply">Apply</button>
-            </div>
-        </div>
+<div class="page-header">
+    <h1 class="large-title">Reports</h1>
+</div>
+
+<div class="report-filters">
+    <div class="segmented" role="group" aria-label="Range" id="report-preset">
+        @foreach (var preset in Presets)
+        {
+            <button type="button" class="@(selectedPreset == preset.Value ? "active" : "")" aria-pressed="@(selectedPreset == preset.Value ? "true" : "false")"
+                    @onclick="() => SelectPreset(preset.Value)">@preset.Label</button>
+        }
     </div>
+    @if (selectedPreset == ReportPreset.Custom)
+    {
+        <div class="group group-padded report-custom">
+            <div>
+                <label class="form-label" for="report-from">From</label>
+                <input id="report-from" type="date" class="form-control" value="@fromText" @onchange="e => fromText = e.Value?.ToString() ?? string.Empty" />
+            </div>
+            <div>
+                <label class="form-label" for="report-to">To</label>
+                <input id="report-to" type="date" class="form-control" value="@toText" @onchange="e => toText = e.Value?.ToString() ?? string.Empty" />
+            </div>
+            <button type="button" class="btn btn-primary" @onclick="Apply">Apply</button>
+        </div>
+    }
 </div>
 
 @if (!string.IsNullOrEmpty(rangeError))
 {
-    <div class="alert alert-warning" role="alert">@rangeError</div>
+    <div class="banner banner-warning alert alert-warning" role="alert">@rangeError</div>
 }
 
 @if (!string.IsNullOrEmpty(loadError))
 {
-    <div class="alert alert-danger" role="alert">@loadError</div>
+    <div class="banner banner-danger alert alert-danger" role="alert">@loadError</div>
 }
 
 @if (data is not null)
 {
     var s = data.Summary;
-    <p class="text-muted" data-testid="report-range">@Iso(data.Range.From) to @Iso(data.Range.To)</p>
+    <p class="footnote report-range" data-testid="report-range">@Iso(data.Range.From) to @Iso(data.Range.To)</p>
 
-    <section class="mb-4" aria-labelledby="h-summary">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h2 class="h5 mb-0" id="h-summary">Summary</h2>
-            <a class="btn btn-outline-secondary btn-sm" href="@ExportHref("summary")" download>Export CSV</a>
+    <section class="report-section" aria-labelledby="h-summary">
+        <div class="report-head">
+            <h2 class="group-caption report-caption" id="h-summary">Summary</h2>
+            <a class="btn btn-sm btn-outline-secondary" href="@ExportHref("summary")" download>Export CSV</a>
         </div>
-        <div class="row g-2" data-testid="report-summary">
-            <div class="col-6 col-md-4 col-xl-3"><div class="report-tile"><div class="tile-label">Total collected</div><div class="tile-value">@s.Collected.ToString("C")</div></div></div>
-            <div class="col-6 col-md-4 col-xl-3"><div class="report-tile"><div class="tile-label">Cash</div><div class="tile-value">@s.Cash.ToString("C")</div></div></div>
-            <div class="col-6 col-md-4 col-xl-3"><div class="report-tile"><div class="tile-label">Card</div><div class="tile-value">@s.Card.ToString("C")</div></div></div>
-            <div class="col-6 col-md-4 col-xl-3"><div class="report-tile"><div class="tile-label">Sessions</div><div class="tile-value">@s.SessionCount</div></div></div>
-            <div class="col-6 col-md-4 col-xl-3"><div class="report-tile"><div class="tile-label">Session hours</div><div class="tile-value">@s.SessionHours.ToString("0.##", CultureInfo.InvariantCulture)</div></div></div>
-            <div class="col-6 col-md-4 col-xl-3"><div class="report-tile"><div class="tile-label">Average session length</div><div class="tile-value">@s.AverageSessionMinutes.ToString("0.#", CultureInfo.InvariantCulture) min</div></div></div>
-            <div class="col-12 col-md-8 col-xl-6">
-                <div class="report-tile report-tile-unpaid">
-                    <div class="tile-label">Charged (unpaid)</div>
-                    <div class="tile-value">@s.ChargedUnpaid.ToString("C")</div>
-                    <div class="small text-muted">Owed but not yet collected</div>
-                </div>
+        <div class="report-tiles" data-testid="report-summary">
+            <div class="report-tile"><div class="tile-label">Total collected</div><div class="tile-value">@s.Collected.ToString("C")</div></div>
+            <div class="report-tile"><div class="tile-label">Cash</div><div class="tile-value">@s.Cash.ToString("C")</div></div>
+            <div class="report-tile"><div class="tile-label">Card</div><div class="tile-value">@s.Card.ToString("C")</div></div>
+            <div class="report-tile"><div class="tile-label">Sessions</div><div class="tile-value">@s.SessionCount</div></div>
+            <div class="report-tile"><div class="tile-label">Session hours</div><div class="tile-value">@s.SessionHours.ToString("0.##", CultureInfo.InvariantCulture)</div></div>
+            <div class="report-tile"><div class="tile-label">Average session length</div><div class="tile-value">@s.AverageSessionMinutes.ToString("0.#", CultureInfo.InvariantCulture) min</div></div>
+            <div class="report-tile report-tile-unpaid">
+                <div class="tile-label">Charged (unpaid)</div>
+                <div class="tile-value">@s.ChargedUnpaid.ToString("C")</div>
+                <div class="footnote">Owed but not yet collected</div>
             </div>
         </div>
     </section>
 
-    <section class="card mb-4" aria-labelledby="h-days">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h2 class="h5 mb-0" id="h-days">Revenue by day</h2>
-                <a class="btn btn-outline-secondary btn-sm" href="@ExportHref("days")" download>Export CSV</a>
+    <section class="report-section" aria-labelledby="h-days">
+            <div class="report-head">
+                <h2 class="group-caption report-caption" id="h-days">Revenue by day</h2>
+                <a class="btn btn-sm btn-outline-secondary" href="@ExportHref("days")" download>Export CSV</a>
             </div>
-            <RevenueBarChart Bars="dayBars" Title="Revenue by day" />
+            <div class="group group-padded report-chart"><RevenueBarChart Bars="dayBars" Title="Revenue by day" /></div>
             @if (AllZero(data.Days.Select(d => d.Collected)))
             {
-                <p class="text-muted mt-2 mb-0">No revenue in this range.</p>
+                <div class="group mt-3"><div class="group-row"><span class="footnote">No revenue in this range.</span></div></div>
             }
             else
             {
-                <div class="table-responsive mt-2">
-                    <table class="table table-striped align-middle mb-0">
-                        <thead><tr><th>Date</th><th class="text-end">Collected</th><th class="text-end">Cash</th><th class="text-end">Card</th></tr></thead>
+                <div class="table-responsive mt-3">
+                    <table class="table align-middle">
+                        <thead><tr><th>Date</th><th class="num">Collected</th><th class="num">Cash</th><th class="num">Card</th></tr></thead>
                         <tbody>
                             @foreach (var day in data.Days)
                             {
                                 <tr>
                                     <td>@Iso(day.Date)</td>
-                                    <td class="text-end">@day.Collected.ToString("C")</td>
-                                    <td class="text-end">@day.Cash.ToString("C")</td>
-                                    <td class="text-end">@day.Card.ToString("C")</td>
+                                    <td class="num">@day.Collected.ToString("C")</td>
+                                    <td class="num">@day.Cash.ToString("C")</td>
+                                    <td class="num">@day.Card.ToString("C")</td>
                                 </tr>
                             }
                         </tbody>
                     </table>
                 </div>
             }
-        </div>
     </section>
 
-    <section class="card mb-4" aria-labelledby="h-weeks">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h2 class="h5 mb-0" id="h-weeks">Revenue by week</h2>
-                <a class="btn btn-outline-secondary btn-sm" href="@ExportHref("weeks")" download>Export CSV</a>
+    <section class="report-section" aria-labelledby="h-weeks">
+            <div class="report-head">
+                <h2 class="group-caption report-caption" id="h-weeks">Revenue by week</h2>
+                <a class="btn btn-sm btn-outline-secondary" href="@ExportHref("weeks")" download>Export CSV</a>
             </div>
             @if (AllZero(data.Weeks.Select(w => w.Collected)))
             {
-                <p class="text-muted mb-0">No revenue in this range.</p>
+                <div class="group"><div class="group-row"><span class="footnote">No revenue in this range.</span></div></div>
             }
             else
             {
                 <div class="table-responsive">
-                    <table class="table table-striped align-middle mb-0">
-                        <thead><tr><th>ISO week</th><th>Week starts (Monday)</th><th class="text-end">Collected</th></tr></thead>
+                    <table class="table align-middle">
+                        <thead><tr><th>ISO week</th><th>Week starts (Monday)</th><th class="num">Collected</th></tr></thead>
                         <tbody>
                             @foreach (var week in data.Weeks)
                             {
-                                <tr><td>@week.IsoLabel</td><td>@Iso(week.WeekStart)</td><td class="text-end">@week.Collected.ToString("C")</td></tr>
+                                <tr><td>@week.IsoLabel</td><td>@Iso(week.WeekStart)</td><td class="num">@week.Collected.ToString("C")</td></tr>
                             }
                         </tbody>
                     </table>
                 </div>
             }
-        </div>
     </section>
 
-    <section class="card mb-4" aria-labelledby="h-types">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h2 class="h5 mb-0" id="h-types">By station type</h2>
-                <a class="btn btn-outline-secondary btn-sm" href="@ExportHref("station-types")" download>Export CSV</a>
+    <section class="report-section" aria-labelledby="h-types">
+            <div class="report-head">
+                <h2 class="group-caption report-caption" id="h-types">By station type</h2>
+                <a class="btn btn-sm btn-outline-secondary" href="@ExportHref("station-types")" download>Export CSV</a>
             </div>
             @if (data.StationTypes.Count == 0 || (AllZero(data.StationTypes.Select(t => t.Collected)) && data.StationTypes.All(t => t.Hours == 0)))
             {
-                <p class="text-muted mb-0">No revenue in this range.</p>
+                <div class="group"><div class="group-row"><span class="footnote">No revenue in this range.</span></div></div>
             }
             else
             {
                 <div class="table-responsive">
-                    <table class="table table-striped align-middle mb-0">
-                        <thead><tr><th>Station type</th><th class="text-end">Collected</th><th class="text-end">Hours</th></tr></thead>
+                    <table class="table align-middle">
+                        <thead><tr><th>Station type</th><th class="num">Collected</th><th class="num">Hours</th></tr></thead>
                         <tbody>
                             @foreach (var row in data.StationTypes)
                             {
-                                <tr><td>@row.Name</td><td class="text-end">@row.Collected.ToString("C")</td><td class="text-end">@row.Hours.ToString("0.##", CultureInfo.InvariantCulture)</td></tr>
+                                <tr><td>@row.Name</td><td class="num">@row.Collected.ToString("C")</td><td class="num">@row.Hours.ToString("0.##", CultureInfo.InvariantCulture)</td></tr>
                             }
                         </tbody>
                     </table>
                 </div>
             }
-        </div>
     </section>
 
-    <section class="card mb-4" aria-labelledby="h-products">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h2 class="h5 mb-0" id="h-products">By product</h2>
-                <a class="btn btn-outline-secondary btn-sm" href="@ExportHref("products")" download>Export CSV</a>
+    <section class="report-section" aria-labelledby="h-products">
+            <div class="report-head">
+                <h2 class="group-caption report-caption" id="h-products">By product</h2>
+                <a class="btn btn-sm btn-outline-secondary" href="@ExportHref("products")" download>Export CSV</a>
             </div>
             @if (data.Products.Count == 0)
             {
-                <p class="text-muted mb-0">No revenue in this range.</p>
+                <div class="group"><div class="group-row"><span class="footnote">No revenue in this range.</span></div></div>
             }
             else
             {
                 <div class="table-responsive">
-                    <table class="table table-striped align-middle mb-0">
-                        <thead><tr><th>Product</th><th>Category</th><th class="text-end">Quantity</th><th class="text-end">Revenue</th></tr></thead>
+                    <table class="table align-middle">
+                        <thead><tr><th>Product</th><th>Category</th><th class="num">Quantity</th><th class="num">Revenue</th></tr></thead>
                         <tbody>
                             @foreach (var row in data.Products)
                             {
-                                <tr><td>@row.Name</td><td>@row.Category</td><td class="text-end">@row.Quantity.ToString("0.##", CultureInfo.InvariantCulture)</td><td class="text-end">@row.Revenue.ToString("C")</td></tr>
+                                <tr><td>@row.Name</td><td>@row.Category</td><td class="num">@row.Quantity.ToString("0.##", CultureInfo.InvariantCulture)</td><td class="num">@row.Revenue.ToString("C")</td></tr>
                             }
                         </tbody>
                     </table>
                 </div>
             }
-        </div>
     </section>
 
-    <section class="card mb-4" aria-labelledby="h-categories">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h2 class="h5 mb-0" id="h-categories">By category</h2>
-                <a class="btn btn-outline-secondary btn-sm" href="@ExportHref("categories")" download>Export CSV</a>
+    <section class="report-section" aria-labelledby="h-categories">
+            <div class="report-head">
+                <h2 class="group-caption report-caption" id="h-categories">By category</h2>
+                <a class="btn btn-sm btn-outline-secondary" href="@ExportHref("categories")" download>Export CSV</a>
             </div>
             @if (data.Categories.Count == 0)
             {
-                <p class="text-muted mb-0">No revenue in this range.</p>
+                <div class="group"><div class="group-row"><span class="footnote">No revenue in this range.</span></div></div>
             }
             else
             {
                 <div class="table-responsive">
-                    <table class="table table-striped align-middle mb-0">
-                        <thead><tr><th>Category</th><th class="text-end">Quantity</th><th class="text-end">Revenue</th></tr></thead>
+                    <table class="table align-middle">
+                        <thead><tr><th>Category</th><th class="num">Quantity</th><th class="num">Revenue</th></tr></thead>
                         <tbody>
                             @foreach (var row in data.Categories)
                             {
-                                <tr><td>@row.Category</td><td class="text-end">@row.Quantity.ToString("0.##", CultureInfo.InvariantCulture)</td><td class="text-end">@row.Revenue.ToString("C")</td></tr>
+                                <tr><td>@row.Category</td><td class="num">@row.Quantity.ToString("0.##", CultureInfo.InvariantCulture)</td><td class="num">@row.Revenue.ToString("C")</td></tr>
                             }
                         </tbody>
                     </table>
                 </div>
             }
-        </div>
     </section>
 
-    <section class="card mb-4" aria-labelledby="h-methods">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h2 class="h5 mb-0" id="h-methods">By payment method</h2>
-                <a class="btn btn-outline-secondary btn-sm" href="@ExportHref("methods")" download>Export CSV</a>
+    <section class="report-section" aria-labelledby="h-methods">
+            <div class="report-head">
+                <h2 class="group-caption report-caption" id="h-methods">By payment method</h2>
+                <a class="btn btn-sm btn-outline-secondary" href="@ExportHref("methods")" download>Export CSV</a>
             </div>
             @if (data.Methods.Count == 0 || AllZero(data.Methods.Select(m => m.Collected)))
             {
-                <p class="text-muted mb-0">No revenue in this range.</p>
+                <div class="group"><div class="group-row"><span class="footnote">No revenue in this range.</span></div></div>
             }
             else
             {
                 <div class="table-responsive">
-                    <table class="table table-striped align-middle mb-0">
-                        <thead><tr><th>Method</th><th class="text-end">Collected</th></tr></thead>
+                    <table class="table align-middle">
+                        <thead><tr><th>Method</th><th class="num">Collected</th></tr></thead>
                         <tbody>
                             @foreach (var row in data.Methods)
                             {
-                                <tr><td>@row.Method</td><td class="text-end">@row.Collected.ToString("C")</td></tr>
+                                <tr><td>@row.Method</td><td class="num">@row.Collected.ToString("C")</td></tr>
                             }
                         </tbody>
                     </table>
                 </div>
             }
-        </div>
     </section>
 }
 
@@ -315,6 +299,12 @@
             Logger.LogError(ex, "Could not load the report for {From} to {To}", range!.From, range.To);
             loadError = "Could not load the report. Try again.";
         }
+    }
+
+    private void SelectPreset(ReportPreset preset)
+    {
+        selectedPreset = preset;
+        OnPresetChanged();
     }
 
     private void OnPresetChanged()

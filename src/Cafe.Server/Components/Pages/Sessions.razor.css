@@ -1,0 +1,8 @@
+.event-trail > td {
+    background: var(--bg-3);
+    padding-left: 1.5rem;
+}
+
+.event-trail li {
+    padding: .15rem 0;
+}

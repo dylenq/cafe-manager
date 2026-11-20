@@ -7,14 +7,14 @@
     <button type="button" class="@CssClass" disabled="@busy" @onclick="PrintAsync">@(busy ? "Printing..." : Label)</button>
     @if (!string.IsNullOrEmpty(failure))
     {
-        <div class="alert alert-danger alert-dismissible mt-2 mb-0 py-2" role="alert">
+        <div class="banner banner-danger alert alert-danger alert-dismissible mt-2 mb-0" role="alert">
             Receipt printing failed: @failure
             <button type="button" class="btn-close" aria-label="Close" @onclick="() => failure = null"></button>
         </div>
     }
     else if (!string.IsNullOrEmpty(info))
     {
-        <div class="small @infoClass mt-1" role="status">@info</div>
+        <div class="footnote @infoClass mt-1" role="status">@info</div>
     }
 </div>
 

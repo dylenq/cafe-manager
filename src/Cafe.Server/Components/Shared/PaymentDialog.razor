@@ -2,129 +2,137 @@
 @using Cafe.Server.Payments
 @inject ILogger<PaymentDialog> Logger
 
-<div class="payment-backdrop" role="dialog" aria-modal="true" aria-label="@Title">
-    <div class="payment-card card shadow">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                <h2 class="h5 mb-0">@Title</h2>
+<div class="payment-backdrop sheet-backdrop" role="dialog" aria-modal="true" aria-label="@Title">
+    <div class="payment-card sheet">
+        <div class="sheet-header">
+            <div class="sheet-side">
                 @if (settlement is null)
                 {
-                    <button type="button" class="btn-close" aria-label="Cancel" disabled="@busy" @onclick="CloseAsync"></button>
+                    <button type="button" class="btn btn-link sheet-cancel" aria-label="Cancel" disabled="@busy" @onclick="CloseAsync">Cancel</button>
                 }
             </div>
+            <h2 class="sheet-title">@Title</h2>
+            <div class="sheet-side"></div>
+        </div>
 
+        <div class="sheet-body">
             @if (settlement is not null)
             {
-                <div class="alert alert-success" role="status">
-                    <div class="fw-semibold">Payment recorded</div>
-                    <div>Receipt #@settlement.ReceiptPaymentId</div>
+                <div class="banner banner-success alert alert-success" role="status">
+                    <div>
+                        <div class="fw-semibold">Payment recorded</div>
+                        <div>Receipt #@settlement.ReceiptPaymentId</div>
+                    </div>
                 </div>
                 @if (settlement.Change > 0m)
                 {
-                    <div class="mb-2">Change due <span class="fs-3 fw-bold">@settlement.Change.ToString("C")</span></div>
+                    <div class="group">
+                        <div class="group-row">
+                            <span class="row-label">Change due</span>
+                            <span class="pay-big">@settlement.Change.ToString("C")</span>
+                        </div>
+                    </div>
                 }
                 @if (settlement.Remaining > 0m)
                 {
-                    <div class="alert alert-warning py-2">Remaining outstanding: <strong>@settlement.Remaining.ToString("C")</strong></div>
+                    <div class="banner banner-warning alert alert-warning">Remaining outstanding: <strong>@settlement.Remaining.ToString("C")</strong></div>
                 }
-                <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
+                <div class="pay-actions">
+                    <button type="button" class="btn btn-primary pay-primary" @onclick="CloseAsync">Done</button>
                     <PrintReceiptButton PaymentId="settlement.ReceiptPaymentId" Change="settlement.Change" />
-                    <button type="button" class="btn btn-primary" @onclick="CloseAsync">Done</button>
                 </div>
             }
             else
             {
-                <table class="table table-sm align-middle mb-2">
-                    <thead>
-                        <tr><th>Item</th><th class="text-end">Total</th><th class="text-end">Paid</th><th class="text-end">Outstanding</th></tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var item in Items)
-                        {
-                            <tr>
-                                <td>@item.Label</td>
-                                <td class="text-end">@item.Total.ToString("C")</td>
-                                <td class="text-end">@item.Paid.ToString("C")</td>
-                                <td class="text-end">@item.Outstanding.ToString("C")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-
-                <div class="d-flex justify-content-between align-items-baseline mb-3">
-                    <span class="text-muted">Total due</span>
-                    <span class="fs-2 fw-bold">@Due.ToString("C")</span>
+                <div class="group">
+                    @foreach (var item in Items)
+                    {
+                        <div class="group-row">
+                            <div class="pay-item">
+                                <div class="pay-item-label">@item.Label</div>
+                                <div class="footnote">Total @item.Total.ToString("C") - Paid @item.Paid.ToString("C")</div>
+                            </div>
+                            <div class="pay-item-out">
+                                <div class="footnote">Outstanding</div>
+                                <div class="num fw-semibold">@item.Outstanding.ToString("C")</div>
+                            </div>
+                        </div>
+                    }
+                    <div class="group-row pay-due">
+                        <span class="row-label">Total due</span>
+                        <span class="pay-big">@Due.ToString("C")</span>
+                    </div>
                 </div>
 
                 @if (!string.IsNullOrEmpty(error))
                 {
-                    <div class="alert alert-danger" role="alert">@error</div>
+                    <div class="banner banner-danger alert alert-danger" role="alert">@error</div>
                 }
 
                 @if (IsFree)
                 {
-                    <div class="alert alert-info py-2">Nothing to pay. Record the free sale.</div>
+                    <div class="banner banner-info alert alert-info">Nothing to pay. Record the free sale.</div>
                 }
 
                 @for (var i = 0; !IsFree && i < rows.Count; i++)
                 {
                     var row = rows[i];
-                    <div class="row g-2 align-items-end mb-2">
-                        <div class="col-5 col-sm-4">
-                            <label class="form-label small mb-1">Method</label>
+                    <div class="group group-padded pay-tender">
+                        <div class="pay-tender-field">
+                            <label class="form-label">Method</label>
                             <select class="form-select" value="@row.Method" disabled="@busy" @onchange="e => SetMethod(row, e)">
                                 <option value="@PaymentMethod.Cash">Cash</option>
                                 <option value="@PaymentMethod.Card">Card</option>
                             </select>
                         </div>
-                        <div class="col-7 col-sm-5">
-                            <label class="form-label small mb-1">@(row.Method == PaymentMethod.Cash ? "Tendered" : "Amount")</label>
+                        <div class="pay-tender-field">
+                            <label class="form-label">@(row.Method == PaymentMethod.Cash ? "Tendered" : "Amount")</label>
                             <input type="number" inputmode="decimal" step="0.01" min="0" class="form-control" disabled="@busy"
                                    value="@row.Text" @oninput="e => row.Text = e.Value?.ToString()" />
                         </div>
                         @if (rows.Count > 1)
                         {
-                            <div class="col-12 col-sm-3">
-                                <button type="button" class="btn btn-outline-danger w-100" disabled="@busy" @onclick="() => rows.Remove(row)">Remove</button>
-                            </div>
+                            <button type="button" class="btn btn-outline-danger pay-tender-remove" disabled="@busy" @onclick="() => rows.Remove(row)">Remove</button>
                         }
                     </div>
                 }
 
-                <div class="d-flex flex-wrap gap-2 mb-3" hidden="@IsFree">
+                <div class="pay-quick" hidden="@IsFree">
                     <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="AddRow">Add payment</button>
                     <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="ExactCash">Exact cash</button>
                     <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="RestByCard">Rest by card</button>
                 </div>
 
-                <div class="border rounded p-2 mb-3 bg-light">
-                    <div class="d-flex justify-content-between"><span>Applied</span><span>@calc.Applied.ToString("C")</span></div>
+                <div class="group">
+                    <div class="group-row"><span class="row-label">Applied</span><span class="row-value">@calc.Applied.ToString("C")</span></div>
                     @if (calc.Change > 0m)
                     {
-                        <div class="d-flex justify-content-between align-items-baseline">
-                            <span>Change due <span class="small text-muted">(not stored)</span></span>
-                            <span class="fs-3 fw-bold">@calc.Change.ToString("C")</span>
+                        <div class="group-row">
+                            <span class="row-label">Change due <span class="footnote">(not stored)</span></span>
+                            <span class="pay-big">@calc.Change.ToString("C")</span>
                         </div>
                     }
-                    @if (calc.CardClamped)
-                    {
-                        <div class="small text-muted">The card amount was cut down to what is still due.</div>
-                    }
-                    <div class="d-flex justify-content-between"><span>Remaining after this payment</span><span>@calc.Remaining.ToString("C")</span></div>
-                    @if (calc.Remaining > 0m && calc.Applied > 0m)
-                    {
-                        <div class="alert alert-warning py-1 px-2 mt-2 mb-0 small">
-                            @(RequireFullPayment ? "Full payment is required." : "The remainder stays outstanding and can be settled later.")
-                        </div>
-                    }
+                    <div class="group-row"><span class="row-label">Remaining after this payment</span><span class="row-value">@calc.Remaining.ToString("C")</span></div>
                 </div>
-
-                <div class="d-flex flex-column flex-sm-row gap-2">
-                    <button type="button" class="btn btn-primary" disabled="@(!CanConfirm)" @onclick="ConfirmAsync">Record payment</button>
-                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CloseAsync">Cancel</button>
-                </div>
+                @if (calc.CardClamped)
+                {
+                    <div class="group-footer">The card amount was cut down to what is still due.</div>
+                }
+                @if (calc.Remaining > 0m && calc.Applied > 0m)
+                {
+                    <div class="banner banner-warning alert alert-warning mt-3">
+                        @(RequireFullPayment ? "Full payment is required." : "The remainder stays outstanding and can be settled later.")
+                    </div>
+                }
             }
         </div>
+
+        @if (settlement is null)
+        {
+            <div class="sheet-footer">
+                <button type="button" class="btn btn-primary pay-primary" disabled="@(!CanConfirm)" @onclick="ConfirmAsync">Record payment</button>
+            </div>
+        }
     </div>
 </div>
 

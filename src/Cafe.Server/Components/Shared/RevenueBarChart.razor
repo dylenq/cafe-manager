@@ -3,7 +3,7 @@
 
 @if (Bars.Count == 0 || Bars.All(b => b.Value <= 0))
 {
-    <p class="text-muted small mb-0" data-testid="chart-empty">No revenue in this range.</p>
+    <p class="footnote mb-0" data-testid="chart-empty">No revenue in this range.</p>
 }
 else
 {
@@ -13,7 +13,7 @@ else
     var barWidth = Math.Max(2d, slot * 0.7);
     <svg class="revenue-chart" viewBox="0 0 @Width @(Height + 28)" role="img" aria-label="@Title" preserveAspectRatio="xMidYMid meet">
         <title>@Title</title>
-        <line x1="0" y1="@Height" x2="@Width" y2="@Height" stroke="currentColor" stroke-opacity="0.4" stroke-width="1" />
+        <line x1="0" y1="@Height" x2="@Width" y2="@Height" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" />
         @for (var i = 0; i < Bars.Count; i++)
         {
             var bar = Bars[i];

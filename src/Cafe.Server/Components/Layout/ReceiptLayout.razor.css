@@ -1,0 +1,15 @@
+.receipt-shell {
+    min-height: 100vh;
+    padding: 1.5rem 1rem;
+    background: var(--bg-2);
+    color: var(--label);
+}
+
+@media print {
+    .receipt-shell {
+        min-height: 0;
+        padding: 1rem;
+        background: #fff;
+        color: #000;
+    }
+}

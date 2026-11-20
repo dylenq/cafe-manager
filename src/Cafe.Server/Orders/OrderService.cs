@@ -1,12 +1,14 @@
 using Cafe.Server.Data;
+using Cafe.Server.Payments;
 using Cafe.Server.Stations;
 using Microsoft.EntityFrameworkCore;
 
 namespace Cafe.Server.Orders;
 
-public class OrderService(IDbContextFactory<CafeDbContext> dbFactory, TimeProvider time)
+public class OrderService(IDbContextFactory<CafeDbContext> dbFactory, TimeProvider time, SettlementLock settlementLock)
 {
     public const int MaxQuantity = 99;
+    public const int MaxNoteLength = 300;
 
     /// <summary>Rings up an Open order, snapshotting product names and prices. A zero-total order is created Paid.</summary>
     public async Task<ServiceResult<Order>> CreateAsync(OrderDraft draft, CancellationToken cancellationToken = default)
@@ -27,13 +29,25 @@ public class OrderService(IDbContextFactory<CafeDbContext> dbFactory, TimeProvid
             return ServiceResult<Order>.Fail($"Quantity must be between 1 and {MaxQuantity}.");
         }
 
+        if (draft.Note is { } rawNote && rawNote.Trim().Length > MaxNoteLength)
+        {
+            return ServiceResult<Order>.Fail($"Note can be at most {MaxNoteLength} characters.");
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var ids = merged.Select(l => l.ProductId).ToList();
-        var products = await db.Products.Where(p => p.IsActive && ids.Contains(p.Id)).ToDictionaryAsync(p => p.Id, cancellationToken);
-        if (merged.Any(l => !products.ContainsKey(l.ProductId)))
+        var found = await db.Products.Where(p => ids.Contains(p.Id)).ToDictionaryAsync(p => p.Id, cancellationToken);
+        if (merged.Any(l => !found.ContainsKey(l.ProductId)))
         {
-            return ServiceResult<Order>.Fail("One of the products is no longer on sale. Refresh and try again.");
+            return ServiceResult<Order>.Fail("One of the products no longer exists. Refresh and try again.");
         }
+
+        if (found.Values.FirstOrDefault(p => !p.IsActive) is { } inactive)
+        {
+            return ServiceResult<Order>.Fail($"\"{inactive.Name}\" is no longer on sale. Remove it and try again.");
+        }
+
+        var products = found;
 
         var customerId = draft.CustomerId;
         if (draft.SessionId is { } sessionId)
@@ -86,5 +100,69 @@ public class OrderService(IDbContextFactory<CafeDbContext> dbFactory, TimeProvid
         }
 
         return ServiceResult<Order>.Ok(order);
+    }
+
+    /// <summary>
+    /// Voids an Open order (D-02). An order with any allocation is NOT voidable: staff settle the remainder, because
+    /// refunds are out of scope and voiding would lose the money trail. Serialised with settlement by SettlementLock.
+    /// </summary>
+    public async Task<ServiceResult> VoidAsync(int orderId, CancellationToken cancellationToken = default)
+    {
+        using var _ = await settlementLock.AcquireAsync(cancellationToken);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var order = await db.Orders.FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
+        if (order is null)
+        {
+            return ServiceResult.NotFound("That order no longer exists. Refresh the list.");
+        }
+
+        switch (order.Status)
+        {
+            case OrderStatus.Voided:
+                return ServiceResult.Fail("That order is already voided.");
+            case OrderStatus.Paid:
+                return ServiceResult.Fail("A paid order cannot be voided.");
+        }
+
+        if (await db.PaymentAllocations.AnyAsync(a => a.TargetType == AllocationTargetType.Order && a.TargetId == orderId, cancellationToken))
+        {
+            return ServiceResult.Fail("This order already has a payment, so it cannot be voided. Settle the remainder instead.");
+        }
+
+        order.Status = OrderStatus.Voided;
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return ServiceResult.Fail("The order could not be voided. Try again.");
+        }
+
+        return ServiceResult.Ok();
+    }
+
+    public async Task<Order?> GetAsync(int orderId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Orders.AsNoTracking().Include(o => o.Lines).Include(o => o.Customer).Include(o => o.Session).ThenInclude(s => s!.Station)
+            .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
+    }
+
+    /// <summary>Newest first, every status.</summary>
+    public async Task<List<Order>> RecentOrdersAsync(int take = 50, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var rows = await db.Orders.AsNoTracking().Include(o => o.Lines).Include(o => o.Customer).ToListAsync(cancellationToken);
+        // Sorted in memory: SQLite cannot order DateTimeOffset natively.
+        return rows.OrderByDescending(o => o.CreatedAtUtc).ThenByDescending(o => o.Id).Take(take).ToList();
+    }
+
+    public async Task<List<Order>> OrdersForSessionAsync(int sessionId, bool openOnly, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var rows = await db.Orders.AsNoTracking().Include(o => o.Lines)
+            .Where(o => o.SessionId == sessionId && (!openOnly || o.Status == OrderStatus.Open)).ToListAsync(cancellationToken);
+        return rows.OrderBy(o => o.Id).ToList();
     }
 }

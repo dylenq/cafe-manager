@@ -1,0 +1,76 @@
+@using Cafe.Server.Receipts
+@inject ReceiptPrintService PrintService
+@inject IJSRuntime JS
+@inject ILogger<PrintReceiptButton> Logger
+
+<div class="print-receipt-button">
+    <button type="button" class="@CssClass" disabled="@busy" @onclick="PrintAsync">@(busy ? "Printing..." : Label)</button>
+    @if (!string.IsNullOrEmpty(failure))
+    {
+        <div class="alert alert-danger alert-dismissible mt-2 mb-0 py-2" role="alert">
+            Receipt printing failed: @failure
+            <button type="button" class="btn-close" aria-label="Close" @onclick="() => failure = null"></button>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(info))
+    {
+        <div class="small @infoClass mt-1" role="status">@info</div>
+    }
+</div>
+
+@code {
+    private bool busy;
+    private string? failure;
+    private string? info;
+    private string infoClass = "text-success";
+
+    [Parameter, EditorRequired] public int PaymentId { get; set; }
+
+    [Parameter] public decimal? Change { get; set; }
+
+    [Parameter] public string Label { get; set; } = "Print receipt";
+
+    [Parameter] public string CssClass { get; set; } = "btn btn-outline-secondary";
+
+    private async Task PrintAsync()
+    {
+        if (busy)
+        {
+            return;
+        }
+
+        busy = true;
+        failure = null;
+        info = null;
+        try
+        {
+            var outcome = await PrintService.PrintAsync(PaymentId, Change);
+            switch (outcome.Kind)
+            {
+                case PrintOutcomeKind.BrowserUrl when !string.IsNullOrEmpty(outcome.Url):
+                    await JS.InvokeVoidAsync("open", outcome.Url, "_blank");
+                    break;
+                case PrintOutcomeKind.Printed:
+                    info = "Sent to the printer.";
+                    infoClass = "text-success";
+                    break;
+                case PrintOutcomeKind.Failed:
+                    failure = outcome.Error ?? "The printer did not respond.";
+                    break;
+                default:
+                    info = outcome.Message ?? "Nothing was printed.";
+                    infoClass = "text-muted";
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Printing receipt for payment {PaymentId} failed.", PaymentId);
+            failure = "Something went wrong. The payment was not changed.";
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

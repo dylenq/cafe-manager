@@ -1,0 +1,228 @@
+@using Cafe.Server.Data
+@using Cafe.Server.Payments
+@inject ILogger<PaymentDialog> Logger
+
+<div class="payment-backdrop" role="dialog" aria-modal="true" aria-label="@Title">
+    <div class="payment-card card shadow">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                <h2 class="h5 mb-0">@Title</h2>
+                @if (settlement is null)
+                {
+                    <button type="button" class="btn-close" aria-label="Cancel" disabled="@busy" @onclick="CloseAsync"></button>
+                }
+            </div>
+
+            @if (settlement is not null)
+            {
+                <div class="alert alert-success" role="status">
+                    <div class="fw-semibold">Payment recorded</div>
+                    <div>Receipt #@settlement.ReceiptPaymentId</div>
+                </div>
+                @if (settlement.Change > 0m)
+                {
+                    <div class="mb-2">Change due <span class="fs-3 fw-bold">@settlement.Change.ToString("C")</span></div>
+                }
+                @if (settlement.Remaining > 0m)
+                {
+                    <div class="alert alert-warning py-2">Remaining outstanding: <strong>@settlement.Remaining.ToString("C")</strong></div>
+                }
+                <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
+                    <PrintReceiptButton PaymentId="settlement.ReceiptPaymentId" Change="settlement.Change" />
+                    <button type="button" class="btn btn-primary" @onclick="CloseAsync">Done</button>
+                </div>
+            }
+            else
+            {
+                <table class="table table-sm align-middle mb-2">
+                    <thead>
+                        <tr><th>Item</th><th class="text-end">Total</th><th class="text-end">Paid</th><th class="text-end">Outstanding</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Items)
+                        {
+                            <tr>
+                                <td>@item.Label</td>
+                                <td class="text-end">@item.Total.ToString("C")</td>
+                                <td class="text-end">@item.Paid.ToString("C")</td>
+                                <td class="text-end">@item.Outstanding.ToString("C")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <div class="d-flex justify-content-between align-items-baseline mb-3">
+                    <span class="text-muted">Total due</span>
+                    <span class="fs-2 fw-bold">@Due.ToString("C")</span>
+                </div>
+
+                @if (!string.IsNullOrEmpty(error))
+                {
+                    <div class="alert alert-danger" role="alert">@error</div>
+                }
+
+                @for (var i = 0; i < rows.Count; i++)
+                {
+                    var row = rows[i];
+                    <div class="row g-2 align-items-end mb-2">
+                        <div class="col-5 col-sm-4">
+                            <label class="form-label small mb-1">Method</label>
+                            <select class="form-select" value="@row.Method" disabled="@busy" @onchange="e => SetMethod(row, e)">
+                                <option value="@PaymentMethod.Cash">Cash</option>
+                                <option value="@PaymentMethod.Card">Card</option>
+                            </select>
+                        </div>
+                        <div class="col-7 col-sm-5">
+                            <label class="form-label small mb-1">@(row.Method == PaymentMethod.Cash ? "Tendered" : "Amount")</label>
+                            <input type="number" inputmode="decimal" step="0.01" min="0" class="form-control" disabled="@busy"
+                                   value="@row.Text" @oninput="e => row.Text = e.Value?.ToString()" />
+                        </div>
+                        @if (rows.Count > 1)
+                        {
+                            <div class="col-12 col-sm-3">
+                                <button type="button" class="btn btn-outline-danger w-100" disabled="@busy" @onclick="() => rows.Remove(row)">Remove</button>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="AddRow">Add payment</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="ExactCash">Exact cash</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="RestByCard">Rest by card</button>
+                </div>
+
+                <div class="border rounded p-2 mb-3 bg-light">
+                    <div class="d-flex justify-content-between"><span>Applied</span><span>@calc.Applied.ToString("C")</span></div>
+                    @if (calc.Change > 0m)
+                    {
+                        <div class="d-flex justify-content-between align-items-baseline">
+                            <span>Change due <span class="small text-muted">(not stored)</span></span>
+                            <span class="fs-3 fw-bold">@calc.Change.ToString("C")</span>
+                        </div>
+                    }
+                    @if (calc.CardClamped)
+                    {
+                        <div class="small text-muted">The card amount was cut down to what is still due.</div>
+                    }
+                    <div class="d-flex justify-content-between"><span>Remaining after this payment</span><span>@calc.Remaining.ToString("C")</span></div>
+                    @if (calc.Remaining > 0m && calc.Applied > 0m)
+                    {
+                        <div class="alert alert-warning py-1 px-2 mt-2 mb-0 small">
+                            @(RequireFullPayment ? "Full payment is required." : "The remainder stays outstanding and can be settled later.")
+                        </div>
+                    }
+                </div>
+
+                <div class="d-flex flex-column flex-sm-row gap-2">
+                    <button type="button" class="btn btn-primary" disabled="@(!CanConfirm)" @onclick="ConfirmAsync">Record payment</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CloseAsync">Cancel</button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private sealed class Row
+    {
+        public PaymentMethod Method { get; set; } = PaymentMethod.Cash;
+
+        public string? Text { get; set; }
+
+        public decimal Amount =>
+            decimal.TryParse(Text, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var v) && v > 0m
+                ? decimal.Round(v, 2)
+                : 0m;
+    }
+
+    private readonly List<Row> rows = [new Row()];
+    private bool busy;
+    private bool recorded;
+    private string? error;
+    private SettleResult? settlement;
+
+    [Parameter] public string Title { get; set; } = "Take payment";
+
+    [Parameter, EditorRequired] public IReadOnlyList<OutstandingItem> Items { get; set; } = [];
+
+    [Parameter, EditorRequired] public decimal Due { get; set; }
+
+    /// <summary>True for package sales: Record payment stays disabled until nothing remains.</summary>
+    [Parameter] public bool RequireFullPayment { get; set; }
+
+    [Parameter, EditorRequired] public Func<IReadOnlyList<TenderLine>, Task<PaymentDialogResult>> OnConfirm { get; set; } = default!;
+
+    /// <summary>True when a payment was recorded.</summary>
+    [Parameter] public EventCallback<bool> OnClosed { get; set; }
+
+    private TenderResult calc => TenderCalculator.Calculate(Due, rows.Select(r => new TenderEntry(r.Method, r.Amount)).ToList());
+
+    private bool CanConfirm => !busy && calc is { Applied: > 0m } c && !(RequireFullPayment && c.Remaining > 0m);
+
+    private void SetMethod(Row row, ChangeEventArgs e) =>
+        row.Method = Enum.TryParse<PaymentMethod>(e.Value?.ToString(), out var method) ? method : PaymentMethod.Cash;
+
+    private void AddRow() => rows.Add(new Row { Method = PaymentMethod.Card });
+
+    private decimal RemainingExcluding(Row row) =>
+        Math.Max(0m, Due - rows.Where(r => r != row).Sum(r => r.Amount));
+
+    private void Fill(PaymentMethod method)
+    {
+        var row = rows.FirstOrDefault(r => r.Method == method) ?? rows.FirstOrDefault(r => r.Amount == 0m);
+        if (row is null)
+        {
+            row = new Row();
+            rows.Add(row);
+        }
+
+        row.Method = method;
+        row.Text = RemainingExcluding(row).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private void ExactCash() => Fill(PaymentMethod.Cash);
+
+    private void RestByCard() => Fill(PaymentMethod.Card);
+
+    private async Task ConfirmAsync()
+    {
+        if (busy || !CanConfirm)
+        {
+            return;
+        }
+
+        busy = true;
+        error = null;
+        try
+        {
+            var result = await OnConfirm(calc.Lines);
+            if (result.Success)
+            {
+                recorded = true;
+                settlement = result.Settlement;
+                if (settlement is null)
+                {
+                    await OnClosed.InvokeAsync(true);
+                }
+            }
+            else
+            {
+                error = result.Error is { Length: > 0 } message
+                    ? message == SettlementService.ChangedMessage ? message + " Close this window and open it again." : message
+                    : "The payment could not be recorded. Try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Recording payment failed.");
+            error = "Something went wrong. Check the open tabs before trying again.";
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private Task CloseAsync() => busy ? Task.CompletedTask : OnClosed.InvokeAsync(recorded);
+}

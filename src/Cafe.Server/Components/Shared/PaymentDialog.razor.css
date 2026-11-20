@@ -1,0 +1,23 @@
+.payment-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    background-color: rgba(0, 0, 0, 0.5);
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.payment-card {
+    max-width: 640px;
+    margin: 0 auto;
+}
+
+.payment-card .btn,
+.payment-card .form-control,
+.payment-card .form-select {
+    min-height: 48px;
+}
+
+.payment-card ::deep .btn {
+    min-height: 48px;
+}

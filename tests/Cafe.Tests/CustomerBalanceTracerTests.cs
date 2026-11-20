@@ -137,7 +137,8 @@ public class CustomerBalanceTracerTests : CustomerTestBase
         var package = await PackageAsync("1 hour", 60, 50000m);
         var failing = new PackageService(new FailingSaveDbContextFactory(Factory.ConnectionString), Factory.Clock, new BalanceLock());
 
-        await Assert.ThrowsAsync<DbUpdateException>(() => failing.SellAsync(customer, package, PaymentMethod.Card));
+        // Plan 05-02: a failed save is reported as a failure result instead of leaking the exception.
+        Assert.False((await failing.SellAsync(customer, package, PaymentMethod.Card)).Success);
 
         await using var db = await DbAsync();
         Assert.Empty(await db.PackageSales.ToListAsync());

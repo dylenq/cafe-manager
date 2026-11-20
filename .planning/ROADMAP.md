@@ -132,6 +132,12 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
   3. Staff can print a receipt on a network ESC/POS thermal printer, falling back to a Windows printer when it is unavailable
 
 **Plans**: TBD
+- [x] 06-01-PLAN.md
+- [ ] 06-02-PLAN.md
+- [ ] 06-03-PLAN.md
+- [ ] 06-04-PLAN.md
+- [ ] 06-05-PLAN.md
+
 **UI hint**: yes
 
 ### Phase 7: Reports & Deployment
@@ -158,5 +164,5 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
 | 3. PC Agent | 5/5 | In Progress | - |
 | 4. Samsung TV Control | 3/3 | In Progress | - |
 | 5. Customers & Packages | 5/5 | In Progress | - |
-| 6. POS & Receipts | 0/TBD | Not started | - |
+| 6. POS & Receipts | 1/5 | In Progress | - |
 | 7. Reports & Deployment | 0/TBD | Not started | - |

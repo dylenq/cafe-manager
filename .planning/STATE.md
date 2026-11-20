@@ -1,18 +1,18 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 5
-current_phase_name: Customers & Packages
+current_phase: 6
+current_phase_name: POS & Receipts
 status: executing
-stopped_at: Completed 05-05-PLAN.md
-last_updated: "2026-11-20T07:11:47.222Z"
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-11-20T07:20:21.292Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 5 execution started
-state_head: ec0442d88d131d6af52b12311d871745529603ef
+last_activity_desc: Phase 6 execution started
+state_head: 42cdbb82a2682297f0948e3c9deda95387cb0395
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 32
-  completed_plans: 22
+  completed_plans: 23
   percent: 0
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** Staff can start a timed session on any station, and that station reliably stops being usable when the paid time runs out: the PC locks or the TV powers off.
-**Current focus:** Phase 5 — Customers & Packages
+**Current focus:** Phase 6 — POS & Receipts
 
 ## Current Position
 
-Phase: 5 (Customers & Packages) — EXECUTING
-Plan: 4 of 5
+Phase: 6 (POS & Receipts) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-11-20 — Phase 5 execution started
+Last activity: 2026-11-20 — Phase 6 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -72,6 +72,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 5 P05-01 | 35min | 2 tasks | 35 files |
 | Phase 5 P04 | 25min | 2 tasks | 3 files |
 | Phase 5 P05-05 | 35min | 3 tasks | 11 files |
+| Phase 6 P01 | 40min | 2 tasks | 40 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-20T07:11:47.204Z
-Stopped at: Completed 05-05-PLAN.md
+Last session: 2026-11-20T07:20:21.273Z
+Stopped at: Completed 06-01-PLAN.md
 Resume file: None

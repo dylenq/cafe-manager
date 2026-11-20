@@ -94,7 +94,7 @@ public class StopSettleFlowTests : PosTestBase
     }
 
     [Fact]
-    public async Task Stale_quote_after_an_extra_order_reports_changed_and_neither_stops_nor_pays()
+    public async Task Stale_quote_after_an_extra_order_pays_nothing_and_leaves_every_item_in_open_tabs()
     {
         var (sessionId, a, _) = await PrepaidWithTwoOrdersAsync();
         var quote = await QuoteAsync(sessionId);
@@ -103,19 +103,36 @@ public class StopSettleFlowTests : PosTestBase
 
         var result = await SettleAsync(sessionId, quote, quote.TotalDue, new TenderLine(PaymentMethod.Cash, quote.TotalDue));
 
-        Assert.False(result.Success);
-        Assert.Equal(SettlementService.ChangedMessage, result.Error);
-        Assert.NotEqual(SessionStatus.Ended, (await LoadAsync(sessionId)).Status);
+        // The service stops first (the session version is unchanged) and then refuses the stale amount: no money is
+        // taken, the card shows "stopped, items under Open tabs". The card re-quotes before calling so staff see a
+        // changed message instead (covered by the fresh quote below).
+        Assert.True(result.Success, result.Error);
+        Assert.Equal(SettlementService.ChangedMessage, result.Value!.PaymentError);
+        Assert.Null(result.Value.Settlement);
         Assert.Equal(OrderStatus.Open, (await LoadOrderAsync(a)).Status);
-        await using var db = await DbAsync();
-        Assert.Equal(0, await db.Payments.CountAsync());
+        await using (var db = await DbAsync())
+        {
+            Assert.Equal(0, await db.Payments.CountAsync());
+        }
 
-        // A fresh quote includes the extra order and settles.
+        var tabs = await Svc(sp => sp.GetRequiredService<OpenTabsService>().GetOpenTabsAsync());
+        Assert.Equal(quote.TotalDue + 5000m, Assert.Single(tabs).TotalOutstanding);
+    }
+
+    [Fact]
+    public async Task A_fresh_quote_after_an_extra_order_includes_it_and_settles()
+    {
+        var (sessionId, _, _) = await PrepaidWithTwoOrdersAsync();
+        var stale = await QuoteAsync(sessionId);
+        var extra = await ProductAsync("Water", 5000m);
+        await OrderAsync(sessionId, null, (extra, 1));
+
         var fresh = await QuoteAsync(sessionId);
-        Assert.Equal(quote.TotalDue + 5000m, fresh.TotalDue);
-        var retry = await SettleAsync(sessionId, fresh, fresh.TotalDue, new TenderLine(PaymentMethod.Cash, fresh.TotalDue));
-        Assert.True(retry.Success, retry.Error);
-        Assert.Null(retry.Value!.PaymentError);
+
+        Assert.Equal(stale.TotalDue + 5000m, fresh.TotalDue);
+        var result = await SettleAsync(sessionId, fresh, fresh.TotalDue, new TenderLine(PaymentMethod.Cash, fresh.TotalDue));
+        Assert.True(result.Success, result.Error);
+        Assert.Null(result.Value!.PaymentError);
     }
 
     [Fact]

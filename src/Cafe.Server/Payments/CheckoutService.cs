@@ -47,17 +47,6 @@ public class CheckoutService(
         decimal expectedDue,
         CancellationToken cancellationToken = default)
     {
-        // Refuse before stopping when the open orders changed since the quote (an order added or paid meanwhile), so a
-        // stale amount never stops a session it could not settle.
-        if (tenders.Count > 0)
-        {
-            var owing = await OwingOrdersAsync(sessionId, cancellationToken);
-            if (owing.Success && expectedSessionCharge + owing.Value!.Sum(i => i.Outstanding) != expectedDue)
-            {
-                return ServiceResult<CheckoutResult>.Fail(SettlementService.ChangedMessage);
-            }
-        }
-
         var stopped = await sessions.StopAsync(sessionId, expectedVersion, expectedSessionCharge, cancellationToken);
         if (!stopped.Success)
         {

@@ -20,6 +20,9 @@ public class CafeWebApplicationFactory : WebApplicationFactory<Program>
     /// <summary>Extra configuration (e.g. Setup:AllowRemote) applied when the host is built.</summary>
     public Dictionary<string, string?> ExtraSettings { get; } = new();
 
+    /// <summary>Service registrations applied after the server's own, to swap in test doubles.</summary>
+    public List<Action<IServiceCollection>> ServiceOverrides { get; } = [];
+
     /// <summary>
     /// The TimeProvider injected into the server. Starts at the real current instant (whole seconds) so
     /// absolute-time assertions such as cookie expiry still hold; tests move it with Advance.
@@ -35,6 +38,7 @@ public class CafeWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting("Cafe:TimeZone", "UTC");
         // The real-time ticker would interfere with FakeTimeProvider tests; ExtraSettings can turn it back on.
         builder.UseSetting("Sessions:RunTicker", "false");
+        builder.UseSetting("Tv:RunMonitor", "false");
         foreach (var (key, value) in ExtraSettings)
         {
             builder.UseSetting(key, value);
@@ -45,6 +49,10 @@ public class CafeWebApplicationFactory : WebApplicationFactory<Program>
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Clock);
             services.AddSingleton<IStartupFilter>(new RemoteAddressStartupFilter(this));
+            foreach (var apply in ServiceOverrides)
+            {
+                apply(services);
+            }
         });
     }
 

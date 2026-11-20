@@ -11,7 +11,9 @@ public sealed record StationCardModel(
     StationStatus Status,
     SessionCardModel? Session = null,
     bool AgentOffline = false,
-    bool HasAgent = false);
+    bool HasAgent = false,
+    bool HasTv = false,
+    Cafe.Server.Devices.TvPowerState? TvState = null);
 
 /// <summary>Snapshot of a non-ended session. Live values are derived from these plus the current time.</summary>
 public sealed record SessionCardModel(

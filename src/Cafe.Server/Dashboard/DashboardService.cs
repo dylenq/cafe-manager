@@ -11,7 +11,8 @@ public class DashboardService(
     SessionCharges charges,
     Cafe.Server.Pricing.PricingConfigService pricing,
     TimeProvider time,
-    Cafe.Server.Agents.AgentRegistry agents)
+    Cafe.Server.Agents.AgentRegistry agents,
+    Cafe.Server.Devices.TvStateCache? tv = null)
 {
     public async Task<List<StationCardModel>> GetCardsAsync(CancellationToken cancellationToken = default)
     {
@@ -56,7 +57,9 @@ public class DashboardService(
             // stays InSession, so the card can add a small secondary indicator).
             var hasAgent = s.Kind == Cafe.Shared.StationKind.PC && !string.IsNullOrWhiteSpace(s.AgentMachineId);
             var agentOffline = hasAgent && !agents.IsConnected(s.AgentMachineId!);
-            cards.Add(new StationCardModel(s.Id, s.Name, s.StationType.Name, s.Kind, statusProvider.GetStatus(s, session, now), session, agentOffline, hasAgent));
+            var hasTv = s.Kind == Cafe.Shared.StationKind.Console && !string.IsNullOrWhiteSpace(s.TvIpAddress);
+            cards.Add(new StationCardModel(s.Id, s.Name, s.StationType.Name, s.Kind, statusProvider.GetStatus(s, session, now), session, agentOffline, hasAgent,
+                hasTv, hasTv ? tv?.Get(s.Id) : null));
         }
 
         return cards;

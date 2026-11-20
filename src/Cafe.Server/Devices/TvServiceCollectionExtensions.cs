@@ -16,6 +16,11 @@ public static class TvServiceCollectionExtensions
         services.AddSingleton<TvActionQueue>();
         services.AddSingleton<ISessionEventSink, TvSessionEventSink>();
         services.AddSingleton<IExpiryActionHandler, TvExpiryActionHandler>();
+        if (TvMonitorService.IsEnabled(configuration))
+        {
+            services.AddHostedService<TvMonitorService>();
+        }
+
         return services;
     }
 }

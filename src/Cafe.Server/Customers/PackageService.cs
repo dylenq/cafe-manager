@@ -126,9 +126,11 @@ public class PackageService(IDbContextFactory<CafeDbContext> dbFactory, TimeProv
 
     /// <summary>
     /// Sells a package: the PackageSale, the Payment and the ledger credit are added to one context and saved with a
-    /// single SaveChanges, so SQLite commits all three or none (CUST-04).
+    /// single SaveChanges, so SQLite commits all three or none (CUST-04). When <paramref name="expectedPrice"/> is given
+    /// (the price the cashier saw) and the package price has changed since, nothing is sold.
     /// </summary>
-    public async Task<ServiceResult<PackageSale>> SellAsync(int customerId, int packageId, PaymentMethod method, CancellationToken cancellationToken = default)
+    public async Task<ServiceResult<PackageSale>> SellAsync(
+        int customerId, int packageId, PaymentMethod method, decimal? expectedPrice = null, CancellationToken cancellationToken = default)
     {
         using var _ = await balanceLock.AcquireAsync(cancellationToken);
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
@@ -150,6 +152,11 @@ public class PackageService(IDbContextFactory<CafeDbContext> dbFactory, TimeProv
         if (!package.IsActive)
         {
             return ServiceResult<PackageSale>.Fail("That package is no longer on sale.");
+        }
+
+        if (expectedPrice is { } expected && expected != package.Price)
+        {
+            return ServiceResult<PackageSale>.Fail("Price changed — review the package and try again.");
         }
 
         var now = time.GetUtcNow();

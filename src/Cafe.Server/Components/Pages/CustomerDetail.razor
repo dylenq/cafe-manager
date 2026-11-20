@@ -336,7 +336,9 @@ else
         fieldErrors = new Dictionary<string, string>();
         try
         {
-            var result = await PackageSvc.SellAsync(Id, sellPackageId, sellMethod);
+            // Pass the price shown in the picker so a concurrent price edit cannot charge an unseen amount.
+            var shownPrice = packages.FirstOrDefault(p => p.Id == sellPackageId)?.Price;
+            var result = await PackageSvc.SellAsync(Id, sellPackageId, sellMethod, shownPrice);
             if (result.Success)
             {
                 notice = $"Sold: {result.Value!.Minutes} min added to the balance.";

@@ -50,6 +50,49 @@ public class PackageServiceTests : CustomerTestBase
         Assert.True(result.FieldErrors.ContainsKey(field));
     }
 
+    [Theory]
+    [InlineData(12.345)]
+    [InlineData(0.001)]
+    public async Task CUST03_price_with_more_than_two_decimals_is_a_Price_field_error(double price)
+    {
+        var result = await PkgAsync(p => p.CreateAsync(Input("Fractional", 60, (decimal)price)));
+
+        Assert.False(result.Success);
+        Assert.True(result.FieldErrors.ContainsKey("Price"));
+    }
+
+    [Fact]
+    public async Task CUST03_price_with_two_decimals_is_accepted()
+    {
+        Assert.True((await PkgAsync(p => p.CreateAsync(Input("Cents", 60, 12.34m)))).Success);
+    }
+
+    [Fact]
+    public async Task CUST04_sale_fails_when_the_price_changed_since_it_was_displayed_and_writes_nothing()
+    {
+        var customer = await CustomerAsync();
+        var package = await PackageAsync("2 hours", 120, 100m);
+        await PkgAsync(p => p.UpdateAsync(package, Input("2 hours", 120, 150m)));
+
+        var result = await PkgAsync(p => p.SellAsync(customer, package, PaymentMethod.Cash, 100m));
+
+        Assert.False(result.Success);
+        Assert.Contains("Price changed", result.Error);
+        await AssertNothingWrittenAsync();
+    }
+
+    [Fact]
+    public async Task CUST04_sale_succeeds_when_the_expected_price_matches()
+    {
+        var customer = await CustomerAsync();
+        var package = await PackageAsync("2 hours", 120, 100m);
+
+        var result = await PkgAsync(p => p.SellAsync(customer, package, PaymentMethod.Cash, 100m));
+
+        Assert.True(result.Success, result.Error);
+        Assert.Equal(100m, result.Value!.Price);
+    }
+
     [Fact]
     public async Task CUST03_name_over_100_chars_is_rejected_and_boundary_values_pass()
     {

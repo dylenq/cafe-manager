@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Cafe.Server.Customers;
 
-public class TimePackageInput
+public class TimePackageInput : IValidatableObject
 {
     [Required(ErrorMessage = "Name is required.")]
     [StringLength(100, ErrorMessage = "Name must be 100 characters or fewer.")]
@@ -18,4 +18,13 @@ public class TimePackageInput
     public int? StationTypeId { get; set; }
 
     public bool IsActive { get; set; } = true;
+
+    /// <summary>Money is stored with two decimals, so a price with more is rejected rather than silently rounded.</summary>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (Price != Math.Round(Price, 2))
+        {
+            yield return new ValidationResult("Price can have at most 2 decimal places.", [nameof(Price)]);
+        }
+    }
 }

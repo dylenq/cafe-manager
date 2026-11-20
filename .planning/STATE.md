@@ -1,19 +1,19 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 6
-current_phase_name: POS & Receipts
-status: executing
-stopped_at: Completed 07-04-PLAN.md
-last_updated: "2026-11-20T12:28:16.820Z"
+current_phase: 7
+current_phase_name: Reports & Deployment
+status: complete
+stopped_at: Completed 07-05-PLAN.md
+last_updated: "2026-11-20T16:56:52.214Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 6 execution started
-state_head: 061b7267c73ffdb30cb615eafd084c1d6ae0e99e
+last_activity_desc: Phase 7 plan 05 complete (docs and final release bundle)
+state_head: aae7d9d8298be1448142e3232710265965e4e775
 progress:
   total_phases: 7
-  completed_phases: 0
+  completed_phases: 7
   total_plans: 32
-  completed_plans: 31
-  percent: 0
+  completed_plans: 32
+  percent: 100
 ---
 
 # Project State
@@ -23,16 +23,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** Staff can start a timed session on any station, and that station reliably stops being usable when the paid time runs out: the PC locks or the TV powers off.
-**Current focus:** Phase 6 — POS & Receipts
+**Current focus:** All phases complete; Windows install checks remain (human)
 
 ## Current Position
 
-Phase: 6 (POS & Receipts) — EXECUTING
-Plan: 4 of 5
-Status: Ready to execute
-Last activity: 2026-11-20 — Phase 6 execution started
+Phase: 7 (Reports & Deployment) — COMPLETE
+Plan: 5 of 5
+Status: Complete; Windows-only install checks open
+Last activity: 2026-11-20 — Plan 07-05 complete
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -75,6 +75,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 6 P01 | 40min | 2 tasks | 40 files |
 | Phase 6 P05 | 40min | 3 tasks | 9 files |
 | Phase 7 P04 | 25min | 3 tasks | 6 files |
+| Phase 7 P05 | 30m | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,7 @@ Recent decisions affecting current work:
 - [Phase 5]: 05-04: refund capped at session net-drawn minutes; extend-from-balance under BalanceLock with paid fallback via ExtendAsync
 - [Phase 5]: 05-05: Extend-from-balance shortfall shows an explicit paid-extension choice, never a silent fallback
 - [Phase 6]: 06-05: stale-total guard on StationCard (re-quote before StopAndSettleAsync); CheckoutService contract unchanged
+- [Phase 7]: Docs recommend machine env vars for Cafe__TimeZone/Culture since upgrades replace appsettings.json
 
 ### Pending Todos
 
@@ -124,6 +126,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-20T12:28:16.795Z
-Stopped at: Completed 07-04-PLAN.md
+Last session: 2026-11-20T16:56:52.187Z
+Stopped at: Completed 07-05-PLAN.md
 Resume file: None

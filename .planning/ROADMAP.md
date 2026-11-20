@@ -12,7 +12,7 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
 - [ ] **Phase 4: Samsung TV Control** - Pair Tizen TVs, power off on expiry, wake on session start
 - [ ] **Phase 5: Customers & Packages** - Customer lookup, member pricing, prepaid minute packages
 - [ ] **Phase 6: POS & Receipts** - Products, orders, recorded payments and thermal receipts
-- [ ] **Phase 7: Reports & Deployment** - Revenue reports, Windows service install and agent installer script
+- [x] **Phase 7: Reports & Deployment** - Revenue reports, Windows service install and agent installer script
 
 ## Phase Details
 
@@ -157,7 +157,7 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
 - [x] 07-02-PLAN.md
 - [x] 07-03-PLAN.md
 - [x] 07-04-PLAN.md
-- [ ] 07-05-PLAN.md
+- [x] 07-05-PLAN.md
 
 **UI hint**: yes
 
@@ -171,4 +171,4 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
 | 4. Samsung TV Control | 3/3 | In Progress | - |
 | 5. Customers & Packages | 5/5 | In Progress | - |
 | 6. POS & Receipts | 5/5 | In Progress | - |
-| 7. Reports & Deployment | 4/5 | In Progress | - |
+| 7. Reports & Deployment | 5/5 | Complete | 2026-11-20 |

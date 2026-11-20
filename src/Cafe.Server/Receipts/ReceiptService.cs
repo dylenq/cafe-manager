@@ -83,14 +83,14 @@ public class ReceiptService(IDbContextFactory<CafeDbContext> dbFactory, PricingC
                 }
 
                 var seconds = session.Segments.Where(s => s.EndUtc is not null).Sum(s => (long)(s.EndUtc!.Value - s.StartUtc).TotalSeconds);
-                var duration = TimeSpan.FromSeconds(seconds);
+                var minutes = (seconds + 59) / 60;
                 var mode = session.Mode switch
                 {
                     SessionMode.Prepaid => "Prepaid",
                     SessionMode.Balance => "Balance",
                     _ => "Open-ended",
                 };
-                var detail = string.Create(CultureInfo.InvariantCulture, $"{(int)duration.TotalHours}:{duration.Minutes:00}, {mode}");
+                var detail = string.Create(CultureInfo.InvariantCulture, $"{minutes} min, {mode}");
                 return new ReceiptTarget(
                     ReceiptTargetKind.Session, session.Station.Name, detail, session.ChargedAmount, applied,
                     RemainingOf(session.ChargedAmount, allocatedAll), []);

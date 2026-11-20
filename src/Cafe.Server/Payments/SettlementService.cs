@@ -100,14 +100,16 @@ public class SettlementService(IDbContextFactory<CafeDbContext> dbFactory, TimeP
                 Note = request.Note,
                 PrimaryPayment = i == 0 ? null : payments[0],
             };
-            // Denormalised convenience when the checkout pays exactly one target of a kind; allocations are the truth.
-            payment.SessionId = SoleId(owing, AllocationTargetType.Session);
-            payment.OrderId = SoleId(owing, AllocationTargetType.Order);
-            payment.PackageSaleId = SoleId(owing, AllocationTargetType.PackageSale);
             foreach (var part in plan[i])
             {
                 payment.Allocations.Add(new PaymentAllocation { TargetType = part.Type, TargetId = part.Id, Amount = part.Amount });
             }
+
+            // Denormalised convenience: set only when this payment really allocates to the checkout's one target of a
+            // kind, so the columns never claim a target the payment did not pay. Allocations remain the truth.
+            payment.SessionId = SoleId(owing, plan[i], AllocationTargetType.Session);
+            payment.OrderId = SoleId(owing, plan[i], AllocationTargetType.Order);
+            payment.PackageSaleId = SoleId(owing, plan[i], AllocationTargetType.PackageSale);
 
             payments.Add(payment);
             db.Payments.Add(payment);
@@ -139,10 +141,10 @@ public class SettlementService(IDbContextFactory<CafeDbContext> dbFactory, TimeP
             payments.Select(p => p.Id).ToList(), payments[0].Id, totalDue, applied, totalDue - applied, change, paidOrders));
     }
 
-    private static int? SoleId(List<LoadedTarget> owing, AllocationTargetType type)
+    private static int? SoleId(List<LoadedTarget> owing, IReadOnlyList<PlannedAllocation> parts, AllocationTargetType type)
     {
         var of = owing.Where(t => t.Type == type).ToList();
-        return of.Count == 1 ? of[0].Id : null;
+        return of.Count == 1 && parts.Any(p => p.Type == type && p.Id == of[0].Id && p.Amount > 0m) ? of[0].Id : null;
     }
 
     /// <summary>Tender rules shared with the package sale: positive amounts, cash-only tendered, tendered at least the amount.</summary>

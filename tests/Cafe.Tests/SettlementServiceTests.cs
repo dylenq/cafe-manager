@@ -161,6 +161,25 @@ public class SettlementServiceTests : PosTestBase
     }
 
     [Fact]
+    public async Task IN01_denormalised_ids_are_set_only_on_payments_that_allocate_to_that_target()
+    {
+        var order = await OrderAsync(null, null, (await ProductAsync("Item", 1000m), 3));
+        var session = await PrepaidAsync(await StationAsync(), 60);
+        await SvcAsync(s => s.StopAsync(session.Id));
+        var sessionTarget = new SettleTarget(AllocationTargetType.Session, session.Id);
+
+        // Payment 1 covers the whole session charge (6000); payment 2 only the order (3000).
+        var result = await Settle(Request(9000m, [sessionTarget, Order(order.Id)],
+            new TenderLine(PaymentMethod.Cash, 6000m), new TenderLine(PaymentMethod.Card, 3000m)));
+
+        Assert.True(result.Success, result.Error);
+        await using var db = await DbAsync();
+        var payments = await db.Payments.OrderBy(p => p.Id).ToListAsync();
+        Assert.Equal((session.Id, (int?)null), (payments[0].SessionId, payments[0].OrderId));
+        Assert.Equal(((int?)null, order.Id), (payments[1].SessionId, payments[1].OrderId));
+    }
+
+    [Fact]
     public async Task D05_session_two_orders_and_a_package_sale_in_one_payment_allocate_each_target_once()
     {
         var (o1, o2) = await TwoOrdersAsync(2, 3);

@@ -1,0 +1,175 @@
+@* CUST-01 (find or quick-add a customer), CUST-02 (member shown on the chip). *@
+@using Cafe.Server.Customers
+@using Cafe.Server.Data
+@inject CustomerService CustomerSvc
+@inject ILogger<CustomerPicker> Logger
+
+<div class="customer-picker small">
+    @if (_picked is { } pick)
+    {
+        <div class="d-flex align-items-center gap-1">
+            <span class="badge text-bg-light border customer-chip">@pick.Name</span>
+            @if (pick.IsMember)
+            {
+                <span class="badge text-bg-info">Member</span>
+            }
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0" aria-label="Clear customer" @onclick="ClearAsync">Clear</button>
+        </div>
+    }
+    else
+    {
+        <input type="text" class="form-control form-control-sm" placeholder="Name or phone" aria-label="Customer search"
+               value="@_term" @oninput="OnInputAsync" />
+        @if (_results.Count > 0)
+        {
+            <div class="list-group mt-1 customer-results">
+                @foreach (var r in _results)
+                {
+                    <button type="button" class="list-group-item list-group-item-action py-1" @onclick="() => PickAsync(r)">
+                        @r.Name@(string.IsNullOrEmpty(r.Phone) ? "" : " - " + PhoneDisplay.Format(r.Phone))@(r.IsMember ? " (Member)" : "")
+                    </button>
+                }
+            </div>
+        }
+        else if (_searched && _term.Trim().Length >= 2)
+        {
+            <div class="text-muted mt-1">No match.</div>
+        }
+
+        <button type="button" class="btn btn-sm btn-link p-0 mt-1" @onclick="() => _quickAdd = !_quickAdd">Quick add</button>
+        @if (_quickAdd)
+        {
+            <div class="mt-1 d-flex flex-column gap-1">
+                <input type="text" class="form-control form-control-sm" placeholder="Name" aria-label="New customer name" maxlength="100" @bind="_newName" />
+                @FieldError("Name")
+                <input type="text" class="form-control form-control-sm" placeholder="Phone" aria-label="New customer phone" maxlength="40" @bind="_newPhone" />
+                @FieldError("Phone")
+                <button type="button" class="btn btn-sm btn-outline-primary" disabled="@_busy" @onclick="AddAsync">Add and select</button>
+            </div>
+        }
+    }
+
+    @if (_error is not null)
+    {
+        <div class="text-danger mt-1" role="alert">@_error</div>
+    }
+</div>
+
+@code {
+    private CustomerPick? _picked;
+    private string _term = string.Empty;
+    private List<Customer> _results = [];
+    private bool _searched;
+    private bool _quickAdd;
+    private string _newName = string.Empty;
+    private string? _newPhone;
+    private IReadOnlyDictionary<string, string> _fieldErrors = new Dictionary<string, string>();
+    private string? _error;
+    private bool _busy;
+    private int _requestCounter;
+
+    [Parameter] public int? SelectedId { get; set; }
+
+    [Parameter] public EventCallback<CustomerPick?> OnPicked { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (SelectedId is null && _picked is not null)
+        {
+            _picked = null;
+        }
+    }
+
+    private RenderFragment FieldError(string field) => builder =>
+    {
+        if (_fieldErrors.TryGetValue(field, out var message))
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "text-danger");
+            builder.AddContent(2, message);
+            builder.CloseElement();
+        }
+    };
+
+    private async Task OnInputAsync(ChangeEventArgs e)
+    {
+        _term = e.Value?.ToString() ?? string.Empty;
+        var request = ++_requestCounter;
+        var trimmed = _term.Trim();
+        if (trimmed.Length < 2 && !trimmed.Any(char.IsDigit))
+        {
+            _results = [];
+            _searched = false;
+            return;
+        }
+
+        try
+        {
+            var found = await CustomerSvc.SearchAsync(trimmed, includeInactive: false, take: 8);
+            if (request != _requestCounter)
+            {
+                return; // a newer keystroke superseded this search
+            }
+
+            _results = found;
+            _searched = true;
+            _error = null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Customer search failed.");
+            _error = "Something went wrong. Try again.";
+        }
+    }
+
+    private async Task PickAsync(Customer customer)
+    {
+        _picked = new CustomerPick(customer.Id, customer.Name, customer.IsMember, customer.Phone);
+        _results = [];
+        _term = string.Empty;
+        _searched = false;
+        _quickAdd = false;
+        await OnPicked.InvokeAsync(_picked);
+    }
+
+    private async Task ClearAsync()
+    {
+        _picked = null;
+        await OnPicked.InvokeAsync(null);
+    }
+
+    private async Task AddAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        _fieldErrors = new Dictionary<string, string>();
+        try
+        {
+            var result = await CustomerSvc.CreateAsync(new CustomerInput { Name = _newName, Phone = _newPhone });
+            if (!result.Success)
+            {
+                _error = result.FieldErrors.Count == 0 ? result.Error : null;
+                _fieldErrors = result.FieldErrors;
+                return;
+            }
+
+            _newName = string.Empty;
+            _newPhone = null;
+            await PickAsync(result.Value!);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not quick-add a customer.");
+            _error = "Something went wrong. Try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

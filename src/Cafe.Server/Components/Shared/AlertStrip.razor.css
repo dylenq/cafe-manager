@@ -1,0 +1,22 @@
+.alert-strip-row { justify-content: space-between; }
+
+.alert-strip-text {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .25rem .6rem;
+    min-width: 0;
+}
+
+.alert-strip-text ::deep .alert-strip-icon { color: var(--red); flex: none; }
+.alert-strip-ack .alert-strip-text ::deep .alert-strip-icon { color: var(--gray); }
+
+.alert-strip-level { font-weight: 600; color: var(--red); }
+.alert-strip-ack .alert-strip-level { color: var(--label-2); }
+
+.alert-strip-detail {
+    color: var(--label-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.alert-strip-state { font-size: var(--fs-footnote); color: var(--label-2); }

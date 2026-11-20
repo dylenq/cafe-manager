@@ -13,18 +13,18 @@
 <PageTitle>Dashboard</PageTitle>
 <SectionContent SectionName="page-title">Dashboard</SectionContent>
 
-<h1 class="h3 mb-3">Dashboard</h1>
+<h1 class="large-title page-title">Dashboard</h1>
 
 @if (_stale)
 {
-    <div class="alert alert-warning" role="status">Live data is temporarily out of date. Retrying...</div>
+    <div class="banner banner-warning" role="status">Live data is temporarily out of date. Retrying...</div>
 }
 
 <AlertStrip Alerts="_activeAlerts" Details="_alertDetails" OnAcknowledge="AcknowledgeAsync" />
 
 @foreach (var notice in _notices)
 {
-    <div class="alert @(notice.Warning ? "alert-warning" : "alert-success") alert-dismissible py-2" role="status" @key="notice.Id">
+    <div class="banner @(notice.Warning ? "banner-warning" : "banner-success") alert-dismissible" role="status" @key="notice.Id">
         @notice.Text
         <button type="button" class="btn-close" aria-label="Dismiss" @onclick="() => _notices.Remove(notice)"></button>
     </div>
@@ -32,20 +32,20 @@
 
 @if (_cards is null)
 {
-    <p>Loading...</p>
+    <p class="footnote">Loading...</p>
 }
 else if (_cards.Count == 0)
 {
-    <div class="alert alert-info">
+    <div class="banner banner-info">
         No stations yet. Set up <a href="/station-types">station types</a> and then <a href="/stations">stations</a>.
     </div>
 }
 else
 {
-    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-4 g-3">
+    <div class="station-grid">
         @foreach (var card in _cards)
         {
-            <div class="col" @key="card.StationId">
+            <div class="station-grid-item" @key="card.StationId">
                 <StationCard Model="card" IdleStations="IdleStations" OnNotice="AddNotice" Acknowledged="_tracker.IsAcknowledged(card.StationId)" />
             </div>
         }

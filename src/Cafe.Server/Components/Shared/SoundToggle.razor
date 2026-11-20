@@ -4,12 +4,18 @@
 <div class="sound-toggle">
     @if (!_unlocked)
     {
-        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="UnlockAsync">Enable sound</button>
+        <button type="button" class="toolbar-btn sound-toggle-btn" @onclick="UnlockAsync">
+            <Icon Name="speaker-slash" Size="20" />
+            <span class="sound-toggle-label">Enable sound</span>
+        </button>
     }
     else
     {
-        <button type="button" class="btn btn-sm @(_muted ? "btn-outline-secondary" : "btn-outline-success")"
-                aria-pressed="@_muted.ToString().ToLowerInvariant()" @onclick="ToggleMuteAsync">@(_muted ? "Unmute" : "Mute")</button>
+        <button type="button" class="toolbar-btn sound-toggle-btn @(_muted ? "" : "is-active")"
+                aria-pressed="@_muted.ToString().ToLowerInvariant()" @onclick="ToggleMuteAsync">
+            <Icon Name="@(_muted ? "speaker-slash" : "speaker")" Size="20" />
+            <span class="sound-toggle-label">@(_muted ? "Unmute" : "Mute")</span>
+        </button>
     }
 </div>
 

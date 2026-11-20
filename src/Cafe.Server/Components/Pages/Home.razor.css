@@ -1,0 +1,11 @@
+.page-title { margin-bottom: var(--space-4); }
+
+/* Responsive tile grid: as many 17rem tiles as fit, so tablets get 2-3 columns and the desk monitor 4+. */
+.station-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+    gap: var(--space-4);
+    align-items: stretch;
+}
+
+.station-grid-item { min-width: 0; }

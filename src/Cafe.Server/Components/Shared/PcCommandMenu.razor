@@ -3,55 +3,72 @@
 @inject AgentRemoteControlService Remote
 @inject ILogger<PcCommandMenu> Logger
 
-<div class="pc-command-menu mt-2" data-station-id="@StationId">
-    <button type="button" class="btn btn-sm btn-outline-secondary pc-menu-trigger"
+<div class="pc-command-menu menu-anchor" data-station-id="@StationId">
+    <button type="button" class="toolbar-btn pc-menu-trigger"
             aria-expanded="@_open.ToString().ToLowerInvariant()"
+            aria-haspopup="true"
+            aria-label="@(AgentOffline ? "PC agent offline" : "PC commands")"
             disabled="@AgentOffline"
             title="@(AgentOffline ? "PC agent offline" : "PC commands")"
-            @onclick="Toggle">PC &#9662;</button>
+            @onclick="Toggle"><Icon Name="ellipsis" Size="20" /></button>
 
     @if (_open && !AgentOffline)
     {
-        <div class="border rounded p-2 mt-1 pc-menu-panel">
+        <div class="menu-panel pc-menu-panel">
             @switch (_mode)
             {
                 case Mode.ConfirmUnlock:
-                    <div class="small mb-1">Unlock @StationName without a session? The PC stays unlocked until you lock it or the agent reconnects.</div>
-                    <button type="button" class="btn btn-sm btn-warning" disabled="@_busy" @onclick="() => SendAsync(AgentCommandKind.Unlock)">Unlock</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="Back">Cancel</button>
+                    <div class="menu-confirm">
+                        <div class="menu-confirm-text">Unlock @StationName without a session? The PC stays unlocked until you lock it or the agent reconnects.</div>
+                        <div class="menu-confirm-actions">
+                            <button type="button" class="btn btn-sm btn-warning" disabled="@_busy" @onclick="() => SendAsync(AgentCommandKind.Unlock)">Unlock</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="Back">Cancel</button>
+                        </div>
+                    </div>
                     break;
                 case Mode.ConfirmShutdown:
-                    <div class="small mb-1">Shut down @StationName? Any unsaved work on the PC is lost.@(HasActiveSession ? " A session is running on this PC." : "")</div>
-                    <button type="button" class="btn btn-sm btn-danger" disabled="@_busy" @onclick="() => SendAsync(AgentCommandKind.Shutdown)">Shut down</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="Back">Cancel</button>
+                    <div class="menu-confirm">
+                        <div class="menu-confirm-text">Shut down @StationName? Any unsaved work on the PC is lost.@(HasActiveSession ? " A session is running on this PC." : "")</div>
+                        <div class="menu-confirm-actions">
+                            <button type="button" class="btn btn-sm btn-danger" disabled="@_busy" @onclick="() => SendAsync(AgentCommandKind.Shutdown)">Shut down</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="Back">Cancel</button>
+                        </div>
+                    </div>
                     break;
                 case Mode.ConfirmRestart:
-                    <div class="small mb-1">Restart @StationName? Any unsaved work on the PC is lost.@(HasActiveSession ? " A session is running on this PC." : "")</div>
-                    <button type="button" class="btn btn-sm btn-danger" disabled="@_busy" @onclick="() => SendAsync(AgentCommandKind.Restart)">Restart</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="Back">Cancel</button>
+                    <div class="menu-confirm">
+                        <div class="menu-confirm-text">Restart @StationName? Any unsaved work on the PC is lost.@(HasActiveSession ? " A session is running on this PC." : "")</div>
+                        <div class="menu-confirm-actions">
+                            <button type="button" class="btn btn-sm btn-danger" disabled="@_busy" @onclick="() => SendAsync(AgentCommandKind.Restart)">Restart</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="Back">Cancel</button>
+                        </div>
+                    </div>
                     break;
                 case Mode.Message:
-                    <textarea class="form-control form-control-sm mb-1 pc-menu-message" rows="2" maxlength="500"
-                              aria-label="Message to show on the PC" placeholder="Message for @StationName"
-                              @bind="_text" @bind:event="oninput"></textarea>
-                    <button type="button" class="btn btn-sm btn-primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_text))"
-                            @onclick="() => SendAsync(AgentCommandKind.Message)">Send</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="Back">Cancel</button>
+                    <div class="menu-confirm">
+                        <textarea class="form-control form-control-sm pc-menu-message" rows="2" maxlength="500"
+                                  aria-label="Message to show on the PC" placeholder="Message for @StationName"
+                                  @bind="_text" @bind:event="oninput"></textarea>
+                        <div class="menu-confirm-actions">
+                            <button type="button" class="btn btn-sm btn-primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_text))"
+                                    @onclick="() => SendAsync(AgentCommandKind.Message)">Send</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="Back">Cancel</button>
+                        </div>
+                    </div>
                     break;
                 default:
-                    <div class="d-flex flex-wrap gap-1">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="() => SendAsync(AgentCommandKind.Lock)">Lock</button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="() => Go(Mode.ConfirmUnlock)">Unlock PC (free)</button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="() => Go(Mode.Message)">Send message</button>
-                        <button type="button" class="btn btn-sm btn-outline-danger" disabled="@_busy" @onclick="() => Go(Mode.ConfirmShutdown)">Shutdown</button>
-                        <button type="button" class="btn btn-sm btn-outline-danger" disabled="@_busy" @onclick="() => Go(Mode.ConfirmRestart)">Restart</button>
-                    </div>
+                    <button type="button" class="menu-item" disabled="@_busy" @onclick="() => SendAsync(AgentCommandKind.Lock)">Lock</button>
+                    <button type="button" class="menu-item" disabled="@_busy" @onclick="() => Go(Mode.ConfirmUnlock)">Unlock PC (free)</button>
+                    <button type="button" class="menu-item" disabled="@_busy" @onclick="() => Go(Mode.Message)">Send message</button>
+                    <div class="menu-sep" role="separator"></div>
+                    <button type="button" class="menu-item is-destructive" disabled="@_busy" @onclick="() => Go(Mode.ConfirmShutdown)">Shutdown</button>
+                    <button type="button" class="menu-item is-destructive" disabled="@_busy" @onclick="() => Go(Mode.ConfirmRestart)">Restart</button>
                     break;
             }
 
             @if (_result is not null)
             {
-                <div class="alert @(_resultOk ? "alert-success" : "alert-danger") py-1 px-2 mt-2 mb-0 small pc-menu-result" role="status">@_result</div>
+                <div class="banner @(_resultOk ? "banner-success" : "banner-danger") menu-result pc-menu-result" role="status">@_result</div>
             }
         </div>
     }

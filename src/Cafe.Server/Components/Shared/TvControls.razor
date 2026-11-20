@@ -2,25 +2,29 @@
 @inject TvControlService Control
 @inject ILogger<TvControls> Logger
 
-<div class="tv-controls mt-2" data-station-id="@StationId">
-    <div class="d-flex flex-wrap align-items-center gap-1">
-        <span class="badge rounded-pill @BadgeClass tv-indicator" data-station-id="@StationId">@Label</span>
-        <button type="button" class="btn btn-sm btn-outline-success tv-on-button" disabled="@_busy" @onclick="OnAsync">TV On</button>
-        <button type="button" class="btn btn-sm btn-outline-danger tv-off-button" disabled="@_busy" @onclick="OffClickAsync">TV Off</button>
+<div class="tv-controls" data-station-id="@StationId">
+    <div class="tv-row">
+        <span class="capsule @BadgeClass tv-indicator" data-station-id="@StationId">@Label</span>
+        <div class="tv-buttons">
+            <button type="button" class="btn btn-sm btn-outline-success tv-on-button" disabled="@_busy" @onclick="OnAsync">TV On</button>
+            <button type="button" class="btn btn-sm btn-outline-danger tv-off-button" disabled="@_busy" @onclick="OffClickAsync">TV Off</button>
+        </div>
     </div>
 
     @if (_confirmOff)
     {
-        <div class="border rounded p-2 mt-1 small tv-off-confirm">
-            <div class="mb-1">A session is running on this station. Switch the TV off anyway?</div>
-            <button type="button" class="btn btn-sm btn-danger" disabled="@_busy" @onclick="OffAsync">Confirm</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="CancelConfirm">Cancel</button>
+        <div class="tv-confirm tv-off-confirm">
+            <div>A session is running on this station. Switch the TV off anyway?</div>
+            <div class="tv-buttons">
+                <button type="button" class="btn btn-sm btn-danger" disabled="@_busy" @onclick="OffAsync">Confirm</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="CancelConfirm">Cancel</button>
+            </div>
         </div>
     }
 
     @if (_result is not null)
     {
-        <div class="alert @(_ok ? "alert-success" : "alert-danger") py-1 px-2 mt-1 mb-0 small tv-result" role="status">@_result</div>
+        <div class="banner @(_ok ? "banner-success" : "banner-danger") tv-banner tv-result" role="status">@_result</div>
     }
 </div>
 
@@ -49,11 +53,11 @@
 
     private string BadgeClass => State switch
     {
-        TvPowerState.On => "text-bg-success",
-        TvPowerState.Standby => "text-bg-secondary",
-        TvPowerState.Unreachable => "text-bg-dark",
-        TvPowerState.Unknown => "text-bg-warning",
-        _ => "text-bg-light border",
+        TvPowerState.On => "capsule-green",
+        TvPowerState.Standby => "capsule-gray",
+        TvPowerState.Unreachable => "capsule-gray",
+        TvPowerState.Unknown => "capsule-orange",
+        _ => "capsule-gray",
     };
 
     private void CancelConfirm() => _confirmOff = false;

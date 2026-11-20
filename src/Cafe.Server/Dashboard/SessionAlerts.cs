@@ -20,7 +20,7 @@ public static class SessionAlerts
             return AlertLevel.TimeUp;
         }
 
-        if (session.Status != SessionStatus.Active || session.Mode != SessionMode.Prepaid || session.PurchasedMinutes is not { } minutes)
+        if (session.Status != SessionStatus.Active || !session.Mode.IsTimed() || session.PurchasedMinutes is not { } minutes)
         {
             return AlertLevel.None;
         }

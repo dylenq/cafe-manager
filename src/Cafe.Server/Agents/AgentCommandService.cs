@@ -328,7 +328,7 @@ public sealed class AgentCommandService(
         var closed = session.Segments.Where(x => x.EndUtc is not null).Sum(x => (long)(x.EndUtc!.Value - x.StartUtc).TotalSeconds);
         var open = session.Segments.FirstOrDefault(x => x.EndUtc is null)?.StartUtc;
         var active = SessionClock.ActiveSeconds(closed, open, now);
-        return session.Mode == SessionMode.Prepaid && session.PurchasedMinutes is { } purchased
+        return session.Mode.IsTimed() && session.PurchasedMinutes is { } purchased
             ? new SessionInfo(AgentSessionMode.Prepaid, Math.Max(SessionClock.RemainingSeconds(purchased, active), 0), active, stationName, now)
             : new SessionInfo(AgentSessionMode.OpenEnded, null, active, stationName, now);
     }

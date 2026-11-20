@@ -117,7 +117,7 @@ else
                 {
                     <tr @key="row.SessionId">
                         <td>@row.StationName</td>
-                        <td>@(row.Mode == SessionMode.Prepaid ? "Prepaid" : "Open-ended")</td>
+                        <td>@(row.Mode == SessionMode.Balance ? "Balance" : row.Mode == SessionMode.Prepaid ? "Prepaid" : "Open-ended")</td>
                         <td>@Local(row.StartedAtUtc)</td>
                         <td>@(row.EndedAtUtc is { } end ? Local(end) : "")</td>
                         <td>@EndReasonText(row)</td>

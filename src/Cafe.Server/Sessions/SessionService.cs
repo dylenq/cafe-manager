@@ -283,7 +283,7 @@ public class SessionService(
         return await MutateAsync<decimal>(sessionId, async ctx =>
         {
             var session = ctx.Session;
-            if (session.Mode != SessionMode.Prepaid || session.PurchasedMinutes is not { } purchased)
+            if (!session.Mode.IsTimed() || session.PurchasedMinutes is not { } purchased)
             {
                 return ServiceResult<decimal>.Fail("Only prepaid sessions can be extended.");
             }
@@ -446,7 +446,7 @@ public class SessionService(
             return ServiceResult<StopQuote>.Fail(AlreadyEnded);
         }
 
-        var amount = session.Mode == SessionMode.Prepaid
+        var amount = session.Mode != SessionMode.OpenEnded
             ? session.ChargedAmount
             : await charges.OpenEndedAsync(db, session.Segments, time.GetUtcNow(), cancellationToken: cancellationToken);
         return ServiceResult<StopQuote>.Ok(new StopQuote(session.Id, session.Version, amount));

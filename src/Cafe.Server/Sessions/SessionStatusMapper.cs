@@ -8,7 +8,7 @@ public static class SessionStatusMapper
     public static StationStatus Map(SessionStatus status, SessionMode mode, long remainingSeconds, int maxWarningMinutes) =>
         status switch
         {
-            SessionStatus.Active => mode == SessionMode.Prepaid && remainingSeconds <= maxWarningMinutes * 60L
+            SessionStatus.Active => mode.IsTimed() && remainingSeconds <= maxWarningMinutes * 60L
                 ? StationStatus.Expiring
                 : StationStatus.InSession,
             SessionStatus.Paused => StationStatus.Paused,

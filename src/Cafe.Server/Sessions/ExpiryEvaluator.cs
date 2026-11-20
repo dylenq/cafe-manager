@@ -48,7 +48,7 @@ public class ExpiryEvaluator(
         await using (var db = await dbFactory.CreateDbContextAsync(cancellationToken))
         {
             ids = await db.Sessions.AsNoTracking()
-                .Where(s => s.Mode == SessionMode.Prepaid && (s.Status == SessionStatus.Active || s.Status == SessionStatus.Grace))
+                .Where(s => (s.Mode == SessionMode.Prepaid || s.Mode == SessionMode.Balance) && (s.Status == SessionStatus.Active || s.Status == SessionStatus.Grace))
                 .OrderBy(s => s.Id)
                 .Select(s => s.Id)
                 .ToListAsync(cancellationToken);
@@ -133,7 +133,7 @@ public class ExpiryEvaluator(
             .Include(s => s.Events)
             .Include(s => s.Station)
             .FirstOrDefaultAsync(s => s.Id == sessionId, ct);
-        if (session is null || session.Mode != SessionMode.Prepaid || session.PurchasedMinutes is not { } purchased)
+        if (session is null || !session.Mode.IsTimed() || session.PurchasedMinutes is not { } purchased)
         {
             return false;
         }

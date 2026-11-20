@@ -33,13 +33,13 @@
 
 ### PC Agent
 
-- [ ] **AGNT-01**: An agent on each gaming PC connects to the server, registers by machine ID and shows online/offline on the dashboard
-- [ ] **AGNT-02**: When no session is active the PC shows a full-screen lock overlay that Alt+Tab, Win, Alt+F4 and Task Manager can't escape
-- [ ] **AGNT-03**: Starting a session unlocks the PC; stopping or expiring it locks the PC again
-- [ ] **AGNT-04**: The PC shows countdown warnings at 10, 5 and 1 minutes remaining and during the grace period
+- [x] **AGNT-01**: An agent on each gaming PC connects to the server, registers by machine ID and shows online/offline on the dashboard
+- [x] **AGNT-02**: When no session is active the PC shows a full-screen lock overlay that Alt+Tab, Win, Alt+F4 and Task Manager can't escape
+- [x] **AGNT-03**: Starting a session unlocks the PC; stopping or expiring it locks the PC again
+- [x] **AGNT-04**: The PC shows countdown warnings at 10, 5 and 1 minutes remaining and during the grace period
 - [x] **AGNT-05**: Staff can send lock, unlock, message, shutdown and restart commands to a PC from the dashboard
-- [ ] **AGNT-06**: The agent stays locked when it can't reach the server, and reconnects automatically
-- [ ] **AGNT-07**: A simulator can run N fake agents so the PC flow can be tested without Windows machines
+- [x] **AGNT-06**: The agent stays locked when it can't reach the server, and reconnects automatically
+- [x] **AGNT-07**: A simulator can run N fake agents so the PC flow can be tested without Windows machines
 
 ### Console TV Control
 
@@ -114,13 +114,13 @@
 | SESS-10 | Phase 2 | Complete |
 | PRIC-01 | Phase 2 | Complete |
 | PRIC-02 | Phase 2 | Complete |
-| AGNT-01 | Phase 3 | Pending |
-| AGNT-02 | Phase 3 | Pending |
-| AGNT-03 | Phase 3 | Pending |
-| AGNT-04 | Phase 3 | Pending |
+| AGNT-01 | Phase 3 | Complete |
+| AGNT-02 | Phase 3 | Complete |
+| AGNT-03 | Phase 3 | Complete |
+| AGNT-04 | Phase 3 | Complete |
 | AGNT-05 | Phase 3 | Complete |
-| AGNT-06 | Phase 3 | Pending |
-| AGNT-07 | Phase 3 | Pending |
+| AGNT-06 | Phase 3 | Complete |
+| AGNT-07 | Phase 3 | Complete |
 | TVCT-01 | Phase 4 | Complete |
 | TVCT-02 | Phase 4 | Complete |
 | TVCT-03 | Phase 4 | Complete |

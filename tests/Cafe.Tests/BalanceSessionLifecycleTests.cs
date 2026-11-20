@@ -1,4 +1,5 @@
 using Cafe.Server.Customers;
+using Cafe.Server.Dashboard;
 using Cafe.Server.Data;
 using Cafe.Server.Sessions;
 using Cafe.Tests.Infrastructure;
@@ -400,5 +401,141 @@ public class BalanceSessionLifecycleTests : CustomerTestBase
         Assert.Equal(1, results.Count(r => r.Success));
         Assert.Equal(40, await BalanceAsync(customer));
         Assert.Equal(120, (await LoadAsync(session.Id)).PurchasedMinutes);
+    }
+
+    private sealed class RecordingSink : ISessionEventSink
+    {
+        public List<SessionSignal> Signals { get; } = [];
+
+        public Task OnSessionSignalAsync(SessionSignal signal, CancellationToken cancellationToken)
+        {
+            lock (Signals)
+            {
+                Signals.Add(signal);
+            }
+
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class ThrowingSink : ISessionEventSink
+    {
+        public Task OnSessionSignalAsync(SessionSignal signal, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("boom");
+    }
+
+    [Fact]
+    public async Task Signals_for_a_balance_session_match_a_prepaid_one()
+    {
+        var recorder = new RecordingSink();
+        Factory.ServiceOverrides.Add(services => services.AddSingleton<ISessionEventSink>(recorder));
+        var customer = await CustomerWithAnyAsync(100);
+        var station = await StationAsync();
+
+        var session = await StartBalanceAsync(station, customer, 30);
+        await SvcAsync(s => s.ExtendFromBalanceAsync(session.Id, 20));
+        await SvcAsync(s => s.StopAsync(session.Id));
+
+        Assert.Equal(
+            [SessionSignalKind.Started, SessionSignalKind.Extended, SessionSignalKind.Stopped],
+            recorder.Signals.Select(x => x.Kind).ToArray());
+        Assert.Equal(20, recorder.Signals[1].Minutes);
+        Assert.All(recorder.Signals, x => Assert.Equal(station, x.StationId));
+    }
+
+    [Fact]
+    public async Task A_failing_sink_does_not_roll_back_ledger_rows()
+    {
+        Factory.ServiceOverrides.Add(services => services.AddSingleton<ISessionEventSink, ThrowingSink>());
+        var customer = await CustomerWithAnyAsync(100);
+
+        var session = await StartBalanceAsync(await StationAsync(), customer, 30);
+        var extend = await SvcAsync(s => s.ExtendFromBalanceAsync(session.Id, 20));
+
+        Assert.True(extend.Success, extend.Error);
+        Assert.Equal(2, (await LedgerAsync(LedgerReason.SessionDebit)).Count);
+        Assert.Equal(50, await BalanceAsync(customer));
+    }
+
+    [Fact]
+    public async Task Ledger_stays_consistent_after_a_mixed_history_and_no_bucket_goes_negative()
+    {
+        var standard = await TypeAsync("Standard");
+        var vip = await TypeAsync("VIP", 9000m);
+        var customer = await CustomerAsync();
+        await SellAsync(customer, await PackageAsync("standard 40", 40, 500m, standard));
+        await SellAsync(customer, await PackageAsync("any 100", 100, 1000m));
+        var session = await StartBalanceAsync(await StationAsync("PC-01", standard), customer, 50); // 40 typed + 10 any
+        Assert.True((await SvcAsync(s => s.ExtendFromBalanceAsync(session.Id, 30))).Success); // 30 any
+        Assert.True((await SvcAsync(s => s.ExtendAsync(session.Id, 10))).Success); // paid, no ledger
+        Advance(20 * Min);
+        var sameType = await StationAsync("PC-02", standard);
+        var vipStation = await StationAsync("VIP-01", vip);
+        Assert.False((await SvcAsync(s => s.MoveAsync(session.Id, vipStation))).Success);
+        Assert.True((await SvcAsync(s => s.MoveAsync(session.Id, sameType))).Success);
+        Advance(5 * Min);
+
+        var stop = await SvcAsync(s => s.StopAsync(session.Id));
+
+        Assert.True(stop.Success, stop.Error);
+        await using var db = await DbAsync();
+        var rows = await db.CustomerMinuteLedger.AsNoTracking().Where(l => l.SessionId == session.Id).ToListAsync();
+        var drawn = -rows.Where(r => r.Reason == LedgerReason.SessionDebit).Sum(r => r.MinutesDelta);
+        var refunded = rows.Where(r => r.Reason == LedgerReason.SessionRefund).Sum(r => r.MinutesDelta);
+        Assert.Equal(80, drawn);
+        Assert.Equal(65, refunded);
+        Assert.Equal(-(drawn - refunded), rows.Sum(r => r.MinutesDelta));
+        var buckets = await db.CustomerMinuteLedger.AsNoTracking()
+            .GroupBy(l => new { l.CustomerId, l.StationTypeId })
+            .Select(g => new { g.Key.StationTypeId, Sum = g.Sum(l => l.MinutesDelta) })
+            .ToListAsync();
+        Assert.All(buckets, b => Assert.True(b.Sum >= 0, $"bucket {b.StationTypeId} negative: {b.Sum}"));
+        Assert.Equal(140 - 80 + 65, buckets.Sum(b => b.Sum));
+    }
+
+    [Fact]
+    public async Task A_balance_start_that_cannot_proceed_leaves_no_session_and_no_ledger_row()
+    {
+        var customer = await CustomerWithAnyAsync(100);
+        var station = await StationAsync();
+        await PrepaidAsync(station, 30);
+
+        var start = await TryStartBalanceAsync(station, customer, 30);
+
+        Assert.False(start.Success);
+        await using var db = await DbAsync();
+        Assert.Empty(await db.CustomerMinuteLedger.Where(l => l.Reason == LedgerReason.SessionDebit).ToListAsync());
+        Assert.Equal(1, await db.Sessions.CountAsync());
+        Assert.Equal(100, await BalanceAsync(customer));
+    }
+
+    [Fact]
+    public async Task Two_balance_starts_racing_for_one_station_debit_only_once()
+    {
+        var customer = await CustomerWithAnyAsync(100);
+        var station = await StationAsync();
+
+        var results = await Task.WhenAll(TryStartBalanceAsync(station, customer, 30), TryStartBalanceAsync(station, customer, 30));
+
+        Assert.Equal(1, results.Count(r => r.Success));
+        Assert.Single(await LedgerAsync(LedgerReason.SessionDebit));
+        Assert.Equal(70, await BalanceAsync(customer));
+    }
+
+    [Fact]
+    public async Task Dashboard_card_clears_after_stop_and_the_balance_matches_the_ledger()
+    {
+        var customer = await CustomerWithAnyAsync(100);
+        var station = await StationAsync();
+        var session = await StartBalanceAsync(station, customer, 60);
+        Advance(15 * Min);
+        await SvcAsync(s => s.StopAsync(session.Id));
+
+        var cards = await InScopeAsync(sp => sp.GetRequiredService<DashboardService>().GetCardsAsync());
+        var balance = await InScopeAsync(sp => sp.GetRequiredService<BalanceService>().GetBalanceAsync(customer));
+
+        Assert.Null(cards.Single(c => c.StationId == station).Session);
+        Assert.Equal(await BalanceAsync(customer), balance.TotalMinutes);
+        Assert.Equal(85, balance.TotalMinutes);
     }
 }

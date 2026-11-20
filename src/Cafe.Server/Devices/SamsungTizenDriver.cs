@@ -121,8 +121,90 @@ public sealed class SamsungTizenDriver(ITvTransport transport, IOptions<TvOption
         }
     }
 
-    public Task<TvActionResult> PowerOnAsync(Station station, CancellationToken cancellationToken) =>
-        Task.FromResult(new TvActionResult(TvActionOutcome.Failed, TvPowerState.Unknown, "Power on is completed in Task 2 of this plan"));
+    public async Task<TvActionResult> PowerOnAsync(Station station, CancellationToken cancellationToken)
+    {
+        if (!TryGetIp(station, out var ip))
+        {
+            return new TvActionResult(TvActionOutcome.Failed, TvPowerState.Unknown, "This station has no valid TV IP address");
+        }
+
+        using var gate = await LockAsync(ip, cancellationToken);
+        try
+        {
+            var state = await ReadStateAsync(ip, cancellationToken);
+            if (state == TvPowerState.On)
+            {
+                return new TvActionResult(TvActionOutcome.AlreadyOn, state, "The TV is already on");
+            }
+
+            var paired = !string.IsNullOrWhiteSpace(station.TvToken);
+            if (WakeOnLan.TryBuildMagicPacket(station.TvMacAddress, out var packet))
+            {
+                await SendMagicPacketsAsync(packet, IPAddress.Parse(ip), cancellationToken);
+                await DelayAsync(Options.WakeWaitMilliseconds, cancellationToken);
+                state = await ReadStateAsync(ip, cancellationToken);
+            }
+            else
+            {
+                logger.LogWarning("Station {Station} has no valid TV MAC address; no Wake-on-LAN packet was sent.", station.Name);
+                if (state != TvPowerState.Standby)
+                {
+                    return new TvActionResult(TvActionOutcome.Failed, state, "The TV has no valid MAC address and is not in standby, so it cannot be woken");
+                }
+            }
+
+            switch (state)
+            {
+                case TvPowerState.On:
+                    return new TvActionResult(TvActionOutcome.PoweredOn, state, "The TV is on");
+                case TvPowerState.Standby when paired:
+                    if (await SendPowerKeyAsync(ip, station.TvToken!, cancellationToken) is { } failure)
+                    {
+                        return failure;
+                    }
+
+                    return new TvActionResult(TvActionOutcome.PoweredOn, state, "The TV was switched on");
+                case TvPowerState.Standby:
+                    return new TvActionResult(TvActionOutcome.WakeSent, state, "Wake signal sent; the TV is in standby and not paired, so no power key was sent");
+                default:
+                    return new TvActionResult(TvActionOutcome.WakeSent, state, "Wake signal sent; the TV did not answer yet");
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Powering on the TV of station {Station} failed.", station.Name);
+            return new TvActionResult(TvActionOutcome.Failed, TvPowerState.Unknown, "Powering on failed: " + ex.GetType().Name);
+        }
+    }
+
+    private async Task SendMagicPacketsAsync(byte[] packet, IPAddress tv, CancellationToken ct)
+    {
+        IPAddress[] targets = [IPAddress.Broadcast, WakeOnLan.SubnetBroadcast(tv)];
+        var rounds = Math.Max(1, Options.WolRounds);
+        for (var round = 0; round < rounds; round++)
+        {
+            foreach (var target in targets)
+            {
+                foreach (var port in new[] { 9, 7 })
+                {
+                    ct.ThrowIfCancellationRequested();
+                    try
+                    {
+                        await transport.SendUdpAsync(packet, target, port, ct);
+                    }
+                    catch (Exception ex) when (ex is SocketException or IOException)
+                    {
+                        logger.LogWarning("Wake-on-LAN send to {Target}:{Port} failed: {Reason}", target, port, ex.Message);
+                    }
+                }
+            }
+
+            if (round < rounds - 1)
+            {
+                await DelayAsync(Options.WolRoundDelayMilliseconds, ct);
+            }
+        }
+    }
 
     /// <summary>Sends KEY_POWER over a fresh channel. Returns null when sent, else the failure to report.</summary>
     private async Task<TvActionResult?> SendPowerKeyAsync(string ip, string token, CancellationToken ct)

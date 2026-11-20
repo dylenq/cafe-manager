@@ -2,14 +2,16 @@
     width: 100%;
     height: auto;
     max-height: 240px;
-    color: var(--bs-body-color, #212529);
+    color: var(--label-2);
 }
 
 .chart-bar {
-    fill: var(--bs-primary, #0d6efd);
+    fill: var(--accent);
+    rx: 4px;
+    ry: 4px;
 }
 
 .chart-label {
     font-size: 11px;
-    fill: currentColor;
+    fill: var(--label-2);
 }

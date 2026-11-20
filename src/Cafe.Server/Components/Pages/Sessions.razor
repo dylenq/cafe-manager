@@ -14,10 +14,12 @@
 
 <PageTitle>Sessions - Cafe Manager</PageTitle>
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="h3 mb-0">Sessions</h1>
-    <div class="d-flex align-items-center gap-2">
-        <label class="form-label mb-0" for="station-filter">Station</label>
+<SectionContent SectionName="page-title">Sessions</SectionContent>
+
+<div class="page-header">
+    <h1 class="large-title">Sessions</h1>
+    <div class="page-header-actions">
+        <label class="subhead" for="station-filter">Station</label>
         <select id="station-filter" class="form-select w-auto" value="@filterId" @onchange="OnFilterChanged">
             <option value="">All stations</option>
             @foreach (var station in stations)
@@ -28,16 +30,12 @@
     </div>
 </div>
 
-<ul class="nav nav-tabs mb-3" role="tablist">
-    <li class="nav-item">
-        <button type="button" role="tab" class="nav-link @(showCommands ? "" : "active")" aria-selected="@((!showCommands).ToString().ToLowerInvariant())"
-                @onclick="ShowSessionsTab">Sessions</button>
-    </li>
-    <li class="nav-item">
-        <button type="button" role="tab" class="nav-link @(showCommands ? "active" : "")" aria-selected="@showCommands.ToString().ToLowerInvariant()"
-                @onclick="ShowCommandsTab">Agent commands</button>
-    </li>
-</ul>
+<div class="segmented mb-4" role="tablist" aria-label="Sessions view">
+    <button type="button" role="tab" class="@(showCommands ? "" : "active")" aria-selected="@((!showCommands).ToString().ToLowerInvariant())"
+            @onclick="ShowSessionsTab">Sessions</button>
+    <button type="button" role="tab" class="@(showCommands ? "active" : "")" aria-selected="@showCommands.ToString().ToLowerInvariant()"
+            @onclick="ShowCommandsTab">Agent commands</button>
+</div>
 
 @if (!string.IsNullOrEmpty(errorMessage))
 {
@@ -48,23 +46,23 @@
 {
     @if (!string.IsNullOrEmpty(commandsError))
     {
-        <div class="alert alert-danger d-flex justify-content-between align-items-center" role="alert">
+        <div class="alert alert-danger justify-content-between" role="alert">
             <span>@commandsError</span>
             <button type="button" class="btn btn-sm btn-outline-danger" @onclick="LoadCommandsAsync">Retry</button>
         </div>
     }
     else if (commands is null)
     {
-        <p>Loading...</p>
+        <p class="footnote">Loading...</p>
     }
     else if (commands.Count == 0)
     {
-        <p class="text-muted">No PC commands have been sent yet.</p>
+        <div class="group group-padded empty-state">No PC commands have been sent yet.</div>
     }
     else
     {
         <div class="table-responsive">
-            <table class="table table-striped align-middle agent-commands-table">
+            <table class="table align-middle agent-commands-table">
                 <thead>
                     <tr>
                         <th>Time</th>
@@ -77,7 +75,7 @@
                     @foreach (var entry in commands)
                     {
                         <tr @key="entry.Id">
-                            <td>@Local(entry.AtUtc)</td>
+                            <td class="tabular">@Local(entry.AtUtc)</td>
                             <td>@entry.StationName</td>
                             <td>@entry.Command</td>
                             <td>@entry.Details</td>
@@ -90,16 +88,16 @@
 }
 else if (rows is null)
 {
-    <p>Loading...</p>
+    <p class="footnote">Loading...</p>
 }
 else if (rows.Count == 0)
 {
-    <p class="text-muted">No sessions yet.</p>
+    <div class="group group-padded empty-state">No sessions yet.</div>
 }
 else
 {
     <div class="table-responsive">
-        <table class="table table-striped align-middle">
+        <table class="table align-middle">
             <thead>
                 <tr>
                     <th>Station</th>
@@ -107,8 +105,8 @@ else
                     <th>Start</th>
                     <th>End</th>
                     <th>End reason</th>
-                    <th class="text-end">Active time</th>
-                    <th class="text-end">Charge</th>
+                    <th class="num">Active time</th>
+                    <th class="num">Charge</th>
                     <th></th>
                 </tr>
             </thead>
@@ -118,28 +116,28 @@ else
                     <tr @key="row.SessionId">
                         <td>@row.StationName</td>
                         <td>@(row.Mode == SessionMode.Balance ? "Balance" : row.Mode == SessionMode.Prepaid ? "Prepaid" : "Open-ended")</td>
-                        <td>@Local(row.StartedAtUtc)</td>
-                        <td>@(row.EndedAtUtc is { } end ? Local(end) : "")</td>
+                        <td class="tabular">@Local(row.StartedAtUtc)</td>
+                        <td class="tabular">@(row.EndedAtUtc is { } end ? Local(end) : "")</td>
                         <td>@EndReasonText(row)</td>
-                        <td class="text-end">@Duration(row.ActiveSeconds)</td>
-                        <td class="text-end">@row.ChargedAmount.ToString("C")</td>
-                        <td class="text-end">
-                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Toggle(row.SessionId)">
+                        <td class="num">@Duration(row.ActiveSeconds)</td>
+                        <td class="num">@row.ChargedAmount.ToString("C")</td>
+                        <td class="num">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" aria-expanded="@(expanded.Contains(row.SessionId) ? "true" : "false")" @onclick="() => Toggle(row.SessionId)">
                                 @(expanded.Contains(row.SessionId) ? "Hide" : "Events")
                             </button>
                         </td>
                     </tr>
                     @if (expanded.Contains(row.SessionId))
                     {
-                        <tr>
-                            <td colspan="8" class="bg-body-tertiary">
+                        <tr class="event-trail">
+                            <td colspan="8">
                                 @if (row.Events.Count == 0)
                                 {
-                                    <span class="text-muted">No events.</span>
+                                    <span class="footnote">No events.</span>
                                 }
                                 else
                                 {
-                                    <ul class="list-unstyled mb-0 small">
+                                    <ul class="list-unstyled mb-0 footnote">
                                         @foreach (var evt in row.Events)
                                         {
                                             <li>@Local(evt.AtUtc) - @evt.Type - @evt.Details</li>

@@ -2,6 +2,7 @@ using Cafe.Server.Data;
 using Cafe.Shared;
 using Cafe.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cafe.Tests;
@@ -132,5 +133,35 @@ public class DataModelTests
         Assert.Contains(applied, m => m.EndsWith("_InitialCreate"));
         Assert.Contains(applied, m => m.EndsWith("_AddStations"));
         Assert.Empty(await db.Database.GetPendingMigrationsAsync());
+    }
+
+    [Fact]
+    public async Task Phase6_model_has_pos_tables_and_payment_links()
+    {
+        using var factory = new CafeWebApplicationFactory();
+        await using var db = await Db(factory).CreateDbContextAsync();
+        var model = db.GetService<Microsoft.EntityFrameworkCore.Metadata.IDesignTimeModel>().Model;
+
+        foreach (var type in new[] { typeof(Product), typeof(Order), typeof(OrderLine), typeof(PaymentAllocation) })
+        {
+            Assert.NotNull(model.FindEntityType(type));
+        }
+
+        var payment = model.FindEntityType(typeof(Payment))!;
+        Assert.NotNull(payment.FindProperty(nameof(Payment.OrderId)));
+        Assert.NotNull(payment.FindProperty(nameof(Payment.PrimaryPaymentId)));
+    }
+
+    [Fact]
+    public async Task Product_names_are_unique_ignoring_case()
+    {
+        using var factory = new CafeWebApplicationFactory();
+        await using var db = await Db(factory).CreateDbContextAsync();
+        db.Products.Add(new Product { Name = "Coke", Category = "Drinks", Price = 1m });
+        await db.SaveChangesAsync();
+
+        await using var db2 = await Db(factory).CreateDbContextAsync();
+        db2.Products.Add(new Product { Name = "COKE", Category = "Drinks", Price = 1m });
+        await Assert.ThrowsAsync<DbUpdateException>(() => db2.SaveChangesAsync());
     }
 }

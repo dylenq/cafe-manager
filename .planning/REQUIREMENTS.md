@@ -29,7 +29,7 @@
 
 - [x] **PRIC-01**: Session cost uses the station type's hourly rate
 - [x] **PRIC-02**: Staff can define time-of-day/day-of-week rate rules (e.g. happy hour), and costs split correctly across rule boundaries
-- [ ] **PRIC-03**: Members get member pricing (separate rate or discount) and guests pay the guest rate
+- [x] **PRIC-03**: Members get member pricing (separate rate or discount) and guests pay the guest rate
 
 ### PC Agent
 
@@ -50,12 +50,12 @@
 
 ### Customers & Packages
 
-- [ ] **CUST-01**: Staff can create and edit customers (name, phone, member flag, notes)
-- [ ] **CUST-02**: Staff can search customers by name or phone
-- [ ] **CUST-03**: Staff can define time packages (minutes, price, optionally limited to a station type)
-- [ ] **CUST-04**: Staff can sell a package to a customer, which adds minutes to their balance and records the payment
+- [x] **CUST-01**: Staff can create and edit customers (name, phone, member flag, notes)
+- [x] **CUST-02**: Staff can search customers by name or phone
+- [x] **CUST-03**: Staff can define time packages (minutes, price, optionally limited to a station type)
+- [x] **CUST-04**: Staff can sell a package to a customer, which adds minutes to their balance and records the payment
 - [x] **CUST-05**: Staff can start a session that draws time from a customer's minute balance
-- [ ] **CUST-06**: Sessions can be linked to a customer so member pricing applies
+- [x] **CUST-06**: Sessions can be linked to a customer so member pricing applies
 
 ### POS & Payments
 
@@ -125,13 +125,13 @@
 | TVCT-02 | Phase 4 | Complete |
 | TVCT-03 | Phase 4 | Complete |
 | TVCT-04 | Phase 4 | Complete |
-| CUST-01 | Phase 5 | Pending |
-| CUST-02 | Phase 5 | Pending |
-| CUST-03 | Phase 5 | Pending |
-| CUST-04 | Phase 5 | Pending |
+| CUST-01 | Phase 5 | Complete |
+| CUST-02 | Phase 5 | Complete |
+| CUST-03 | Phase 5 | Complete |
+| CUST-04 | Phase 5 | Complete |
 | CUST-05 | Phase 5 | Complete |
-| CUST-06 | Phase 5 | Pending |
-| PRIC-03 | Phase 5 | Pending |
+| CUST-06 | Phase 5 | Complete |
+| PRIC-03 | Phase 5 | Complete |
 | POS-01 | Phase 6 | Pending |
 | POS-02 | Phase 6 | Pending |
 | POS-03 | Phase 6 | Pending |

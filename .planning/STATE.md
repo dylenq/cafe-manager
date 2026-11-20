@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 5
 current_phase_name: Customers & Packages
 status: executing
-stopped_at: Completed 05-04-PLAN.md
-last_updated: "2026-11-20T07:06:11.229Z"
+stopped_at: Completed 05-05-PLAN.md
+last_updated: "2026-11-20T07:11:47.222Z"
 last_activity: 2026-11-20
 last_activity_desc: Phase 5 execution started
-state_head: e689a901657fbcd5f2d5259ec2ad42af0ed34887
+state_head: ec0442d88d131d6af52b12311d871745529603ef
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 32
-  completed_plans: 21
+  completed_plans: 22
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 5 (Customers & Packages) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-11-20 — Phase 5 execution started
 
@@ -71,6 +71,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 4 P03 | 25min | 3 tasks | 9 files |
 | Phase 5 P05-01 | 35min | 2 tasks | 35 files |
 | Phase 5 P04 | 25min | 2 tasks | 3 files |
+| Phase 5 P05-05 | 35min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,7 @@ Recent decisions affecting current work:
 - [Phase 4]: 04-03: Home Notice gains optional Warning flag for TV failure notices
 - [Phase 5]: Balance ledger is append-only; debit type bucket first, refund last-drawn first; expiry never refunds
 - [Phase 5]: 05-04: refund capped at session net-drawn minutes; extend-from-balance under BalanceLock with paid fallback via ExtendAsync
+- [Phase 5]: 05-05: Extend-from-balance shortfall shows an explicit paid-extension choice, never a silent fallback
 
 ### Pending Todos
 
@@ -118,6 +120,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-20T07:06:11.210Z
-Stopped at: Completed 05-04-PLAN.md
+Last session: 2026-11-20T07:11:47.204Z
+Stopped at: Completed 05-05-PLAN.md
 Resume file: None

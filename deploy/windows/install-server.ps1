@@ -171,66 +171,94 @@ function Install-Server {
     # 3. Stop a running service (upgrade), then copy
     Write-Host '[2/8] Stopping the existing service (if any)'
     $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    $serviceExisted = ($null -ne $service)
     if ($null -ne $service -and $service.Status -ne 'Stopped') {
         Stop-Service -Name $ServiceName -Force
         $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(60))
     }
 
-    Write-Host "[3/8] Copying the program files to $InstallPath"
-    New-Item -ItemType Directory -Force -Path $InstallPath | Out-Null
-    & robocopy.exe $SourcePath $InstallPath /MIR /R:3 /W:2 /NFL /NDL /NJH /NJS /NP | Out-Null
-    if ($LASTEXITCODE -ge 8) {
-        throw "robocopy failed with exit code $LASTEXITCODE while copying the server files."
-    }
-
-    # 4. Data folder with a tight ACL (cafe.db holds the admin password hash and the agent key)
-    Write-Host "[4/8] Preparing the data folder $DataPath"
-    New-Item -ItemType Directory -Force -Path $DataPath | Out-Null
-    & icacls.exe $DataPath /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "icacls failed with exit code $LASTEXITCODE while securing $DataPath."
-    }
-
-    # 5. Service
-    Write-Host '[5/8] Creating or updating the Windows service'
-    $exePath = Join-Path $InstallPath 'Cafe.Server.exe'
-    $binaryPath = '"' + $exePath + '"'
-    $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-    if ($null -eq $service) {
-        New-Service -Name $ServiceName -DisplayName $ServiceDisplayName -BinaryPathName $binaryPath -StartupType Automatic | Out-Null
-    }
-    else {
-        # Rewrite the image path directly: it is the exact value "sc.exe config binPath=" would store, without
-        # PowerShell 5.1's native-argument quoting pitfalls for paths that contain spaces.
-        Set-ItemProperty -LiteralPath ('HKLM:\SYSTEM\CurrentControlSet\Services\' + $ServiceName) -Name ImagePath -Value $binaryPath
-        Set-Service -Name $ServiceName -DisplayName $ServiceDisplayName
-    }
-
-    & sc.exe config $ServiceName start= delayed-auto | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "sc.exe config failed with exit code $LASTEXITCODE." }
-    & sc.exe description $ServiceName 'Cafe Manager server: sessions, billing and reports for the gaming cafe.' | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "sc.exe description failed with exit code $LASTEXITCODE." }
-    & sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/5000/restart/30000 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "sc.exe failure failed with exit code $LASTEXITCODE." }
-    & sc.exe failureflag $ServiceName 1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "sc.exe failureflag failed with exit code $LASTEXITCODE." }
-
-    # 6. Firewall (Private and Domain networks only)
-    Write-Host "[6/8] Opening firewall port $Port for Private and Domain networks"
-    $existingRules = Get-NetFirewallRule -DisplayName $FirewallRuleName -ErrorAction SilentlyContinue
-    if ($null -ne $existingRules) {
-        $existingRules | Remove-NetFirewallRule
-    }
-    New-NetFirewallRule -DisplayName $FirewallRuleName -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow -Profile Private, Domain | Out-Null
+    # Steps 3 to 6 replace files and settings while the old service is stopped. If any of them fails on an upgrade,
+    # bring the previous service back up so the cafe is not left without a server.
     try {
-        $publicNetworks = @(Get-NetConnectionProfile | Where-Object { $_.NetworkCategory -eq 'Public' })
-        if ($publicNetworks.Count -gt 0) {
-            Write-Warning 'This PC has a network classified as Public. Other devices cannot reach the server on it.'
-            Write-Warning 'Switch it to Private: Settings > Network & Internet > (your network) > Network profile type > Private.'
+        Write-Host "[3/8] Copying the program files to $InstallPath"
+        New-Item -ItemType Directory -Force -Path $InstallPath | Out-Null
+        & robocopy.exe $SourcePath $InstallPath /MIR /R:3 /W:2 /NFL /NDL /NJH /NJS /NP | Out-Null
+        if ($LASTEXITCODE -ge 8) {
+            throw "robocopy failed with exit code $LASTEXITCODE while copying the server files."
+        }
+
+        # 4. Data folder with a tight ACL (cafe.db holds the admin password hash and the agent key)
+        Write-Host "[4/8] Preparing the data folder $DataPath"
+        New-Item -ItemType Directory -Force -Path $DataPath | Out-Null
+        & icacls.exe $DataPath /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "icacls failed with exit code $LASTEXITCODE while securing $DataPath."
+        }
+        # A gaming PC that is also this server keeps its emergency-lockout state in the "agent" subfolder. The agent
+        # runs as the gaming user, so give Users modify rights on that subfolder only; the database stays restricted.
+        $agentStatePath = Join-Path $DataPath 'agent'
+        New-Item -ItemType Directory -Force -Path $agentStatePath | Out-Null
+        & icacls.exe $agentStatePath /grant '*S-1-5-32-545:(OI)(CI)M' | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "icacls failed with exit code $LASTEXITCODE while preparing $agentStatePath."
+        }
+
+        # 5. Service
+        Write-Host '[5/8] Creating or updating the Windows service'
+        $exePath = Join-Path $InstallPath 'Cafe.Server.exe'
+        $binaryPath = '"' + $exePath + '"'
+        $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+        if ($null -eq $service) {
+            New-Service -Name $ServiceName -DisplayName $ServiceDisplayName -BinaryPathName $binaryPath -StartupType Automatic | Out-Null
+        }
+        else {
+            # Rewrite the image path directly: it is the exact value "sc.exe config binPath=" would store, without
+            # PowerShell 5.1's native-argument quoting pitfalls for paths that contain spaces.
+            Set-ItemProperty -LiteralPath ('HKLM:\SYSTEM\CurrentControlSet\Services\' + $ServiceName) -Name ImagePath -Value $binaryPath
+            Set-Service -Name $ServiceName -DisplayName $ServiceDisplayName
+        }
+
+        & sc.exe config $ServiceName start= delayed-auto | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "sc.exe config failed with exit code $LASTEXITCODE." }
+        & sc.exe description $ServiceName 'Cafe Manager server: sessions, billing and reports for the gaming cafe.' | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "sc.exe description failed with exit code $LASTEXITCODE." }
+        & sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/5000/restart/30000 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "sc.exe failure failed with exit code $LASTEXITCODE." }
+        & sc.exe failureflag $ServiceName 1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "sc.exe failureflag failed with exit code $LASTEXITCODE." }
+
+        # 6. Firewall (Private and Domain networks only)
+        Write-Host "[6/8] Opening firewall port $Port for Private and Domain networks"
+        $existingRules = Get-NetFirewallRule -DisplayName $FirewallRuleName -ErrorAction SilentlyContinue
+        if ($null -ne $existingRules) {
+            $existingRules | Remove-NetFirewallRule
+        }
+        New-NetFirewallRule -DisplayName $FirewallRuleName -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow -Profile Private, Domain | Out-Null
+        try {
+            $publicNetworks = @(Get-NetConnectionProfile | Where-Object { $_.NetworkCategory -eq 'Public' })
+            if ($publicNetworks.Count -gt 0) {
+                Write-Warning 'This PC has a network classified as Public. Other devices cannot reach the server on it.'
+                Write-Warning 'Switch it to Private: Settings > Network & Internet > (your network) > Network profile type > Private.'
+            }
+        }
+        catch {
+            Write-Verbose 'Could not read the network profile.'
         }
     }
     catch {
-        Write-Verbose 'Could not read the network profile.'
+        $failure = $_.Exception.Message
+        if ($serviceExisted) {
+            Write-Host 'The upgrade failed. Trying to start the previous server again...' -ForegroundColor Yellow
+            try {
+                Start-Service -Name $ServiceName -ErrorAction Stop
+                Write-Host 'The service was started again. The server is running, but the upgrade was NOT completed.' -ForegroundColor Yellow
+            }
+            catch {
+                Write-Host ('Could not start the service again: ' + $_.Exception.Message) -ForegroundColor Red
+                Write-Host 'The server is NOT running. Fix the problem below, then run this installer again.' -ForegroundColor Red
+            }
+        }
+        throw "The install failed before the service was started: $failure"
     }
 
     # 7. Start and wait

@@ -1,0 +1,57 @@
+.receipt-shell {
+    padding: 1rem;
+}
+
+.receipt {
+    width: 80mm;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 4mm;
+    background: #fff;
+    color: #000;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.receipt .center {
+    text-align: center;
+}
+
+.receipt .strong {
+    font-weight: 700;
+}
+
+.receipt .detail {
+    padding-left: 1ch;
+    color: #333;
+}
+
+.receipt .row-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 1ch;
+}
+
+.receipt hr {
+    border: 0;
+    border-top: 1px dashed #000;
+    margin: 6px 0;
+    opacity: 1;
+}
+
+@media print {
+    @page {
+        margin: 0;
+    }
+
+    .receipt-shell {
+        padding: 0;
+    }
+
+    .receipt {
+        width: 80mm;
+        margin: 0;
+        padding: 2mm;
+    }
+}

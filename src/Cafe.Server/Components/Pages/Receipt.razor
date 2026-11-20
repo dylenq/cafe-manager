@@ -1,0 +1,83 @@
+@page "/receipts/{PaymentId:int}"
+@attribute [Authorize]
+@layout ReceiptLayout
+@* POS-04: the browser receipt, narrow monospace, printable. *@
+@using System.Globalization
+@using Cafe.Server.Data
+@using Cafe.Server.Receipts
+@inject ReceiptService Receipts
+
+<PageTitle>Receipt - Cafe Manager</PageTitle>
+
+@if (!loaded)
+{
+    <p>Loading...</p>
+}
+else if (doc is null)
+{
+    <p class="text-muted">@(error ?? ReceiptService.NotFoundMessage)</p>
+}
+else
+{
+    <div class="receipt" data-testid="receipt">
+        <div class="center strong">@doc.Header.CafeName</div>
+        @foreach (var line in doc.Header.Lines)
+        {
+            <div class="center">@line</div>
+        }
+        <div class="center">Receipt #@doc.Number</div>
+        <div class="center">@doc.LocalTime.ToString("g", CultureInfo.CurrentCulture)</div>
+        <hr />
+        @foreach (var target in doc.Targets)
+        {
+            <div class="row-line">
+                <span>@target.Title</span>
+                <span>@target.Total.ToString("C")</span>
+            </div>
+            @if (target.Detail is not null)
+            {
+                <div class="detail">@target.Detail</div>
+            }
+            @foreach (var item in target.Items)
+            {
+                <div class="row-line detail">
+                    <span>@item.Quantity x @item.Name @@ @item.UnitPrice.ToString("C")</span>
+                    <span>@item.Amount.ToString("C")</span>
+                </div>
+            }
+        }
+        <hr />
+        <div class="row-line strong"><span>Total</span><span>@doc.Subtotal.ToString("C")</span></div>
+        @foreach (var payment in doc.Payments)
+        {
+            <div class="row-line"><span>@payment.Method</span><span>@payment.Amount.ToString("C")</span></div>
+        }
+        @if (doc.Change is { } change && change > 0m)
+        {
+            <div class="row-line"><span>Change</span><span>@change.ToString("C")</span></div>
+        }
+        @if (doc.Remaining > 0m)
+        {
+            <div class="row-line strong"><span>Still owing</span><span>@doc.Remaining.ToString("C")</span></div>
+        }
+        <hr />
+        <div class="center">@doc.Header.Footer</div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int PaymentId { get; set; }
+
+    private ReceiptDocument? doc;
+    private string? error;
+    private bool loaded;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var result = await Receipts.GetAsync(PaymentId);
+        doc = result.Success ? result.Value : null;
+        error = result.Error;
+        loaded = true;
+    }
+}

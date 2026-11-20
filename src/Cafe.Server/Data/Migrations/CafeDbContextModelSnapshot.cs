@@ -131,6 +131,80 @@ namespace Cafe.Server.Data.Migrations
                     b.ToTable("CustomerMinuteLedger", (string)null);
                 });
 
+            modelBuilder.Entity("Cafe.Server.Data.Order", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("CreatedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("CustomerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("SessionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Total")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("SessionId");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("Orders");
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.OrderLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LineTotal")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ProductNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("UnitPriceSnapshot")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("OrderLines");
+                });
+
             modelBuilder.Entity("Cafe.Server.Data.PackageSale", b =>
                 {
                     b.Property<int>("Id")
@@ -185,7 +259,13 @@ namespace Cafe.Server.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("OrderId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("PackageSaleId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("PrimaryPaymentId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int?>("SessionId")
@@ -193,11 +273,78 @@ namespace Cafe.Server.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OrderId");
+
                     b.HasIndex("PackageSaleId");
+
+                    b.HasIndex("PrimaryPaymentId");
 
                     b.HasIndex("SessionId");
 
                     b.ToTable("Payments");
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.PaymentAllocation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Amount")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PaymentId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TargetId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TargetType")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PaymentId");
+
+                    b.HasIndex("TargetType", "TargetId");
+
+                    b.ToTable("PaymentAllocations");
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.Product", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .UseCollation("NOCASE");
+
+                    b.Property<string>("Price")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Products");
                 });
 
             modelBuilder.Entity("Cafe.Server.Data.RateRule", b =>
@@ -524,6 +671,42 @@ namespace Cafe.Server.Data.Migrations
                     b.Navigation("Session");
                 });
 
+            modelBuilder.Entity("Cafe.Server.Data.Order", b =>
+                {
+                    b.HasOne("Cafe.Server.Data.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Cafe.Server.Data.Session", "Session")
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Session");
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.OrderLine", b =>
+                {
+                    b.HasOne("Cafe.Server.Data.Order", "Order")
+                        .WithMany("Lines")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Cafe.Server.Data.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("Cafe.Server.Data.PackageSale", b =>
                 {
                     b.HasOne("Cafe.Server.Data.Customer", "Customer")
@@ -545,9 +728,19 @@ namespace Cafe.Server.Data.Migrations
 
             modelBuilder.Entity("Cafe.Server.Data.Payment", b =>
                 {
+                    b.HasOne("Cafe.Server.Data.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Cafe.Server.Data.PackageSale", "PackageSale")
                         .WithMany()
                         .HasForeignKey("PackageSaleId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Cafe.Server.Data.Payment", "PrimaryPayment")
+                        .WithMany()
+                        .HasForeignKey("PrimaryPaymentId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Cafe.Server.Data.Session", "Session")
@@ -555,9 +748,24 @@ namespace Cafe.Server.Data.Migrations
                         .HasForeignKey("SessionId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.Navigation("Order");
+
                     b.Navigation("PackageSale");
 
+                    b.Navigation("PrimaryPayment");
+
                     b.Navigation("Session");
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.PaymentAllocation", b =>
+                {
+                    b.HasOne("Cafe.Server.Data.Payment", "Payment")
+                        .WithMany("Allocations")
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Payment");
                 });
 
             modelBuilder.Entity("Cafe.Server.Data.RateRule", b =>
@@ -629,6 +837,16 @@ namespace Cafe.Server.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("StationType");
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.Order", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.Payment", b =>
+                {
+                    b.Navigation("Allocations");
                 });
 
             modelBuilder.Entity("Cafe.Server.Data.Session", b =>

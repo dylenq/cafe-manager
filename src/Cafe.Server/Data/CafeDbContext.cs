@@ -28,6 +28,14 @@ public class CafeDbContext(DbContextOptions<CafeDbContext> options) : DbContext(
 
     public DbSet<Payment> Payments => Set<Payment>();
 
+    public DbSet<Product> Products => Set<Product>();
+
+    public DbSet<Order> Orders => Set<Order>();
+
+    public DbSet<OrderLine> OrderLines => Set<OrderLine>();
+
+    public DbSet<PaymentAllocation> PaymentAllocations => Set<PaymentAllocation>();
+
     public DbSet<AgentCommandLog> AgentCommandLogs => Set<AgentCommandLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -176,6 +184,48 @@ public class CafeDbContext(DbContextOptions<CafeDbContext> options) : DbContext(
             e.Property(x => x.Note).HasMaxLength(300);
             e.HasOne(x => x.PackageSale).WithMany().HasForeignKey(x => x.PackageSaleId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Session).WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Order).WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.PrimaryPayment).WithMany().HasForeignKey(x => x.PrimaryPaymentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.PrimaryPaymentId);
+            e.HasMany(x => x.Allocations).WithOne(x => x.Payment).HasForeignKey(x => x.PaymentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Product>(e =>
+        {
+            e.Property(x => x.Name).IsRequired().HasMaxLength(100).UseCollation("NOCASE");
+            e.HasIndex(x => x.Name).IsUnique();
+            e.Property(x => x.Category).IsRequired().HasMaxLength(50);
+            e.Property(x => x.Price).HasColumnType("TEXT").HasConversion<string>();
+        });
+
+        modelBuilder.Entity<Order>(e =>
+        {
+            e.Property(x => x.CreatedAtUtc).HasConversion(dto);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.Property(x => x.Total).HasColumnType("TEXT").HasConversion<string>();
+            e.Property(x => x.Note).HasMaxLength(300);
+            e.HasIndex(x => x.Status);
+            e.HasIndex(x => x.SessionId);
+            e.HasIndex(x => x.CustomerId);
+            e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Session).WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Lines).WithOne(x => x.Order).HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OrderLine>(e =>
+        {
+            e.Property(x => x.ProductNameSnapshot).IsRequired().HasMaxLength(100);
+            e.Property(x => x.UnitPriceSnapshot).HasColumnType("TEXT").HasConversion<string>();
+            e.Property(x => x.LineTotal).HasColumnType("TEXT").HasConversion<string>();
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PaymentAllocation>(e =>
+        {
+            e.Property(x => x.TargetType).HasConversion<int>();
+            e.Property(x => x.Amount).HasColumnType("TEXT").HasConversion<string>();
+            e.HasIndex(x => new { x.TargetType, x.TargetId });
+            e.HasIndex(x => x.PaymentId);
         });
     }
 }

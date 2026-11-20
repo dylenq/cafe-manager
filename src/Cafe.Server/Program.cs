@@ -5,6 +5,8 @@ using Cafe.Server.Components;
 using Cafe.Server.Dashboard;
 using Cafe.Server.Data;
 using Cafe.Server.Devices;
+using Cafe.Server.Payments;
+using Cafe.Server.Receipts;
 using Cafe.Server.Pricing;
 using Cafe.Server.Sessions;
 using Cafe.Server.Stations;
@@ -55,6 +57,8 @@ if (SessionTicker.IsEnabled(builder.Configuration))
     builder.Services.AddHostedService<SessionTicker>();
 }
 
+builder.Services.AddPosServices();
+builder.Services.AddReceiptServices();
 builder.Services.AddAgentServices();
 builder.Services.AddTvServices(builder.Configuration);
 builder.Services.AddScoped<SessionHistoryService>();

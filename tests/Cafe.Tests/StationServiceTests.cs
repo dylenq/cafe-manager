@@ -121,7 +121,7 @@ public class StationServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Update_switching_kind_clears_other_fields_and_keeps_tv_token()
+    public async Task Update_switching_kind_clears_other_fields_and_the_tv_token()
     {
         var typeId = await TypeAsync();
         var id = (await _stations.CreateAsync(Console(typeId))).Value!.Id;
@@ -137,12 +137,12 @@ public class StationServiceTests : IDisposable
         Assert.Equal("machine-x", pc!.AgentMachineId);
         Assert.Null(pc.TvIpAddress);
         Assert.Null(pc.TvMacAddress);
-        Assert.Equal("secret-token", pc.TvToken);
+        Assert.Null(pc.TvToken); // WR-04: a stale pairing token must not outlive the TV
 
         Assert.True((await _stations.UpdateAsync(id, Console(typeId))).Success);
         var console = await _stations.GetAsync(id);
         Assert.Null(console!.AgentMachineId);
-        Assert.Equal("secret-token", console.TvToken);
+        Assert.Null(console.TvToken);
     }
 
     [Fact]

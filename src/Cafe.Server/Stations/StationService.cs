@@ -61,11 +61,18 @@ public class StationService(IDbContextFactory<CafeDbContext> dbFactory)
             return ServiceResult.NotFound(Gone);
         }
 
-        // TvToken is deliberately never assigned here: pairing (Phase 4) owns it.
+        // TvToken is never assigned from the input (pairing owns it), but it belongs to one physical TV: drop it when
+        // the TV address changes or the station stops being a console, so a stale secret cannot outlive its device.
+        var previousTvIp = entity.TvIpAddress;
         var failure = Prepare(entity, id, input);
         if (failure is not null)
         {
             return failure;
+        }
+
+        if (entity.Kind != StationKind.Console || !string.Equals(previousTvIp, entity.TvIpAddress, StringComparison.OrdinalIgnoreCase))
+        {
+            entity.TvToken = null;
         }
 
         var checkFailure = await CheckRulesAsync(db, id, entity);

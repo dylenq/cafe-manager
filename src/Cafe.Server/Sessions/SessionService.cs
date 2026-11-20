@@ -552,22 +552,22 @@ public class SessionService(
     }
 
     /// <summary>
-    /// Unused whole minutes of a Balance session (purchased minus ceil(active seconds / 60), never negative), capped at
-    /// what the session net-drew from balance so paid-extension minutes are never refunded. One computation shared by
-    /// StopAsync and the stop quote so the preview always matches the refund.
+    /// Refundable whole minutes of a Balance session: max(0, drawn - ceil(active seconds / 60)), where drawn is what the
+    /// session net-drew from balance. Balance-funded minutes are consumed first, so any minutes still unused beyond that
+    /// belong to paid extensions and are never refunded as balance. One computation shared by StopAsync and the stop
+    /// quote so the preview always matches the refund.
     /// </summary>
     private static async Task<int> RefundableMinutesAsync(
         CafeDbContext db, Session session, DateTimeOffset now, int purchasedMinutes, CancellationToken ct)
     {
         var used = (int)Math.Ceiling(ActiveSeconds(session, now) / 60.0);
-        var unused = Math.Max(0, purchasedMinutes - used);
-        if (unused == 0)
+        if (purchasedMinutes - used <= 0)
         {
             return 0;
         }
 
         var drawn = (await BalanceService.NetDrawnByBucketAsync(db, session.Id, ct)).Sum(b => b.Minutes);
-        return Math.Min(unused, drawn);
+        return Math.Max(0, drawn - used);
     }
 
     private static ServiceResult<decimal> Forward(ServiceResult failed) =>

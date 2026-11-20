@@ -345,6 +345,36 @@ public class BalanceSessionLifecycleTests : CustomerTestBase
     }
 
     [Fact]
+    public async Task Paid_extension_minutes_are_not_refunded_when_balance_minutes_were_used_up_first()
+    {
+        var customer = await CustomerWithAnyAsync(60);
+        var session = await StartBalanceAsync(await StationAsync(), customer, 60);
+        Assert.True((await SvcAsync(s => s.ExtendAsync(session.Id, 30))).Success);
+        Advance(70 * Min);
+
+        var stop = await SvcAsync(s => s.StopAsync(session.Id));
+
+        Assert.True(stop.Success, stop.Error);
+        Assert.Empty(await LedgerAsync(LedgerReason.SessionRefund));
+        Assert.Equal(0, await BalanceAsync(customer));
+    }
+
+    [Fact]
+    public async Task Paid_extension_refunds_only_the_unused_part_of_the_balance_draw()
+    {
+        var customer = await CustomerWithAnyAsync(60);
+        var session = await StartBalanceAsync(await StationAsync(), customer, 60);
+        Assert.True((await SvcAsync(s => s.ExtendAsync(session.Id, 30))).Success);
+        Advance(20 * Min);
+
+        var stop = await SvcAsync(s => s.StopAsync(session.Id));
+
+        Assert.True(stop.Success, stop.Error);
+        Assert.Equal(40, Assert.Single(await LedgerAsync(LedgerReason.SessionRefund)).MinutesDelta);
+        Assert.Equal(40, await BalanceAsync(customer));
+    }
+
+    [Fact]
     public async Task Move_is_refused_when_type_specific_minutes_would_land_on_another_station_type()
     {
         var standard = await TypeAsync("Standard");
@@ -483,14 +513,14 @@ public class BalanceSessionLifecycleTests : CustomerTestBase
         var drawn = -rows.Where(r => r.Reason == LedgerReason.SessionDebit).Sum(r => r.MinutesDelta);
         var refunded = rows.Where(r => r.Reason == LedgerReason.SessionRefund).Sum(r => r.MinutesDelta);
         Assert.Equal(80, drawn);
-        Assert.Equal(65, refunded);
+        Assert.Equal(55, refunded); // drawn 80 - used 25: balance minutes are consumed before the paid 10
         Assert.Equal(-(drawn - refunded), rows.Sum(r => r.MinutesDelta));
         var buckets = await db.CustomerMinuteLedger.AsNoTracking()
             .GroupBy(l => new { l.CustomerId, l.StationTypeId })
             .Select(g => new { g.Key.StationTypeId, Sum = g.Sum(l => l.MinutesDelta) })
             .ToListAsync();
         Assert.All(buckets, b => Assert.True(b.Sum >= 0, $"bucket {b.StationTypeId} negative: {b.Sum}"));
-        Assert.Equal(140 - 80 + 65, buckets.Sum(b => b.Sum));
+        Assert.Equal(140 - 80 + 55, buckets.Sum(b => b.Sum));
     }
 
     [Fact]

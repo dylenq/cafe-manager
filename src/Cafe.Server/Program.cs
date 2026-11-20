@@ -7,6 +7,7 @@ using Cafe.Server.Data;
 using Cafe.Server.Devices;
 using Cafe.Server.Payments;
 using Cafe.Server.Receipts;
+using Cafe.Server.Reports;
 using Cafe.Server.Pricing;
 using Cafe.Server.Sessions;
 using Cafe.Server.Stations;
@@ -59,6 +60,7 @@ if (SessionTicker.IsEnabled(builder.Configuration))
 
 builder.Services.AddPosServices();
 builder.Services.AddReceiptServices();
+builder.Services.AddReportServices();
 builder.Services.AddAgentServices();
 builder.Services.AddTvServices(builder.Configuration);
 builder.Services.AddScoped<SessionHistoryService>();
@@ -117,6 +119,8 @@ app.MapPost("/logout", async (HttpContext context, [FromForm] string? returnUrl)
     await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     return Results.Redirect("/login");
 }).AllowAnonymous();
+
+app.MapReportEndpoints();
 
 app.MapHub<AgentHub>(AgentProtocol.HubPath).AllowAnonymous();
 

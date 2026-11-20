@@ -14,6 +14,8 @@ public class CafeWebApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"cafe-test-{Guid.NewGuid():N}.db");
 
+    private readonly string _backupDir = Path.Combine(Path.GetTempPath(), $"cafe-test-backups-{Guid.NewGuid():N}");
+
     /// <summary>Remote address the TestServer reports for every request (it has none of its own). Defaults to loopback.</summary>
     public System.Net.IPAddress? RemoteAddress { get; set; } = System.Net.IPAddress.Loopback;
 
@@ -39,6 +41,8 @@ public class CafeWebApplicationFactory : WebApplicationFactory<Program>
         // The real-time ticker would interfere with FakeTimeProvider tests; ExtraSettings can turn it back on.
         builder.UseSetting("Sessions:RunTicker", "false");
         builder.UseSetting("Tv:RunMonitor", "false");
+        builder.UseSetting("Backup:RunScheduler", "false");
+        builder.UseSetting("Backup:Directory", _backupDir);
         foreach (var (key, value) in ExtraSettings)
         {
             builder.UseSetting(key, value);
@@ -80,6 +84,17 @@ public class CafeWebApplicationFactory : WebApplicationFactory<Program>
             catch (IOException)
             {
             }
+        }
+
+        try
+        {
+            if (Directory.Exists(_backupDir))
+            {
+                Directory.Delete(_backupDir, true);
+            }
+        }
+        catch (IOException)
+        {
         }
     }
 }

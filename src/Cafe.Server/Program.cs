@@ -69,6 +69,10 @@ if (SessionTicker.IsEnabled(builder.Configuration))
     builder.Services.AddHostedService<SessionTicker>();
 }
 
+// Nightly database backup (also injected into Settings for "Back up now"); the loop itself honours Backup:RunScheduler.
+builder.Services.AddSingleton<Cafe.Server.Backups.BackupService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Cafe.Server.Backups.BackupService>());
+
 builder.Services.AddPosServices();
 builder.Services.AddReceiptServices();
 builder.Services.AddReportServices();

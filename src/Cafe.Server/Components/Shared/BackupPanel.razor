@@ -1,0 +1,72 @@
+@using System.Globalization
+@using Cafe.Server.Backups
+@using Cafe.Server.Pricing
+@inject BackupService Backups
+@inject PricingConfigService Pricing
+
+<div class="card mb-4" id="backups">
+    <div class="card-body">
+        <h2 class="h5 card-title">Backups</h2>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger" role="alert">@_error</div>
+        }
+
+        @if (!string.IsNullOrEmpty(_notice))
+        {
+            <div class="alert alert-success py-2" role="status">@_notice</div>
+        }
+
+        <dl class="row mb-3">
+            <dt class="col-sm-4">Last backup</dt>
+            <dd class="col-sm-8">@LastBackupText</dd>
+            <dt class="col-sm-4">Backup folder</dt>
+            <dd class="col-sm-8 font-monospace text-break">@Backups.Directory</dd>
+            <dt class="col-sm-4">Retention</dt>
+            <dd class="col-sm-8">Keeps the newest @Backups.Keep backups. A copy is made every night at @Backups.Hour:00.</dd>
+        </dl>
+
+        <button type="button" class="btn btn-outline-primary" @onclick="BackUpNowAsync" disabled="@_running">
+            @(_running ? "Backing up..." : "Back up now")
+        </button>
+    </div>
+</div>
+
+@code {
+    private bool _running;
+    private string? _error;
+    private string? _notice;
+    private DateTimeOffset? _last;
+
+    protected override void OnInitialized() => _last = Backups.LastBackupUtc;
+
+    private string LastBackupText => _last is { } at
+        ? TimeZoneInfo.ConvertTime(at, Pricing.TimeZone).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
+        : "Never";
+
+    private async Task BackUpNowAsync()
+    {
+        _running = true;
+        _error = null;
+        _notice = null;
+        try
+        {
+            var result = await Backups.BackupNowAsync();
+            if (result.Success)
+            {
+                _notice = $"Backup saved as {result.FileName}.";
+            }
+            else
+            {
+                _error = result.Error ?? "Backup failed. See the server log.";
+            }
+
+            _last = Backups.LastBackupUtc;
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+}

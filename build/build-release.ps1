@@ -32,12 +32,15 @@ $Version = $match.Groups[1].Value.Trim()
 $Bundle = "CafeManager-$Version-win-x64"
 $Stage = Join-Path $Root 'dist\stage'
 $BundlePath = Join-Path $Stage $Bundle
-$Zip = Join-Path $Root "dist\$Bundle.zip"
+# A bundle built without running the tests gets an "-untested" suffix so it cannot be mistaken for a shippable one.
+$ZipSuffix = ''
+if ($env:SKIP_TESTS -eq '1') { $ZipSuffix = '-untested' }
+$Zip = Join-Path $Root "dist\$Bundle$ZipSuffix.zip"
 Write-Host "== Cafe Manager release $Version =="
 
 Write-Host '[a] Tests'
 if ($env:SKIP_TESTS -eq '1') {
-    Write-Warning 'SKIP_TESTS=1 - the test suite was NOT run. Do not ship this bundle.'
+    Write-Warning 'SKIP_TESTS=1 - the test suite was NOT run. The zip is named -untested; do not ship it.'
 }
 else {
     & dotnet test Cafe.sln -c Release --nologo -v minimal
@@ -87,14 +90,14 @@ if (-not $haveDocs) {
     }
 }
 if (Test-Path -LiteralPath (Join-Path $Root 'docs')) {
-    Copy-Item -Path (Join-Path $Root 'docs\*.md') -Destination $docsPath -ErrorAction SilentlyContinue
+    Copy-Item -Path (Join-Path $Root 'docs\*.md') -Destination $docsPath
 }
 Copy-Item -LiteralPath (Join-Path $Root 'build\bundle-README.txt') -Destination (Join-Path $BundlePath 'README.txt')
 
 Write-Host '[g] Safety scan'
-$dbFiles = @(Get-ChildItem -LiteralPath $Stage -Recurse -File | Where-Object { $_.Name -match '\.db(-wal|-shm)?$' })
+$dbFiles = @(Get-ChildItem -LiteralPath $Stage -Recurse -File | Where-Object { $_.Name -match '\.(db(-wal|-shm)?|sqlite3?|tmp)$' })
 if ($dbFiles.Count -gt 0) {
-    throw ('Database files in the bundle: ' + (($dbFiles | ForEach-Object { $_.FullName }) -join ', '))
+    throw ('Database or temporary files in the bundle: ' + (($dbFiles | ForEach-Object { $_.FullName }) -join ', '))
 }
 foreach ($settingsFile in @(Get-ChildItem -LiteralPath $Stage -Recurse -File -Filter 'agentsettings.json')) {
     if ((Get-Content -LiteralPath $settingsFile.FullName -Raw) -match '"SharedKey"\s*:\s*"[^"]+"') {

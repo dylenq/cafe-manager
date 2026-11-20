@@ -17,12 +17,26 @@ if [ -z "$VERSION" ]; then
 fi
 BUNDLE="CafeManager-${VERSION}-win-x64"
 STAGE="dist/stage"
-ZIP="dist/${BUNDLE}.zip"
+# A bundle built without running the tests gets an "-untested" suffix so it cannot be mistaken for a shippable one.
+ZIP_SUFFIX=""
+if [ "${SKIP_TESTS:-0}" = "1" ]; then
+  ZIP_SUFFIX="-untested"
+fi
+ZIP="dist/${BUNDLE}${ZIP_SUFFIX}.zip"
 echo "== Cafe Manager release ${VERSION} =="
+
+# Fail fast on an unsupported host before the long publish steps run.
+case "$(uname -s)-$(uname -m)" in
+  Darwin-arm64) RID="osx-arm64" ;;
+  Darwin-x86_64) RID="osx-x64" ;;
+  Linux-x86_64) RID="linux-x64" ;;
+  Linux-aarch64 | Linux-arm64) RID="linux-arm64" ;;
+  *) echo "ERROR: unsupported OS/arch for the simulator: $(uname -s)-$(uname -m)" >&2; exit 1 ;;
+esac
 
 echo "[a] Tests"
 if [ "${SKIP_TESTS:-0}" = "1" ]; then
-  echo "WARNING: SKIP_TESTS=1 - the test suite was NOT run. Do not ship this bundle." >&2
+  echo "WARNING: SKIP_TESTS=1 - the test suite was NOT run. The zip is named -untested; do not ship it." >&2
 else
   dotnet test Cafe.sln -c Release --nologo -v minimal
 fi
@@ -48,14 +62,7 @@ if ! dotnet publish src/Cafe.Agent -c Release -r win-x64 --self-contained true -
 fi
 echo "Agent mode: $AGENT_MODE"
 
-echo "[e] Publishing the agent simulator for this OS"
-case "$(uname -s)-$(uname -m)" in
-  Darwin-arm64) RID="osx-arm64" ;;
-  Darwin-x86_64) RID="osx-x64" ;;
-  Linux-x86_64) RID="linux-x64" ;;
-  Linux-aarch64 | Linux-arm64) RID="linux-arm64" ;;
-  *) echo "ERROR: unsupported OS/arch for the simulator: $(uname -s)-$(uname -m)" >&2; exit 1 ;;
-esac
+echo "[e] Publishing the agent simulator for this OS ($RID)"
 dotnet publish src/Cafe.AgentSim -c Release -r "$RID" --self-contained false --nologo -v minimal \
   -o "$STAGE/$BUNDLE/tools/AgentSim-$RID"
 
@@ -76,9 +83,9 @@ fi
 cp build/bundle-README.txt "$STAGE/$BUNDLE/README.txt"
 
 echo "[g] Safety scan"
-BAD="$(find "$STAGE" \( -name '*.db' -o -name '*.db-wal' -o -name '*.db-shm' \) -print)"
+BAD="$(find "$STAGE" \( -name '*.db' -o -name '*.db-wal' -o -name '*.db-shm' -o -name '*.sqlite' -o -name '*.sqlite3' -o -name '*.tmp' \) -print)"
 if [ -n "$BAD" ]; then
-  echo "ERROR: database files in the bundle:" >&2
+  echo "ERROR: database or temporary files in the bundle:" >&2
   echo "$BAD" >&2
   exit 1
 fi

@@ -39,14 +39,27 @@ public sealed class PosMigrationTests : IDisposable
         Assert.EndsWith("_AddPos", migrations[^1]);
         await db.GetService<IMigrator>().MigrateAsync(migrations[^2]);
 
+        // Real parent rows (these tables are unchanged by AddPos) so the Payments table rebuild passes FK checks.
+        var at = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var type = new StationType { Name = "PC", HourlyRate = 1m };
+        var station = new Station { Name = "PC-01", StationType = type };
+        var customer = new Customer { Name = "Alice", CreatedAtUtc = at };
+        var package = new TimePackage { Name = "Pack", Minutes = 60, Price = 15000m };
+        var sale = new PackageSale { Customer = customer, TimePackage = package, Price = 15000m, Minutes = 60, AtUtc = at };
+        var session = new Session { Station = station, StartedAtUtc = at, Status = SessionStatus.Ended, ChargedAmount = 6000.50m };
+        await using (var seed = NewContext())
+        {
+            seed.AddRange(sale, session);
+            await seed.SaveChangesAsync();
+        }
+
         await using (var raw = new SqliteConnection($"Data Source={_path}"))
         {
             await raw.OpenAsync();
             await using var cmd = raw.CreateCommand();
-            cmd.CommandText = """
-                PRAGMA foreign_keys = OFF;
-                INSERT INTO Payments (Id, Amount, Method, AtUtc, PackageSaleId, SessionId, Note) VALUES (1, '15000', 0, 1, 7, NULL, NULL);
-                INSERT INTO Payments (Id, Amount, Method, AtUtc, PackageSaleId, SessionId, Note) VALUES (2, '6000.50', 1, 2, NULL, 9, NULL);
+            cmd.CommandText = $"""
+                INSERT INTO Payments (Id, Amount, Method, AtUtc, PackageSaleId, SessionId, Note) VALUES (1, '15000', 0, 1, {sale.Id}, NULL, NULL);
+                INSERT INTO Payments (Id, Amount, Method, AtUtc, PackageSaleId, SessionId, Note) VALUES (2, '6000.50', 1, 2, NULL, {session.Id}, NULL);
                 INSERT INTO Payments (Id, Amount, Method, AtUtc, PackageSaleId, SessionId, Note) VALUES (3, '100', 0, 3, NULL, NULL, 'loose');
                 """;
             await cmd.ExecuteNonQueryAsync();
@@ -57,9 +70,9 @@ public sealed class PosMigrationTests : IDisposable
         await using var read = NewContext();
         var allocations = await read.PaymentAllocations.AsNoTracking().OrderBy(a => a.PaymentId).ToListAsync();
         Assert.Equal(2, allocations.Count);
-        Assert.Equal((1, AllocationTargetType.PackageSale, 7, 15000m),
+        Assert.Equal((1, AllocationTargetType.PackageSale, sale.Id, 15000m),
             (allocations[0].PaymentId, allocations[0].TargetType, allocations[0].TargetId, allocations[0].Amount));
-        Assert.Equal((2, AllocationTargetType.Session, 9, 6000.50m),
+        Assert.Equal((2, AllocationTargetType.Session, session.Id, 6000.50m),
             (allocations[1].PaymentId, allocations[1].TargetType, allocations[1].TargetId, allocations[1].Amount));
         Assert.DoesNotContain(allocations, a => a.PaymentId == 3);
 

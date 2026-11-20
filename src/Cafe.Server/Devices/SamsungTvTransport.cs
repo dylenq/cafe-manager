@@ -21,23 +21,35 @@ public sealed class SamsungTvTransport : ITvTransport
     public async Task<ITvSocket?> ConnectAsync(Uri uri, TimeSpan connectTimeout, CancellationToken cancellationToken)
     {
         var socket = new ClientWebSocket();
-        socket.Options.RemoteCertificateValidationCallback = static (_, _, _, _) => true;
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(connectTimeout);
+        var handedOver = false;
         try
         {
-            await socket.ConnectAsync(uri, timeout.Token);
-            return new Socket(socket);
+            socket.Options.RemoteCertificateValidationCallback = static (_, _, _, _) => true;
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(connectTimeout);
+            try
+            {
+                await socket.ConnectAsync(uri, timeout.Token);
+                var connected = new Socket(socket);
+                handedOver = true;
+                return connected;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or WebSocketException or HttpRequestException or SocketException or IOException)
+            {
+                return null;
+            }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        finally
         {
-            socket.Dispose();
-            throw;
-        }
-        catch (Exception ex) when (ex is OperationCanceledException or WebSocketException or HttpRequestException or SocketException or IOException)
-        {
-            socket.Dispose();
-            return null;
+            // Any exit that did not hand the socket to the caller (including unexpected exception types) disposes it.
+            if (!handedOver)
+            {
+                socket.Dispose();
+            }
         }
     }
 

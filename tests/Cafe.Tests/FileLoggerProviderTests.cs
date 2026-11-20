@@ -107,4 +107,42 @@ public sealed class FileLoggerProviderTests : IDisposable
             File.Delete(blocker);
         }
     }
+
+    [Fact]
+    public void Unwritable_directory_records_LastError_and_recovers_after_the_retry_delay()
+    {
+        var blocker = Path.Combine(Path.GetTempPath(), $"cafe-logblock-{Guid.NewGuid():N}");
+        File.WriteAllText(blocker, "a file where the log folder should be");
+        try
+        {
+            var dir = Path.Combine(blocker, "logs");
+            using var provider = new FileLoggerProvider(dir, () => _now);
+            var logger = provider.CreateLogger("c");
+
+            logger.LogInformation("lost");
+            Assert.NotNull(provider.LastError);
+
+            File.Delete(blocker);
+            logger.LogInformation("still within the retry delay");
+            Assert.False(Directory.Exists(dir));
+
+            _now = _now.AddSeconds(31);
+            logger.LogInformation("recovered");
+
+            Assert.Null(provider.LastError);
+            Assert.Contains(File.ReadAllLines(Path.Combine(dir, "cafe-20261120.log")), l => l.EndsWith("recovered"));
+        }
+        finally
+        {
+            if (File.Exists(blocker))
+            {
+                File.Delete(blocker);
+            }
+
+            if (Directory.Exists(blocker))
+            {
+                Directory.Delete(blocker, true);
+            }
+        }
+    }
 }

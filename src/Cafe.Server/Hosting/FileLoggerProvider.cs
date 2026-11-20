@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,9 @@ public sealed class FileLoggerProvider : ILoggerProvider
     private readonly LogLevel _minimumLevel;
     private readonly object _gate = new();
     private DateOnly? _lastTrimDay;
+    private bool _directoryReady;
+    private DateTimeOffset _nextDirectoryAttempt = DateTimeOffset.MinValue;
+    private static readonly TimeSpan DirectoryRetryDelay = TimeSpan.FromSeconds(30);
 
     public FileLoggerProvider(string directory, Func<DateTimeOffset> now, int retentionDays = 14, LogLevel minimumLevel = LogLevel.Information)
     {
@@ -28,6 +32,9 @@ public sealed class FileLoggerProvider : ILoggerProvider
             TrimOldFiles(DateOnly.FromDateTime(SafeNow().DateTime));
         }
     }
+
+    /// <summary>The most recent write failure (null once a write succeeds), so a caller can surface "logs are not being written".</summary>
+    public string? LastError { get; private set; }
 
     public ILogger CreateLogger(string categoryName) => new FileLogger(this, categoryName);
 
@@ -54,19 +61,63 @@ public sealed class FileLoggerProvider : ILoggerProvider
             lock (_gate)
             {
                 var day = DateOnly.FromDateTime(at.DateTime);
-                Directory.CreateDirectory(_directory);
+                if (!EnsureDirectory(at))
+                {
+                    return;
+                }
+
                 if (_lastTrimDay != day)
                 {
                     TrimOldFiles(day);
                 }
 
                 var path = Path.Combine(_directory, $"cafe-{day:yyyyMMdd}.log");
-                File.AppendAllText(path, text + Environment.NewLine);
+                try
+                {
+                    File.AppendAllText(path, text + Environment.NewLine);
+                    LastError = null;
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    // The folder was removed under us; recreate it on the next write.
+                    _directoryReady = false;
+                    throw;
+                }
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Logging must never take the server down.
+            // Logging must never take the server down, but do not fail silently either.
+            LastError = ex.Message;
+            Trace.WriteLine($"FileLoggerProvider: could not write to '{_directory}': {ex.Message}");
+        }
+    }
+
+    // Creates the log folder once; after a failure it is retried at most every 30 seconds.
+    private bool EnsureDirectory(DateTimeOffset at)
+    {
+        if (_directoryReady)
+        {
+            return true;
+        }
+
+        if (at < _nextDirectoryAttempt)
+        {
+            return false;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(_directory);
+            _directoryReady = true;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _nextDirectoryAttempt = at + DirectoryRetryDelay;
+            LastError = ex.Message;
+            Trace.WriteLine($"FileLoggerProvider: could not create '{_directory}': {ex.Message}");
+            return false;
         }
     }
 
@@ -92,9 +143,10 @@ public sealed class FileLoggerProvider : ILoggerProvider
                 }
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // Best effort.
+            Trace.WriteLine($"FileLoggerProvider: could not trim old logs in '{_directory}': {ex.Message}");
         }
     }
 

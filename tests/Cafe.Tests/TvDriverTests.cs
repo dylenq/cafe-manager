@@ -19,7 +19,7 @@ public class TvDriverTests
     {
         var o = new TvOptions
         {
-            SettleMilliseconds = 0, KeyFlushMilliseconds = 0, WakeWaitMilliseconds = 0, WolRoundDelayMilliseconds = 0, PairTimeoutSeconds = 1,
+            SettleMilliseconds = 0, KeyFlushMilliseconds = 0, WakeWaitMilliseconds = 0, WakePollMilliseconds = 0, WolRoundDelayMilliseconds = 0, PairTimeoutSeconds = 1,
         };
         tweak?.Invoke(o);
         return new SamsungTizenDriver(_net, Options.Create(o), NullLogger<SamsungTizenDriver>.Instance);
@@ -160,12 +160,38 @@ public class TvDriverTests
     }
 
     [Fact]
-    public async Task Unknown_state_sends_the_key()
+    public async Task Unknown_state_sends_no_key_and_fails_after_one_re_query()
     {
         _net.Http = () => new TvHttpResult(true, 500, null);
         _net.Incoming.Enqueue(FakeTvTransport.Connected());
         var r = await Driver().PowerOffAsync(Tv(), default);
-        Assert.Equal(TvActionOutcome.KeySent, r.Outcome);
+        Assert.Equal(TvActionOutcome.Failed, r.Outcome);
+        Assert.Equal(TvPowerState.Unknown, r.State);
+        Assert.Equal(0, _net.KeyCount);
+        Assert.Empty(_net.Connects);
+        Assert.Equal(2, _net.HttpRequests);
+    }
+
+    [Fact]
+    public async Task Unknown_then_standby_on_the_re_query_sends_no_key()
+    {
+        var calls = 0;
+        _net.Http = () => ++calls == 1 ? new TvHttpResult(true, 500, null) : FakeTvTransport.State("standby");
+        var r = await Driver().PowerOffAsync(Tv(), default);
+        Assert.Equal(TvActionOutcome.AlreadyOff, r.Outcome);
+        Assert.Equal(0, _net.KeyCount);
+    }
+
+    [Fact]
+    public async Task Unknown_then_on_on_the_re_query_sends_the_key()
+    {
+        var calls = 0;
+        var power = "on";
+        _net.Http = () => ++calls == 1 ? new TvHttpResult(true, 500, null) : FakeTvTransport.State(power);
+        _net.OnKeyPower = () => power = "standby";
+        _net.Incoming.Enqueue(FakeTvTransport.Connected());
+        var r = await Driver().PowerOffAsync(Tv(), default);
+        Assert.Equal(TvActionOutcome.PoweredOff, r.Outcome);
         Assert.Equal(1, _net.KeyCount);
     }
 
@@ -249,6 +275,49 @@ public class TvDriverTests
         Assert.Equal(IPAddress.Parse("192.168.1.255"), WakeOnLan.SubnetBroadcast(IPAddress.Parse("192.168.1.50")));
     }
 
+    private static WakeOnLan.LocalInterface Nic(string address, string mask) => new(IPAddress.Parse(address), IPAddress.Parse(mask));
+
+    [Fact]
+    public void Broadcast_targets_use_the_real_subnet_mask()
+    {
+        var targets = WakeOnLan.BroadcastTargets(IPAddress.Parse("10.1.5.20"), [Nic("10.1.4.9", "255.255.254.0")]);
+        Assert.Equal([IPAddress.Parse("10.1.5.255")], targets);
+    }
+
+    [Fact]
+    public void Broadcast_targets_cover_only_the_interfaces_that_contain_the_tv()
+    {
+        var targets = WakeOnLan.BroadcastTargets(IPAddress.Parse("192.168.1.50"),
+            [Nic("10.0.0.2", "255.0.0.0"), Nic("192.168.1.10", "255.255.255.0"), Nic("192.168.1.11", "255.255.255.0"), Nic("172.16.0.5", "255.255.0.0")]);
+        Assert.Equal([IPAddress.Parse("192.168.1.255")], targets);
+
+        var two = WakeOnLan.BroadcastTargets(IPAddress.Parse("192.168.1.50"), [Nic("192.168.1.10", "255.255.255.0"), Nic("192.168.0.10", "255.255.254.0")]);
+        Assert.Equal(["192.168.1.255"], two.Select(a => a.ToString()).Distinct());
+    }
+
+    [Fact]
+    public void Broadcast_targets_fall_back_to_slash_24_and_the_limited_broadcast()
+    {
+        var none = WakeOnLan.BroadcastTargets(IPAddress.Parse("192.168.1.50"), []);
+        Assert.Equal(["192.168.1.255", "255.255.255.255"], none.Select(a => a.ToString()));
+
+        var unrelated = WakeOnLan.BroadcastTargets(IPAddress.Parse("192.168.1.50"), [Nic("10.0.0.2", "255.255.255.0")]);
+        Assert.Equal(["192.168.1.255", "255.255.255.255"], unrelated.Select(a => a.ToString()));
+    }
+
+    [Fact]
+    public async Task Wake_on_lan_goes_to_the_broadcast_of_the_matching_interface_only()
+    {
+        _net.Interfaces.Add(Nic("10.1.4.9", "255.255.254.0"));
+        _net.Interfaces.Add(Nic("172.16.0.5", "255.255.0.0"));
+        _net.Http = () => FakeTvTransport.State("standby");
+
+        await Driver(o => o.WolRounds = 1).PowerOnAsync(Tv(ip: "10.1.5.20", token: null), default);
+
+        Assert.Equal(2, _net.Datagrams.Count);
+        Assert.All(_net.Datagrams, d => Assert.Equal("10.1.5.255", d.Target.ToString()));
+    }
+
     [Fact]
     public async Task A_tv_that_is_on_is_left_alone()
     {
@@ -260,12 +329,15 @@ public class TvDriverTests
     [Fact]
     public async Task Wake_on_lan_sends_12_datagrams_to_both_broadcasts_on_ports_9_and_7_then_the_key_from_standby()
     {
-        _net.Http = () => FakeTvTransport.State("standby");
+        var power = "standby";
+        _net.Http = () => FakeTvTransport.State(power);
+        _net.OnKeyPower = () => power = "on";
         _net.Incoming.Enqueue(FakeTvTransport.Connected());
 
         var r = await Driver().PowerOnAsync(Tv(), default);
 
         Assert.Equal(TvActionOutcome.PoweredOn, r.Outcome);
+        Assert.Equal(TvPowerState.On, r.State);
         Assert.Equal(12, _net.Datagrams.Count);
         Assert.All(_net.Datagrams, d => Assert.Equal(102, d.Payload.Length));
         foreach (var target in new[] { "255.255.255.255", "192.168.1.255" })
@@ -277,6 +349,65 @@ public class TvDriverTests
         }
 
         Assert.Equal(1, _net.KeyCount);
+    }
+
+    [Fact]
+    public async Task A_key_that_does_not_bring_the_tv_on_reports_the_fresh_state_not_power_on()
+    {
+        _net.Http = () => FakeTvTransport.State("standby");
+        _net.Incoming.Enqueue(FakeTvTransport.Connected());
+
+        var r = await Driver().PowerOnAsync(Tv(), default);
+
+        Assert.Equal(TvActionOutcome.KeySent, r.Outcome);
+        Assert.Equal(TvPowerState.Standby, r.State);
+        Assert.Equal(1, _net.KeyCount);
+    }
+
+    [Fact]
+    public async Task A_tv_that_leaves_standby_during_the_wake_window_gets_no_key()
+    {
+        var calls = 0;
+        // 1 initial read, 2 in the window report standby, then the TV is up.
+        _net.Http = () => ++calls <= 2 ? FakeTvTransport.State("standby") : FakeTvTransport.State("on");
+        var r = await Driver(o => { o.WakeWaitMilliseconds = 200; o.WakePollMilliseconds = 10; }).PowerOnAsync(Tv(), default);
+        Assert.Equal(TvActionOutcome.PoweredOn, r.Outcome);
+        Assert.Equal(0, _net.KeyCount);
+    }
+
+    [Fact]
+    public async Task A_tv_that_blips_out_of_standby_during_the_wake_window_gets_no_key()
+    {
+        var calls = 0;
+        _net.Http = () => ++calls == 3 ? FakeTvTransport.Down() : FakeTvTransport.State("standby");
+        var r = await Driver(o => { o.WakeWaitMilliseconds = 100; o.WakePollMilliseconds = 10; }).PowerOnAsync(Tv(), default);
+        Assert.Equal(TvActionOutcome.WakeSent, r.Outcome);
+        Assert.Equal(0, _net.KeyCount);
+        Assert.Empty(_net.Connects);
+    }
+
+    [Fact]
+    public async Task A_tv_that_wakes_between_the_window_and_the_key_gets_no_key()
+    {
+        var calls = 0;
+        // Standby for the initial read and the whole (single read) window, on at the re-read before the key.
+        _net.Http = () => ++calls <= 2 ? FakeTvTransport.State("standby") : FakeTvTransport.State("on");
+        var r = await Driver().PowerOnAsync(Tv(), default);
+        Assert.Equal(TvActionOutcome.PoweredOn, r.Outcome);
+        Assert.Equal(0, _net.KeyCount);
+    }
+
+    [Fact]
+    public async Task A_tv_in_standby_for_the_whole_window_is_read_several_times_before_the_key()
+    {
+        var power = "standby";
+        _net.Http = () => FakeTvTransport.State(power);
+        _net.OnKeyPower = () => power = "on";
+        _net.Incoming.Enqueue(FakeTvTransport.Connected());
+        var r = await Driver(o => { o.WakeWaitMilliseconds = 100; o.WakePollMilliseconds = 10; }).PowerOnAsync(Tv(), default);
+        Assert.Equal(TvActionOutcome.PoweredOn, r.Outcome);
+        Assert.Equal(1, _net.KeyCount);
+        Assert.True(_net.HttpRequests >= 5, $"expected several reads, got {_net.HttpRequests}");
     }
 
     [Fact]
@@ -301,7 +432,9 @@ public class TvDriverTests
     [Fact]
     public async Task Without_a_mac_a_standby_tv_still_gets_the_key()
     {
-        _net.Http = () => FakeTvTransport.State("standby");
+        var power = "standby";
+        _net.Http = () => FakeTvTransport.State(power);
+        _net.OnKeyPower = () => power = "on";
         _net.Incoming.Enqueue(FakeTvTransport.Connected());
         var r = await Driver().PowerOnAsync(Tv(mac: null), default);
         Assert.Equal(TvActionOutcome.PoweredOn, r.Outcome);
@@ -339,12 +472,14 @@ public class TvDriverTests
 
     public class HandlerTests : SessionTestBase
     {
+        private readonly TvStateCache _cache = new(TimeProvider.System, Options.Create(new TvOptions()));
+
         private TvExpiryActionHandler Handler(ITvDriver driver)
         {
             var dbFactory = Factory.Services.GetRequiredService<IDbContextFactory<CafeDbContext>>();
-            var control = new TvControlService(driver, dbFactory, new TvStateCache(TimeProvider.System, Options.Create(new TvOptions())),
+            var control = new TvControlService(driver, dbFactory, _cache,
                 TimeProvider.System, NullLogger<TvControlService>.Instance);
-            return new(control, dbFactory, NullLogger<TvExpiryActionHandler>.Instance);
+            return new(control, dbFactory, Options.Create(new TvOptions()), NullLogger<TvExpiryActionHandler>.Instance);
         }
 
         private async Task<Station> ConsoleAsync()
@@ -380,11 +515,11 @@ public class TvDriverTests
 
         [Theory]
         [InlineData(TvActionOutcome.Failed, true)]
-        [InlineData(TvActionOutcome.Unreachable, true)]
+        [InlineData(TvActionOutcome.Unreachable, false)]
         [InlineData(TvActionOutcome.AlreadyOff, false)]
         [InlineData(TvActionOutcome.PoweredOff, false)]
         [InlineData(TvActionOutcome.KeySent, false)]
-        public async Task Failed_and_unreachable_throw_so_the_expiry_is_retried(TvActionOutcome outcome, bool throws)
+        public async Task Failed_throws_so_the_expiry_is_retried_and_unreachable_counts_as_already_off(TvActionOutcome outcome, bool throws)
         {
             var station = await ConsoleAsync();
             var stub = new StubDriver(outcome);
@@ -401,6 +536,34 @@ public class TvDriverTests
             }
 
             Assert.Equal(1, stub.Off);
+        }
+
+        [Fact]
+        public async Task An_unreachable_tv_at_expiry_raises_one_rate_limited_desk_notice()
+        {
+            var station = await ConsoleAsync();
+            var notices = new List<string>();
+            _cache.NoticeRaised += notices.Add;
+            var handler = Handler(new StubDriver(TvActionOutcome.Unreachable));
+
+            await handler.ExecuteAsync(station, default);
+            await handler.ExecuteAsync(station, default);
+
+            var notice = Assert.Single(notices);
+            Assert.Contains("unreachable at expiry", notice);
+            Assert.Contains(station.Name, notice);
+        }
+
+        [Fact]
+        public async Task A_failed_power_off_at_expiry_raises_a_notice_and_is_retried()
+        {
+            var station = await ConsoleAsync();
+            var notices = new List<string>();
+            _cache.NoticeRaised += notices.Add;
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => Handler(new StubDriver(TvActionOutcome.Failed)).ExecuteAsync(station, default));
+
+            Assert.Single(notices);
         }
     }
 }

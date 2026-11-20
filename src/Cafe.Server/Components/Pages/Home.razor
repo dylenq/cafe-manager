@@ -134,13 +134,47 @@ else
     private void AddNotice(string text) => _notices.Insert(0, new Notice(++_noticeId, text));
 
     // A TV state changed: refresh the cards at once. A TV failure: show a warning notice.
-    private void OnTvChanged(int stationId) => _ = RefreshNowAsync();
-
-    private void OnTvNotice(string text) => _ = InvokeAsync(() =>
+    // These events are raised from monitor and queue threads, possibly while the circuit is being disposed: check
+    // for disposal first and never let the discarded task fault.
+    private void OnTvChanged(int stationId)
     {
-        _notices.Insert(0, new Notice(++_noticeId, text, Warning: true));
-        StateHasChanged();
-    });
+        if (_cts.IsCancellationRequested)
+        {
+            return;
+        }
+
+        _ = RefreshNowAsync();
+    }
+
+    private void OnTvNotice(string text)
+    {
+        if (_cts.IsCancellationRequested)
+        {
+            return;
+        }
+
+        _ = ShowTvNoticeAsync(text);
+    }
+
+    private async Task ShowTvNoticeAsync(string text)
+    {
+        try
+        {
+            await InvokeAsync(() =>
+            {
+                _notices.Insert(0, new Notice(++_noticeId, text, Warning: true));
+                StateHasChanged();
+            });
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+        {
+            // Page left or circuit ended.
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Could not show a TV notice.");
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {

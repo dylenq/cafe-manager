@@ -2,16 +2,23 @@ using Cafe.Server.Data;
 using Cafe.Server.Sessions;
 using Cafe.Shared;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Cafe.Server.Devices;
 
 /// <summary>
 /// Powers a console's TV off when its paid time and grace are used up. Idempotent: a TV that is already off is left
-/// alone (KEY_POWER toggles). Throws when the TV could not be switched off, so the expiry evaluator retries it
+/// alone (KEY_POWER toggles). An unreachable TV counts as already off (there is nothing to power off; a TV with no
+/// network standby or switched off at the wall looks exactly like this) and raises one rate-limited desk notice so
+/// staff can check it. Throws when the TV could not be switched off (Failed), so the expiry evaluator retries it
 /// (bounded by <see cref="ExpiryEvaluator.MaxActionAttempts"/>). Never acts on a station that has already started a
 /// new session, so a retried expiry cannot cut a new customer off.
 /// </summary>
-public sealed class TvExpiryActionHandler(TvControlService control, IDbContextFactory<CafeDbContext> dbFactory, ILogger<TvExpiryActionHandler> logger) : IExpiryActionHandler
+public sealed class TvExpiryActionHandler(
+    TvControlService control,
+    IDbContextFactory<CafeDbContext> dbFactory,
+    IOptions<TvOptions> options,
+    ILogger<TvExpiryActionHandler> logger) : IExpiryActionHandler
 {
     public async Task ExecuteAsync(Station station, CancellationToken cancellationToken)
     {
@@ -29,8 +36,22 @@ public sealed class TvExpiryActionHandler(TvControlService control, IDbContextFa
             }
         }
 
-        var result = await control.ExecuteAsync(station, on: false, "Expiry", cancellationToken);
-        if (result.Outcome is TvActionOutcome.Failed or TvActionOutcome.Unreachable)
+        // Stay inside the evaluator's handler timeout: a TV that is still busy when the budget runs out is a failed,
+        // retryable attempt (the retry sees Standby and ends as AlreadyOff) rather than an opaque evaluator timeout.
+        var budget = TimeSpan.FromSeconds(Math.Max(1, options.Value.ExpiryActionTimeoutSeconds));
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        limit.CancelAfter(budget);
+        TvActionResult result;
+        try
+        {
+            result = await control.ExecuteAsync(station, on: false, "Expiry", limit.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new InvalidOperationException($"The TV of {station.Name} did not finish powering off within {budget.TotalSeconds:0.#} s; it will be retried.");
+        }
+
+        if (result.Outcome == TvActionOutcome.Failed)
         {
             throw new InvalidOperationException($"The TV of {station.Name} was not powered off: {result.Message}.");
         }

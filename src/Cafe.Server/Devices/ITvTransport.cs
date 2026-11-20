@@ -11,6 +11,9 @@ public interface ITvTransport
     Task<TvHttpResult> GetStringAsync(Uri uri, TimeSpan timeout, CancellationToken cancellationToken);
 
     Task SendUdpAsync(byte[] payload, IPAddress target, int port, CancellationToken cancellationToken);
+
+    /// <summary>Up IPv4 interfaces of this machine, used to pick the Wake-on-LAN broadcast addresses. Empty when unknown.</summary>
+    IReadOnlyList<WakeOnLan.LocalInterface> GetLocalInterfaces();
 }
 
 public interface ITvSocket : IAsyncDisposable

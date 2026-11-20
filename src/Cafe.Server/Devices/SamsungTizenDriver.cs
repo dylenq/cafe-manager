@@ -11,7 +11,7 @@ namespace Cafe.Server.Devices;
 
 /// <summary>
 /// Samsung Tizen driver: pairing and power key over the remote WebSocket channel, power state over the REST
-/// endpoint. KEY_POWER toggles, so a key is only ever sent after the state says the TV is On (or unknown), and
+/// endpoint. KEY_POWER toggles, so a key is only ever sent after the state says the TV is On (power off) or has stayed in Standby (power on), and
 /// actions on one TV never overlap. The pairing token is never logged.
 /// </summary>
 public sealed class SamsungTizenDriver(ITvTransport transport, IOptions<TvOptions> options, ILogger<SamsungTizenDriver> logger) : ITvDriver
@@ -92,12 +92,20 @@ public sealed class SamsungTizenDriver(ITvTransport transport, IOptions<TvOption
         try
         {
             var state = await ReadStateAsync(ip, cancellationToken);
+            if (state == TvPowerState.Unknown)
+            {
+                // KEY_POWER toggles: an unreadable state may be standby, and the key would switch the TV on. Ask once more.
+                state = await ReadStateAsync(ip, cancellationToken);
+            }
+
             switch (state)
             {
                 case TvPowerState.Standby:
                     return new TvActionResult(TvActionOutcome.AlreadyOff, state, "The TV is already off");
                 case TvPowerState.Unreachable:
                     return new TvActionResult(TvActionOutcome.Unreachable, state, "The TV did not respond");
+                case TvPowerState.Unknown:
+                    return new TvActionResult(TvActionOutcome.Failed, state, "The TV state could not be read, so the power key was not sent");
             }
 
             if (await SendPowerKeyAsync(ip, station.TvToken, cancellationToken) is { } failure)
@@ -138,11 +146,11 @@ public sealed class SamsungTizenDriver(ITvTransport transport, IOptions<TvOption
             }
 
             var paired = !string.IsNullOrWhiteSpace(station.TvToken);
+            var standbyThroughout = state == TvPowerState.Standby;
             if (WakeOnLan.TryBuildMagicPacket(station.TvMacAddress, out var packet))
             {
                 await SendMagicPacketsAsync(packet, IPAddress.Parse(ip), cancellationToken);
-                await DelayAsync(Options.WakeWaitMilliseconds, cancellationToken);
-                state = await ReadStateAsync(ip, cancellationToken);
+                (state, standbyThroughout) = await WatchWakeAsync(ip, cancellationToken);
             }
             else
             {
@@ -157,13 +165,32 @@ public sealed class SamsungTizenDriver(ITvTransport transport, IOptions<TvOption
             {
                 case TvPowerState.On:
                     return new TvActionResult(TvActionOutcome.PoweredOn, state, "The TV is on");
-                case TvPowerState.Standby when paired:
+                case TvPowerState.Standby when paired && standbyThroughout:
+                    // KEY_POWER toggles. Only press it when the TV stayed in standby for the whole wake window and
+                    // still reads standby right now; a TV that is mid-boot would be switched back off.
+                    var recheck = await ReadStateAsync(ip, cancellationToken);
+                    if (recheck == TvPowerState.On)
+                    {
+                        return new TvActionResult(TvActionOutcome.PoweredOn, recheck, "The TV is on");
+                    }
+
+                    if (recheck != TvPowerState.Standby)
+                    {
+                        return new TvActionResult(TvActionOutcome.WakeSent, recheck, "Wake signal sent; the TV state changed, so no power key was sent");
+                    }
+
                     if (await SendPowerKeyAsync(ip, station.TvToken!, cancellationToken) is { } failure)
                     {
                         return failure;
                     }
 
-                    return new TvActionResult(TvActionOutcome.PoweredOn, state, "The TV was switched on");
+                    await DelayAsync(Options.SettleMilliseconds, cancellationToken);
+                    var after = await ReadStateAsync(ip, cancellationToken);
+                    return after == TvPowerState.On
+                        ? new TvActionResult(TvActionOutcome.PoweredOn, after, "The TV was switched on")
+                        : new TvActionResult(TvActionOutcome.KeySent, after, "The power key was sent, the TV is not confirmed on yet");
+                case TvPowerState.Standby when paired:
+                    return new TvActionResult(TvActionOutcome.WakeSent, state, "Wake signal sent; the TV state was unstable, so no power key was sent");
                 case TvPowerState.Standby:
                     return new TvActionResult(TvActionOutcome.WakeSent, state, "Wake signal sent; the TV is in standby and not paired, so no power key was sent");
                 default:
@@ -177,9 +204,33 @@ public sealed class SamsungTizenDriver(ITvTransport transport, IOptions<TvOption
         }
     }
 
+    /// <summary>
+    /// Watches the TV for up to <see cref="TvOptions.WakeWaitMilliseconds"/> after the wake packets. Stops at the first
+    /// On. Returns the last state and whether every read in the window was Standby.
+    /// </summary>
+    private async Task<(TvPowerState State, bool StandbyThroughout)> WatchWakeAsync(string ip, CancellationToken ct)
+    {
+        var window = TimeSpan.FromMilliseconds(Math.Max(0, Options.WakeWaitMilliseconds));
+        var poll = Math.Max(0, Options.WakePollMilliseconds);
+        var clock = Stopwatch.StartNew();
+        var state = TvPowerState.Unknown;
+        var standbyThroughout = true;
+        do
+        {
+            var remaining = window - clock.Elapsed;
+            var pause = poll > 0 ? (int)Math.Min(poll, Math.Max(0, remaining.TotalMilliseconds)) : (int)Math.Max(0, remaining.TotalMilliseconds);
+            await DelayAsync(pause, ct);
+            state = await ReadStateAsync(ip, ct);
+            standbyThroughout &= state == TvPowerState.Standby;
+        }
+        while (state != TvPowerState.On && clock.Elapsed < window);
+
+        return (state, standbyThroughout);
+    }
+
     private async Task SendMagicPacketsAsync(byte[] packet, IPAddress tv, CancellationToken ct)
     {
-        IPAddress[] targets = [IPAddress.Broadcast, WakeOnLan.SubnetBroadcast(tv)];
+        var targets = WakeOnLan.BroadcastTargets(tv, transport.GetLocalInterfaces());
         var rounds = Math.Max(1, Options.WolRounds);
         for (var round = 0; round < rounds; round++)
         {

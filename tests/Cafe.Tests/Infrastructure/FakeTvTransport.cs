@@ -24,6 +24,11 @@ public sealed class FakeTvTransport : ITvTransport
 
     public bool ConnectFails { get; set; }
 
+    /// <summary>Local interfaces the driver sees. Empty by default, which makes it use the /24 plus limited broadcast fallback.</summary>
+    public List<WakeOnLan.LocalInterface> Interfaces { get; } = [];
+
+    public IReadOnlyList<WakeOnLan.LocalInterface> GetLocalInterfaces() => Interfaces.ToArray();
+
     /// <summary>Called when a KEY_POWER frame is sent (e.g. to flip the scripted TV state).</summary>
     public Action? OnKeyPower { get; set; }
 

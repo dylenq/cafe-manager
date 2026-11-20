@@ -1,0 +1,222 @@
+@using Cafe.Server.Receipts
+@inject ReceiptSettingsService SettingsService
+@inject ReceiptPrintService PrintService
+@inject ILogger<ReceiptSettingsPanel> Logger
+
+<div class="card mb-4 receipt-settings">
+    <div class="card-body">
+        <h2 class="h5 card-title">Receipts</h2>
+        @if (input is null)
+        {
+            <p>Loading...</p>
+        }
+        else
+        {
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger" role="alert">@errorMessage</div>
+            }
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success" role="status">@successMessage</div>
+            }
+            <EditForm Model="input" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="receipt-mode">Print mode</label>
+                        <InputSelect id="receipt-mode" class="form-select" @bind-Value="input.Mode">
+                            <option value="@ReceiptMode.None">None</option>
+                            <option value="@ReceiptMode.Network">Network printer</option>
+                            <option value="@ReceiptMode.WindowsPrinter">Windows printer</option>
+                            <option value="@ReceiptMode.Browser">Browser</option>
+                        </InputSelect>
+                        <div class="form-text">Network mode falls back to the named Windows printer if the network printer cannot be reached.</div>
+                        @FieldError(nameof(ReceiptSettingsInput.Mode))
+                    </div>
+                    <div class="col-12 col-md-5">
+                        <label class="form-label" for="receipt-host">Printer host or IP</label>
+                        <InputText id="receipt-host" class="form-control" @bind-Value="input.Host" />
+                        <ValidationMessage For="() => input.Host" class="text-danger" />
+                        @FieldError(nameof(ReceiptSettingsInput.Host))
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label" for="receipt-port">Port</label>
+                        <InputNumber id="receipt-port" class="form-control" @bind-Value="input.Port" />
+                        <ValidationMessage For="() => input.Port" class="text-danger" />
+                        @FieldError(nameof(ReceiptSettingsInput.Port))
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="receipt-windows">Windows printer name</label>
+                        <InputText id="receipt-windows" class="form-control" @bind-Value="input.WindowsPrinter" />
+                        <ValidationMessage For="() => input.WindowsPrinter" class="text-danger" />
+                        @FieldError(nameof(ReceiptSettingsInput.WindowsPrinter))
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="receipt-columns">Paper width</label>
+                        <InputSelect id="receipt-columns" class="form-select" @bind-Value="input.Columns">
+                            <option value="42">42 columns (80mm)</option>
+                            <option value="32">32 columns (58mm)</option>
+                        </InputSelect>
+                        @FieldError(nameof(ReceiptSettingsInput.Columns))
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="receipt-name">Cafe name</label>
+                        <InputText id="receipt-name" class="form-control" @bind-Value="input.CafeName" />
+                        <ValidationMessage For="() => input.CafeName" class="text-danger" />
+                        @FieldError(nameof(ReceiptSettingsInput.CafeName))
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="receipt-phone">Phone</label>
+                        <InputText id="receipt-phone" class="form-control" @bind-Value="input.Phone" />
+                        <ValidationMessage For="() => input.Phone" class="text-danger" />
+                        @FieldError(nameof(ReceiptSettingsInput.Phone))
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="receipt-address">Address</label>
+                        <InputText id="receipt-address" class="form-control" @bind-Value="input.Address" />
+                        <ValidationMessage For="() => input.Address" class="text-danger" />
+                        @FieldError(nameof(ReceiptSettingsInput.Address))
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="receipt-footer">Footer</label>
+                        <InputText id="receipt-footer" class="form-control" @bind-Value="input.Footer" />
+                        <ValidationMessage For="() => input.Footer" class="text-danger" />
+                        @FieldError(nameof(ReceiptSettingsInput.Footer))
+                    </div>
+                </div>
+                <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
+                    <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@testing" @onclick="TestPrintAsync">Print test receipt</button>
+                </div>
+            </EditForm>
+            @if (testError is not null)
+            {
+                <div class="alert alert-danger mt-3 mb-0" role="alert">Test print failed: @testError</div>
+            }
+            else if (testInfo is not null)
+            {
+                <div class="alert alert-info mt-3 mb-0" role="status">@testInfo</div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private ReceiptSettingsInput? input;
+    private IReadOnlyDictionary<string, string> fieldErrors = new Dictionary<string, string>();
+    private bool saving;
+    private bool testing;
+    private string? errorMessage;
+    private string? successMessage;
+    private string? testInfo;
+    private string? testError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var current = await SettingsService.GetAsync();
+            input = new ReceiptSettingsInput
+            {
+                Mode = current.Mode,
+                Host = current.Host,
+                Port = current.Port,
+                WindowsPrinter = current.WindowsPrinter,
+                Columns = current.Columns,
+                CafeName = current.CafeName,
+                Address = current.Address,
+                Phone = current.Phone,
+                Footer = current.Footer,
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load receipt settings.");
+            input = new ReceiptSettingsInput();
+            errorMessage = "Could not load the saved receipt settings. Refresh the page and try again.";
+        }
+    }
+
+    private RenderFragment FieldError(string field) => builder =>
+    {
+        if (fieldErrors.TryGetValue(field, out var message))
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "text-danger small");
+            builder.AddContent(2, message);
+            builder.CloseElement();
+        }
+    };
+
+    private async Task SaveAsync()
+    {
+        if (input is null || saving)
+        {
+            return;
+        }
+
+        saving = true;
+        successMessage = null;
+        try
+        {
+            var result = await SettingsService.SaveAsync(input);
+            if (!result.Success)
+            {
+                errorMessage = result.Error;
+                fieldErrors = result.FieldErrors;
+                return;
+            }
+
+            errorMessage = null;
+            fieldErrors = new Dictionary<string, string>();
+            successMessage = "Receipt settings saved.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not save receipt settings.");
+            errorMessage = "Something went wrong. Try again.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task TestPrintAsync()
+    {
+        if (testing)
+        {
+            return;
+        }
+
+        testing = true;
+        testInfo = null;
+        testError = null;
+        try
+        {
+            var outcome = await PrintService.PrintTestAsync();
+            switch (outcome.Kind)
+            {
+                case PrintOutcomeKind.Printed:
+                    testInfo = "Test receipt sent to the printer.";
+                    break;
+                case PrintOutcomeKind.Failed:
+                    testError = outcome.Error ?? "The printer did not respond.";
+                    break;
+                default:
+                    testInfo = outcome.Message ?? "Nothing was printed.";
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Test receipt failed.");
+            testError = "Something went wrong. Nothing was changed.";
+        }
+        finally
+        {
+            testing = false;
+        }
+    }
+}

@@ -6,6 +6,8 @@
 @using Cafe.Server.Data
 @using Cafe.Server.Receipts
 @inject ReceiptService Receipts
+@inject IJSRuntime JS
+@inject ILogger<Receipt> Logger
 
 <PageTitle>Receipt - Cafe Manager</PageTitle>
 
@@ -69,6 +71,12 @@ else
     [Parameter]
     public int PaymentId { get; set; }
 
+    /// <summary>?print=1 opens the browser print dialog once after the receipt first renders.</summary>
+    [SupplyParameterFromQuery(Name = "print")]
+    public string? Print { get; set; }
+
+    private bool printed;
+
     private ReceiptDocument? doc;
     private string? error;
     private bool loaded;
@@ -79,5 +87,24 @@ else
         doc = result.Success ? result.Value : null;
         error = result.Error;
         loaded = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (printed || doc is null || Print != "1")
+        {
+            return;
+        }
+
+        printed = true;
+        try
+        {
+            await JS.InvokeVoidAsync("window.print");
+        }
+        catch (Exception ex)
+        {
+            // Printing is a convenience: a missing dialog must never affect the page or any payment.
+            Logger.LogWarning(ex, "Could not open the print dialog for receipt {PaymentId}.", PaymentId);
+        }
     }
 }

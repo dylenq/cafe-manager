@@ -61,7 +61,12 @@
                     <div class="alert alert-danger" role="alert">@error</div>
                 }
 
-                @for (var i = 0; i < rows.Count; i++)
+                @if (IsFree)
+                {
+                    <div class="alert alert-info py-2">Nothing to pay. Record the free sale.</div>
+                }
+
+                @for (var i = 0; !IsFree && i < rows.Count; i++)
                 {
                     var row = rows[i];
                     <div class="row g-2 align-items-end mb-2">
@@ -86,7 +91,7 @@
                     </div>
                 }
 
-                <div class="d-flex flex-wrap gap-2 mb-3">
+                <div class="d-flex flex-wrap gap-2 mb-3" hidden="@IsFree">
                     <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="AddRow">Add payment</button>
                     <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="ExactCash">Exact cash</button>
                     <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="RestByCard">Rest by card</button>
@@ -148,6 +153,9 @@
 
     [Parameter, EditorRequired] public decimal Due { get; set; }
 
+    /// <summary>True for free package sales: when nothing is due, Record payment is enabled with no tender lines.</summary>
+    [Parameter] public bool AllowZeroDue { get; set; }
+
     /// <summary>True for package sales: Record payment stays disabled until nothing remains.</summary>
     [Parameter] public bool RequireFullPayment { get; set; }
 
@@ -158,7 +166,9 @@
 
     private TenderResult calc => TenderCalculator.Calculate(Due, rows.Select(r => new TenderEntry(r.Method, r.Amount)).ToList());
 
-    private bool CanConfirm => !busy && calc is { Applied: > 0m } c && !(RequireFullPayment && c.Remaining > 0m);
+    private bool IsFree => AllowZeroDue && Due <= 0m;
+
+    private bool CanConfirm => !busy && (IsFree || (calc is { Applied: > 0m } c && !(RequireFullPayment && c.Remaining > 0m)));
 
     private void SetMethod(Row row, ChangeEventArgs e) =>
         row.Method = Enum.TryParse<PaymentMethod>(e.Value?.ToString(), out var method) ? method : PaymentMethod.Cash;
@@ -196,7 +206,7 @@
         error = null;
         try
         {
-            var result = await OnConfirm(calc.Lines);
+            var result = await OnConfirm(IsFree ? [] : calc.Lines);
             if (result.Success)
             {
                 recorded = true;

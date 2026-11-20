@@ -1,5 +1,7 @@
 using Cafe.Server.Customers;
 using Cafe.Server.Data;
+using Cafe.Server.Payments;
+using Cafe.Server.Receipts;
 using Cafe.Server.Stations;
 using Cafe.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -200,6 +202,30 @@ public class PackageServiceTests : CustomerTestBase
         Assert.Equal(0m, (await db.Payments.SingleAsync()).Amount);
         Assert.Equal(1, await db.PackageSales.CountAsync());
         Assert.Equal(15, await BalanceAsync(customer));
+    }
+
+    [Fact]
+    public async Task WR03_free_package_writes_a_zero_allocation_so_history_and_receipt_show_the_sale()
+    {
+        var customer = await CustomerAsync();
+        var package = await PackageAsync("Welcome gift", 15, 0m);
+
+        var sold = await InScopeAsync(sp => sp.GetRequiredService<PackageService>().SellPaidAsync(customer, package, [], 0m));
+
+        Assert.True(sold.Success, sold.Error);
+        await using (var db = await DbAsync())
+        {
+            var allocation = await db.PaymentAllocations.SingleAsync();
+            Assert.Equal(AllocationTargetType.PackageSale, allocation.TargetType);
+            Assert.Equal(0m, allocation.Amount);
+        }
+
+        var history = await InScopeAsync(sp => sp.GetRequiredService<PaymentHistoryService>().ForCustomerAsync(customer));
+        Assert.Single(history);
+        var receipt = (await InScopeAsync(sp => sp.GetRequiredService<ReceiptService>().GetAsync(sold.Value!.ReceiptPaymentId))).Value!;
+        var target = Assert.Single(receipt.Targets);
+        Assert.Equal("Welcome gift", target.Title);
+        Assert.Equal(0m, receipt.Remaining);
     }
 
     [Fact]

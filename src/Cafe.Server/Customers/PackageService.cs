@@ -193,7 +193,8 @@ public class PackageService(
         var tenders = tendersFor(package.Price);
         if (package.Price == 0m)
         {
-            // A free package still records its (zero) payment as in Phase 5; there is nothing to validate or allocate.
+            // A free package still records its (zero) payment as in Phase 5; there is nothing to validate. The zero
+            // allocation below keeps receipts and history consistent with migrated free sales.
             tenders = [new TenderLine(tenders.Count > 0 ? tenders[0].Method : PaymentMethod.Cash, 0m)];
         }
         else if (SettlementService.ValidateTenders(tenders) is { } tenderError)
@@ -258,6 +259,11 @@ public class PackageService(
                 {
                     payments[i].Allocations.Add(new PaymentAllocation { TargetType = part.Type, TargetId = part.Id, Amount = part.Amount });
                 }
+            }
+
+            if (sale.Price == 0m)
+            {
+                payments[0].Allocations.Add(new PaymentAllocation { TargetType = AllocationTargetType.PackageSale, TargetId = sale.Id, Amount = 0m });
             }
 
             await db.SaveChangesAsync(cancellationToken);

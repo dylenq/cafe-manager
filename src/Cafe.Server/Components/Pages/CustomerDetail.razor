@@ -268,7 +268,7 @@ else
     @if (sellPending is { } pending)
     {
         <PaymentDialog Title="Sell package" Items="SellItems(pending)"
-                       Due="pending.Price" RequireFullPayment="true"
+                       Due="pending.Price" RequireFullPayment="true" AllowZeroDue="true"
                        OnConfirm="tenders => ConfirmSellAsync(pending, tenders)" OnClosed="SellClosedAsync" />
     }
 }

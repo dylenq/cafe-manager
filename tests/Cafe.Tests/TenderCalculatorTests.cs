@@ -92,4 +92,13 @@ public class TenderCalculatorTests
         Assert.Equal(0m, r.Remaining);
         Assert.Equal(0.3m, r.Applied);
     }
+
+    [Fact]
+    public void WR06_entries_round_half_away_from_zero_like_the_pricing_engine()
+    {
+        var r = Calc(10m, (PaymentMethod.Cash, 0.125m));
+
+        Assert.Equal(0.13m, r.Applied);
+        Assert.Equal(new TenderLine(PaymentMethod.Cash, 0.13m, 0.13m), Assert.Single(r.Lines));
+    }
 }

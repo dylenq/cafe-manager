@@ -74,6 +74,18 @@ public class ProductServiceTests : PosTestBase
     }
 
     [Fact]
+    public async Task WR06_price_with_more_than_two_decimals_is_rejected_on_create_and_update()
+    {
+        var created = await Products(p => p.CreateAsync(Input("Coke", 10.005m)));
+        Assert.False(created.Success);
+        Assert.True(created.FieldErrors!.ContainsKey("Price"));
+
+        var id = (await Products(p => p.CreateAsync(Input("Fanta", 10.50m)))).Value!.Id;
+        Assert.False((await Products(p => p.UpdateAsync(id, Input("Fanta", 0.001m)))).Success);
+        Assert.True((await Products(p => p.UpdateAsync(id, Input("Fanta", 12.25m)))).Success);
+    }
+
+    [Fact]
     public async Task D01_delete_removes_an_unused_product()
     {
         var id = (await Products(p => p.CreateAsync(Input("Coke")))).Value!.Id;

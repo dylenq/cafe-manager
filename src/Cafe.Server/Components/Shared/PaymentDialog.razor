@@ -137,7 +137,7 @@
 
         public decimal Amount =>
             decimal.TryParse(Text, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var v) && v > 0m
-                ? decimal.Round(v, 2)
+                ? decimal.Round(v, 2, MidpointRounding.AwayFromZero)
                 : 0m;
     }
 

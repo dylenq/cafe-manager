@@ -165,6 +165,12 @@ public class SettlementService(IDbContextFactory<CafeDbContext> dbFactory, TimeP
                 return "That payment amount is too large.";
             }
 
+            // Money has two decimals: a finer amount would leave a sub-cent balance that can never be cleared.
+            if (tender.Amount != decimal.Round(tender.Amount, 2) || (tender.Tendered is { } handed && handed != decimal.Round(handed, 2)))
+            {
+                return "Payment amounts can have at most 2 decimal places.";
+            }
+
             if (tender.Tendered is { } tendered)
             {
                 if (tender.Method != PaymentMethod.Cash)

@@ -26,13 +26,15 @@ public static class TenderCalculator
         var clamped = false;
         foreach (var entry in entries)
         {
-            if (entry.Entered <= 0m)
+            // Same rounding as the pricing engine (half away from zero), so 0.125 is 0.13 here as everywhere else.
+            var entered = Math.Round(entry.Entered, 2, MidpointRounding.AwayFromZero);
+            if (entered <= 0m)
             {
                 continue;
             }
 
-            var applied = Math.Min(entry.Entered, remaining);
-            if (entry.Method == PaymentMethod.Card && entry.Entered > applied)
+            var applied = Math.Min(entered, remaining);
+            if (entry.Method == PaymentMethod.Card && entered > applied)
             {
                 clamped = true;
             }
@@ -45,8 +47,8 @@ public static class TenderCalculator
             remaining -= applied;
             if (entry.Method == PaymentMethod.Cash)
             {
-                lines.Add(new TenderLine(PaymentMethod.Cash, applied, entry.Entered));
-                change += entry.Entered - applied;
+                lines.Add(new TenderLine(PaymentMethod.Cash, applied, entered));
+                change += entered - applied;
             }
             else
             {

@@ -79,6 +79,10 @@ public class SettlementServiceTests : PosTestBase
         Assert.False((await Settle(Request(8000m, [Order(o1)], new TenderLine(PaymentMethod.Cash, 8000m, 7000m)))).Success);
         Assert.False((await Settle(Request(8000m, [Order(o1)], new TenderLine(PaymentMethod.Cash, 0m)))).Success);
         Assert.False((await Settle(Request(8000m, [Order(o1)], new TenderLine(PaymentMethod.Cash, -5m)))).Success);
+        // WR-06: amounts finer than a cent are refused instead of leaving a balance that can never clear.
+        Assert.False((await Settle(Request(8000m, [Order(o1)], new TenderLine(PaymentMethod.Cash, 10.005m)))).Success);
+        Assert.False((await Settle(Request(8000m, [Order(o1)], new TenderLine(PaymentMethod.Cash, 0.0001m)))).Success);
+        Assert.False((await Settle(Request(8000m, [Order(o1)], new TenderLine(PaymentMethod.Cash, 100m, 100.001m)))).Success);
         Assert.Equal(0, await PaymentCountAsync());
     }
 

@@ -97,4 +97,13 @@ public class CafeDataPathsTests
             }
         }
     }
+
+    [Fact]
+    public void Default_root_is_ProgramData_on_Windows_and_the_per_user_folder_elsewhere()
+    {
+        Assert.Equal("/pd", CafeDataPaths.DefaultAppDataRoot(true, "/pd", "/local"));
+        Assert.Equal("/local", CafeDataPaths.DefaultAppDataRoot(false, "/usr/share", "/local"));
+        Assert.NotEqual("/usr/share", CafeDataPaths.DefaultAppDataRoot(false, "/usr/share", ""));
+        Assert.Contains("CafeManager", CafeDataPaths.DefaultAppDataRoot(false, "/usr/share", ""));
+    }
 }

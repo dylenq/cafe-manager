@@ -33,6 +33,29 @@ public static class CafeDataPaths
     public const string FolderName = "CafeManager";
     public const string DatabaseFileName = "cafe.db";
 
+    /// <summary>
+    /// The folder that holds CafeManager's data by default: ProgramData on Windows. On other hosts
+    /// CommonApplicationData is a system folder such as /usr/share that a normal user cannot write, so use the
+    /// per-user LocalApplicationData instead.
+    /// </summary>
+    public static string DefaultAppDataRoot() =>
+        DefaultAppDataRoot(
+            OperatingSystem.IsWindows(),
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+
+    public static string DefaultAppDataRoot(bool isWindows, string commonAppData, string localAppData)
+    {
+        if (isWindows && !string.IsNullOrWhiteSpace(commonAppData))
+        {
+            return commonAppData;
+        }
+
+        return !string.IsNullOrWhiteSpace(localAppData)
+            ? localAppData
+            : Path.Combine(Path.GetTempPath(), FolderName + "-data");
+    }
+
     public static DataLocation Resolve(
         string? explicitConnectionString,
         string? dataDirectoryOverride,

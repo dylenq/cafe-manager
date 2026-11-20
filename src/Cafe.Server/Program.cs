@@ -34,7 +34,7 @@ var dataLocation = CafeDataPaths.Resolve(
     builder.Configuration["Cafe:DataDirectory"],
     builder.Environment.IsProduction(),
     Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceHelpers.IsWindowsService(),
-    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+    CafeDataPaths.DefaultAppDataRoot(),
     builder.Environment.ContentRootPath);
 dataLocation.EnsureDirectories();
 builder.Services.AddSingleton(dataLocation);

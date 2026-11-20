@@ -5,6 +5,7 @@
 @inject DashboardService Dashboard
 @inject SessionNotifier Notifier
 @inject Cafe.Server.Agents.AgentRegistry AgentRegistry
+@inject Cafe.Server.Devices.TvStateCache TvCache
 @inject ILogger<Home> Logger
 @inject TimeProvider Time
 @inject IJSRuntime Js
@@ -22,7 +23,7 @@
 
 @foreach (var notice in _notices)
 {
-    <div class="alert alert-success alert-dismissible py-2" role="status" @key="notice.Id">
+    <div class="alert @(notice.Warning ? "alert-warning" : "alert-success") alert-dismissible py-2" role="status" @key="notice.Id">
         @notice.Text
         <button type="button" class="btn-close" aria-label="Dismiss" @onclick="() => _notices.Remove(notice)"></button>
     </div>
@@ -64,7 +65,7 @@ else
     private readonly List<Notice> _notices = [];
     private int _noticeId;
 
-    private sealed record Notice(int Id, string Text);
+    private sealed record Notice(int Id, string Text, bool Warning = false);
 
     private IReadOnlyList<IdleStation> IdleStations =>
         _cards?.Where(c => c.Session is null).Select(c => new IdleStation(c.StationId, c.Name)).ToList() ?? [];
@@ -132,6 +133,15 @@ else
 
     private void AddNotice(string text) => _notices.Insert(0, new Notice(++_noticeId, text));
 
+    // A TV state changed: refresh the cards at once. A TV failure: show a warning notice.
+    private void OnTvChanged(int stationId) => _ = RefreshNowAsync();
+
+    private void OnTvNotice(string text) => _ = InvokeAsync(() =>
+    {
+        _notices.Insert(0, new Notice(++_noticeId, text, Warning: true));
+        StateHasChanged();
+    });
+
     protected override async Task OnInitializedAsync()
     {
         _cards = await Dashboard.GetCardsAsync();
@@ -157,6 +167,8 @@ else
             _tickLoop = TickLoopAsync(_tickTimer, _cts.Token);
             Notifier.Changed += OnSessionChanged;
             AgentRegistry.Changed += OnAgentChanged;
+            TvCache.Changed += OnTvChanged;
+            TvCache.NoticeRaised += OnTvNotice;
             _subscribed = true;
         }
     }
@@ -255,6 +267,8 @@ else
         {
             Notifier.Changed -= OnSessionChanged;
             AgentRegistry.Changed -= OnAgentChanged;
+            TvCache.Changed -= OnTvChanged;
+            TvCache.NoticeRaised -= OnTvNotice;
         }
 
         await _cts.CancelAsync();

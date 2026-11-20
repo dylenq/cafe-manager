@@ -26,6 +26,12 @@
                            HasActiveSession="Model.Session is not null" />
         }
 
+        @if (Model.Kind == StationKind.Console && Model.HasTv)
+        {
+            <TvControls StationId="Model.StationId" StationName="@Model.Name" State="Model.TvState"
+                        HasActiveSession="Model.Session is not null" />
+        }
+
         @if (Model.Session is { } session)
         {
             var now = Time.GetUtcNow();

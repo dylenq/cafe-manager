@@ -1,0 +1,104 @@
+@using Cafe.Server.Devices
+@inject TvControlService Control
+@inject ILogger<TvControls> Logger
+
+<div class="tv-controls mt-2" data-station-id="@StationId">
+    <div class="d-flex flex-wrap align-items-center gap-1">
+        <span class="badge rounded-pill @BadgeClass tv-indicator" data-station-id="@StationId">@Label</span>
+        <button type="button" class="btn btn-sm btn-outline-success tv-on-button" disabled="@_busy" @onclick="OnAsync">TV On</button>
+        <button type="button" class="btn btn-sm btn-outline-danger tv-off-button" disabled="@_busy" @onclick="OffClickAsync">TV Off</button>
+    </div>
+
+    @if (_confirmOff)
+    {
+        <div class="border rounded p-2 mt-1 small tv-off-confirm">
+            <div class="mb-1">A session is running on this station. Switch the TV off anyway?</div>
+            <button type="button" class="btn btn-sm btn-danger" disabled="@_busy" @onclick="OffAsync">Confirm</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="CancelConfirm">Cancel</button>
+        </div>
+    }
+
+    @if (_result is not null)
+    {
+        <div class="alert @(_ok ? "alert-success" : "alert-danger") py-1 px-2 mt-1 mb-0 small tv-result" role="status">@_result</div>
+    }
+</div>
+
+@code {
+    private bool _busy;
+    private bool _confirmOff;
+    private bool _ok;
+    private string? _result;
+
+    [Parameter, EditorRequired] public int StationId { get; set; }
+
+    [Parameter] public string StationName { get; set; } = string.Empty;
+
+    [Parameter] public TvPowerState? State { get; set; }
+
+    [Parameter] public bool HasActiveSession { get; set; }
+
+    private string Label => State switch
+    {
+        TvPowerState.On => "TV On",
+        TvPowerState.Standby => "TV Standby",
+        TvPowerState.Unreachable => "TV Unreachable",
+        TvPowerState.Unknown => "TV Unknown",
+        _ => "TV not checked",
+    };
+
+    private string BadgeClass => State switch
+    {
+        TvPowerState.On => "text-bg-success",
+        TvPowerState.Standby => "text-bg-secondary",
+        TvPowerState.Unreachable => "text-bg-dark",
+        TvPowerState.Unknown => "text-bg-warning",
+        _ => "text-bg-light border",
+    };
+
+    private void CancelConfirm() => _confirmOff = false;
+
+    private Task OffClickAsync()
+    {
+        _result = null;
+        if (HasActiveSession)
+        {
+            _confirmOff = true;
+            return Task.CompletedTask;
+        }
+
+        return OffAsync();
+    }
+
+    private Task OnAsync() => RunAsync(() => Control.PowerOnAsync(StationId, "Manual"));
+
+    private Task OffAsync() => RunAsync(() => Control.PowerOffAsync(StationId, "Manual"));
+
+    private async Task RunAsync(Func<Task<TvCommandResult>> action)
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _confirmOff = false;
+        _result = null;
+        try
+        {
+            var outcome = await action();
+            _ok = outcome.Success;
+            _result = outcome.Message;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogError(ex, "Could not send a TV command for station {StationId}.", StationId);
+            _ok = false;
+            _result = "Something went wrong. Try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -1,9 +1,30 @@
+using System.Globalization;
 using Cafe.Server.Receipts;
 
 namespace Cafe.Tests;
 
 public class ReceiptTextLayoutTests
 {
+    [Fact]
+    public void IN05_amounts_always_print_two_decimals_even_when_the_culture_has_none()
+    {
+        var culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+        culture.NumberFormat.CurrencyDecimalDigits = 0;
+        var previous = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = culture;
+
+            Assert.Equal("1,234.50", ReceiptTextLayout.FormatAmount(1234.5m));
+            Assert.Equal("0.13", ReceiptTextLayout.FormatAmount(0.13m));
+            Assert.Equal("50,000.00", ReceiptTextLayout.FormatAmount(50000m));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previous;
+        }
+    }
+
     [Fact]
     public void Row_pads_to_the_exact_width_with_the_amount_right_aligned_at_42_columns()
     {

@@ -7,9 +7,12 @@ public sealed class ReceiptTextLayout(int columns)
 {
     public int Columns { get; } = columns;
 
-    /// <summary>Amount as plain number text (no currency symbol) so the printer never needs a glyph outside CP437.</summary>
-    public static string FormatAmount(decimal value) =>
-        value.ToString("N" + CultureInfo.CurrentCulture.NumberFormat.CurrencyDecimalDigits, CultureInfo.CurrentCulture);
+    /// <summary>
+    /// Amount as plain number text (no currency symbol) so the printer never needs a glyph outside CP437. Always two
+    /// decimals whatever the culture's currency digits are, so printed lines add up to the stored amounts; only the
+    /// separators follow the culture.
+    /// </summary>
+    public static string FormatAmount(decimal value) => value.ToString("N2", CultureInfo.CurrentCulture);
 
     public string Separator() => new('-', Columns);
 

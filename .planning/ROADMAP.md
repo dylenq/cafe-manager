@@ -153,6 +153,12 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
   4. Running the installer script on a gaming PC sets up the logon scheduled task, Task Manager policy and server URL config so the agent starts locked at logon
 
 **Plans**: TBD
+- [x] 07-01-PLAN.md
+- [ ] 07-02-PLAN.md
+- [ ] 07-03-PLAN.md
+- [ ] 07-04-PLAN.md
+- [ ] 07-05-PLAN.md
+
 **UI hint**: yes
 
 ## Progress
@@ -165,4 +171,4 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
 | 4. Samsung TV Control | 3/3 | In Progress | - |
 | 5. Customers & Packages | 5/5 | In Progress | - |
 | 6. POS & Receipts | 5/5 | In Progress | - |
-| 7. Reports & Deployment | 0/TBD | Not started | - |
+| 7. Reports & Deployment | 1/5 | In Progress | - |

@@ -1,18 +1,18 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 3
-current_phase_name: PC Agent
+current_phase: 4
+current_phase_name: Samsung TV Control
 status: executing
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-11-19T21:40:58.343Z"
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-11-20T06:35:15.130Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 2 execution started
-state_head: 01b68ed53cbf326c18124c851bb8d73793e9c009
+last_activity_desc: Phase 4 execution started
+state_head: 28bc7f5200ec71d039fb4e4e749f4b8d9567d87d
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 14
-  completed_plans: 10
+  total_plans: 20
+  completed_plans: 15
   percent: 0
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** Staff can start a timed session on any station, and that station reliably stops being usable when the paid time runs out: the PC locks or the TV powers off.
-**Current focus:** Phase 2 — Session Engine & Pricing
+**Current focus:** Phase 4 — Samsung TV Control
 
 ## Current Position
 
-Phase: 3 (PC Agent) — READY TO EXECUTE
-Plan: 5 of 5
+Phase: 4 (Samsung TV Control) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-11-20 — Phase 2 execution started
+Last activity: 2026-11-20 — Phase 4 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -66,6 +66,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 2 P02-04 | 30min | 2 tasks | 8 files |
 | Phase 2 P05 | 25min | 3 tasks | 17 files |
 | Phase 3 P01 | 25min | 2 tasks | 40 files |
+| Phase 4 P04-01 | 35min | 2 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,7 @@ Recent decisions affecting current work:
 - [Phase 2]: 02-04: expiry handlers run after Ended commit (at most once); ExpiryActionFired is a second save; IExpiryEvaluator interface and Sessions:RunTicker flag (default true, off in test factory)
 - [Phase 2]: Acknowledged alerts stay flagged on the card but stop pulsing; tracker beeps once per alert level change
 - [Phase 3]: Agent hub gated only by shared-key middleware; /hubs exempt from setup gate
+- [Phase 4]: TV no-token marker is '-'; certificate bypass only in SamsungTvTransport; state reads not serialised per TV
 
 ### Pending Todos
 
@@ -108,6 +110,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-19T21:40:58.329Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-11-20T06:35:15.113Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None

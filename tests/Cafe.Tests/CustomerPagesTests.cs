@@ -82,6 +82,7 @@ public class CustomerPagesTests : CustomerTestBase
         Assert.Contains("Package purchase", body);
         Assert.Contains("Session", body);
         Assert.Contains("Sell package", body);
+        Assert.Contains("Receipts", body);
         Assert.Contains("Manual adjustment", body);
         Assert.Contains("Ledger history", body);
         Assert.Contains("Recent sessions", body);

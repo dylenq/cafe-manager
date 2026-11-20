@@ -5,10 +5,12 @@
 @using Cafe.Server.Customers
 @using CustomerDetailModel = Cafe.Server.Customers.CustomerDetail
 @using Cafe.Server.Data
+@using Cafe.Server.Payments
 @using Cafe.Server.Stations
 @inject CustomerService CustomerSvc
 @inject PackageService PackageSvc
 @inject BalanceService BalanceSvc
+@inject PaymentHistoryService HistorySvc
 @inject StationTypeService TypeSvc
 @inject ILogger<CustomerDetail> Logger
 
@@ -115,14 +117,7 @@ else
                                 }
                             </select>
                         </div>
-                        <div class="mb-2">
-                            <label class="form-label" for="sell-method">Payment</label>
-                            <select id="sell-method" class="form-select" @bind="sellMethod">
-                                <option value="@PaymentMethod.Cash">Cash</option>
-                                <option value="@PaymentMethod.Card">Card</option>
-                            </select>
-                        </div>
-                        <button type="button" class="btn btn-primary" disabled="@(busy || sellPackageId == 0 || !ShowsCurrentCustomer)" @onclick="SellAsync">Sell package</button>
+                        <button type="button" class="btn btn-primary" disabled="@(busy || sellPackageId == 0 || !ShowsCurrentCustomer)" @onclick="BeginSell">Sell package</button>
                     }
                 </div>
             </div>
@@ -177,6 +172,34 @@ else
                                 <td class="text-end">@sale.Minutes</td>
                                 <td class="text-end">@sale.Price.ToString("C", CultureInfo.CurrentCulture)</td>
                                 <td>@(sale.Method?.ToString() ?? "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section class="mb-4 customer-receipts">
+        <h2 class="h5">Receipts</h2>
+        @if (receipts.Count == 0)
+        {
+            <p class="text-muted">No receipts yet.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>When</th><th>For</th><th>Payment</th><th class="text-end">Amount</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var receipt in receipts)
+                        {
+                            <tr>
+                                <td>@receipt.AtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)</td>
+                                <td>@receipt.Label</td>
+                                <td>@receipt.Methods</td>
+                                <td class="text-end">@receipt.Total.ToString("C", CultureInfo.CurrentCulture)</td>
+                                <td><PrintReceiptButton PaymentId="receipt.RootPaymentId" Label="Reprint" CssClass="btn btn-sm btn-outline-secondary" /></td>
                             </tr>
                         }
                     </tbody>
@@ -241,6 +264,13 @@ else
             </div>
         }
     </section>
+
+    @if (sellPending is { } pending)
+    {
+        <PaymentDialog Title="Sell package" Items="SellItems(pending)"
+                       Due="pending.Price" RequireFullPayment="true"
+                       OnConfirm="tenders => ConfirmSellAsync(pending, tenders)" OnClosed="SellClosedAsync" />
+    }
 }
 
 @code {
@@ -256,7 +286,8 @@ else
     private bool ShowsCurrentCustomer => detail is not null && detail.Customer.Id == Id;
     private string? notice;
     private int sellPackageId;
-    private PaymentMethod sellMethod = PaymentMethod.Cash;
+    private TimePackage? sellPending;
+    private List<ReceiptSummary> receipts = [];
     private int adjustBucket;
     private int adjustMinutes;
     private string? adjustNote;
@@ -294,6 +325,7 @@ else
                 errorMessage = result.Error;
             }
 
+            receipts = detail is null ? [] : (await HistorySvc.ForCustomerAsync(Id, 20)).ToList();
             packages = await PackageSvc.ListAsync(includeInactive: false);
             types = await TypeSvc.ListAsync();
         }
@@ -323,40 +355,36 @@ else
     private string TypeName(int? typeId) =>
         typeId is null ? "Any type" : types.FirstOrDefault(t => t.Id == typeId)?.Name ?? "Unknown type";
 
-    private async Task SellAsync()
+    private static IReadOnlyList<OutstandingItem> SellItems(TimePackage package) =>
+        [new OutstandingItem(AllocationTargetType.PackageSale, package.Id, package.Name, package.Price, 0m, package.Price)];
+
+    private void BeginSell()
     {
         if (busy || sellPackageId == 0 || !ShowsCurrentCustomer)
         {
             return;
         }
 
-        busy = true;
         errorMessage = null;
         notice = null;
-        fieldErrors = new Dictionary<string, string>();
-        try
+        // The price shown in the picker is what the dialog charges; the service refuses if it changed meanwhile.
+        sellPending = packages.FirstOrDefault(p => p.Id == sellPackageId);
+    }
+
+    private async Task<PaymentDialogResult> ConfirmSellAsync(TimePackage package, IReadOnlyList<TenderLine> tenders)
+    {
+        var result = await PackageSvc.SellPaidAsync(Id, package.Id, tenders, package.Price);
+        return new PaymentDialogResult(result.Success, result.Error, result.Value);
+    }
+
+    private async Task SellClosedAsync(bool recorded)
+    {
+        var sold = sellPending;
+        sellPending = null;
+        if (recorded && sold is not null)
         {
-            // Pass the price shown in the picker so a concurrent price edit cannot charge an unseen amount.
-            var shownPrice = packages.FirstOrDefault(p => p.Id == sellPackageId)?.Price;
-            var result = await PackageSvc.SellAsync(Id, sellPackageId, sellMethod, shownPrice);
-            if (result.Success)
-            {
-                notice = $"Sold: {result.Value!.Minutes} min added to the balance.";
-                sellPackageId = 0;
-            }
-            else
-            {
-                errorMessage = result.Error;
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Could not sell a package to customer {CustomerId}.", Id);
-            errorMessage = "Something went wrong. Try again.";
-        }
-        finally
-        {
-            busy = false;
+            notice = $"Sold: {sold.Minutes} min added to the balance.";
+            sellPackageId = 0;
         }
 
         await LoadAsync();

@@ -40,6 +40,12 @@ dataLocation.EnsureDirectories();
 builder.Services.AddSingleton(dataLocation);
 if (dataLocation.UseProductionLayout)
 {
+    // Keep per-query EF SQL text out of the daily log unless appsettings explicitly sets a level for it.
+    if (string.IsNullOrEmpty(builder.Configuration["Logging:LogLevel:Microsoft.EntityFrameworkCore"]))
+    {
+        builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
+    }
+
     builder.Logging.AddProvider(new FileLoggerProvider(dataLocation.LogDirectory, () => DateTimeOffset.Now));
 }
 

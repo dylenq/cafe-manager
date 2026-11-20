@@ -256,6 +256,7 @@ public class TvSessionSinkTests : SessionTestBase
         _driver.OffResult = _ => new TvActionResult(TvActionOutcome.Failed, TvPowerState.Unknown, "nope");
         await Assert.ThrowsAsync<InvalidOperationException>(() => handler.ExecuteAsync(station, CancellationToken.None));
         _driver.OffResult = _ => new TvActionResult(TvActionOutcome.Unreachable, TvPowerState.Unreachable, "off");
-        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.ExecuteAsync(station, CancellationToken.None));
+        // Unreachable at expiry counts as already off (WR-01): no retry, a desk notice instead.
+        await handler.ExecuteAsync(station, CancellationToken.None);
     }
 }

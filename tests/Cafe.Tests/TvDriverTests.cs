@@ -339,10 +339,12 @@ public class TvDriverTests
 
     public class HandlerTests : SessionTestBase
     {
+        private readonly TvStateCache _cache = new(TimeProvider.System, Options.Create(new TvOptions()));
+
         private TvExpiryActionHandler Handler(ITvDriver driver)
         {
             var dbFactory = Factory.Services.GetRequiredService<IDbContextFactory<CafeDbContext>>();
-            var control = new TvControlService(driver, dbFactory, new TvStateCache(TimeProvider.System, Options.Create(new TvOptions())),
+            var control = new TvControlService(driver, dbFactory, _cache,
                 TimeProvider.System, NullLogger<TvControlService>.Instance);
             return new(control, dbFactory, NullLogger<TvExpiryActionHandler>.Instance);
         }
@@ -380,11 +382,11 @@ public class TvDriverTests
 
         [Theory]
         [InlineData(TvActionOutcome.Failed, true)]
-        [InlineData(TvActionOutcome.Unreachable, true)]
+        [InlineData(TvActionOutcome.Unreachable, false)]
         [InlineData(TvActionOutcome.AlreadyOff, false)]
         [InlineData(TvActionOutcome.PoweredOff, false)]
         [InlineData(TvActionOutcome.KeySent, false)]
-        public async Task Failed_and_unreachable_throw_so_the_expiry_is_retried(TvActionOutcome outcome, bool throws)
+        public async Task Failed_throws_so_the_expiry_is_retried_and_unreachable_counts_as_already_off(TvActionOutcome outcome, bool throws)
         {
             var station = await ConsoleAsync();
             var stub = new StubDriver(outcome);
@@ -401,6 +403,34 @@ public class TvDriverTests
             }
 
             Assert.Equal(1, stub.Off);
+        }
+
+        [Fact]
+        public async Task An_unreachable_tv_at_expiry_raises_one_rate_limited_desk_notice()
+        {
+            var station = await ConsoleAsync();
+            var notices = new List<string>();
+            _cache.NoticeRaised += notices.Add;
+            var handler = Handler(new StubDriver(TvActionOutcome.Unreachable));
+
+            await handler.ExecuteAsync(station, default);
+            await handler.ExecuteAsync(station, default);
+
+            var notice = Assert.Single(notices);
+            Assert.Contains("unreachable at expiry", notice);
+            Assert.Contains(station.Name, notice);
+        }
+
+        [Fact]
+        public async Task A_failed_power_off_at_expiry_raises_a_notice_and_is_retried()
+        {
+            var station = await ConsoleAsync();
+            var notices = new List<string>();
+            _cache.NoticeRaised += notices.Add;
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => Handler(new StubDriver(TvActionOutcome.Failed)).ExecuteAsync(station, default));
+
+            Assert.Single(notices);
         }
     }
 }

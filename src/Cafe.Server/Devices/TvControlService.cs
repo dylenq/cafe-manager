@@ -90,6 +90,11 @@ public sealed class TvControlService(
             logger.LogWarning("TV {Command} for station {Station} failed: {Message}", kind, station.Name, result.Message);
             cache.RaiseNotice(station.Id, $"TV for {station.Name} did not respond");
         }
+        else if (!on && result.Outcome == TvActionOutcome.Unreachable && source == "Expiry")
+        {
+            // The expiry handler treats this as success (nothing to power off), so tell staff to look at the TV.
+            cache.RaiseNotice(station.Id, $"TV for {station.Name} unreachable at expiry \u2014 check it's off");
+        }
         else if (on && result.Outcome == TvActionOutcome.WakeSent && result.State == TvPowerState.Unreachable)
         {
             cache.RaiseNotice(station.Id, $"TV for {station.Name} did not wake up");

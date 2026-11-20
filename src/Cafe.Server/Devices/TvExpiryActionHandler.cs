@@ -7,7 +7,9 @@ namespace Cafe.Server.Devices;
 
 /// <summary>
 /// Powers a console's TV off when its paid time and grace are used up. Idempotent: a TV that is already off is left
-/// alone (KEY_POWER toggles). Throws when the TV could not be switched off, so the expiry evaluator retries it
+/// alone (KEY_POWER toggles). An unreachable TV counts as already off (there is nothing to power off; a TV with no
+/// network standby or switched off at the wall looks exactly like this) and raises one rate-limited desk notice so
+/// staff can check it. Throws when the TV could not be switched off (Failed), so the expiry evaluator retries it
 /// (bounded by <see cref="ExpiryEvaluator.MaxActionAttempts"/>). Never acts on a station that has already started a
 /// new session, so a retried expiry cannot cut a new customer off.
 /// </summary>
@@ -30,7 +32,7 @@ public sealed class TvExpiryActionHandler(TvControlService control, IDbContextFa
         }
 
         var result = await control.ExecuteAsync(station, on: false, "Expiry", cancellationToken);
-        if (result.Outcome is TvActionOutcome.Failed or TvActionOutcome.Unreachable)
+        if (result.Outcome == TvActionOutcome.Failed)
         {
             throw new InvalidOperationException($"The TV of {station.Name} was not powered off: {result.Message}.");
         }

@@ -19,7 +19,7 @@ public class TvDriverTests
     {
         var o = new TvOptions
         {
-            SettleMilliseconds = 0, KeyFlushMilliseconds = 0, WakeWaitMilliseconds = 0, WolRoundDelayMilliseconds = 0, PairTimeoutSeconds = 1,
+            SettleMilliseconds = 0, KeyFlushMilliseconds = 0, WakeWaitMilliseconds = 0, WakePollMilliseconds = 0, WolRoundDelayMilliseconds = 0, PairTimeoutSeconds = 1,
         };
         tweak?.Invoke(o);
         return new SamsungTizenDriver(_net, Options.Create(o), NullLogger<SamsungTizenDriver>.Instance);
@@ -286,12 +286,15 @@ public class TvDriverTests
     [Fact]
     public async Task Wake_on_lan_sends_12_datagrams_to_both_broadcasts_on_ports_9_and_7_then_the_key_from_standby()
     {
-        _net.Http = () => FakeTvTransport.State("standby");
+        var power = "standby";
+        _net.Http = () => FakeTvTransport.State(power);
+        _net.OnKeyPower = () => power = "on";
         _net.Incoming.Enqueue(FakeTvTransport.Connected());
 
         var r = await Driver().PowerOnAsync(Tv(), default);
 
         Assert.Equal(TvActionOutcome.PoweredOn, r.Outcome);
+        Assert.Equal(TvPowerState.On, r.State);
         Assert.Equal(12, _net.Datagrams.Count);
         Assert.All(_net.Datagrams, d => Assert.Equal(102, d.Payload.Length));
         foreach (var target in new[] { "255.255.255.255", "192.168.1.255" })
@@ -303,6 +306,65 @@ public class TvDriverTests
         }
 
         Assert.Equal(1, _net.KeyCount);
+    }
+
+    [Fact]
+    public async Task A_key_that_does_not_bring_the_tv_on_reports_the_fresh_state_not_power_on()
+    {
+        _net.Http = () => FakeTvTransport.State("standby");
+        _net.Incoming.Enqueue(FakeTvTransport.Connected());
+
+        var r = await Driver().PowerOnAsync(Tv(), default);
+
+        Assert.Equal(TvActionOutcome.KeySent, r.Outcome);
+        Assert.Equal(TvPowerState.Standby, r.State);
+        Assert.Equal(1, _net.KeyCount);
+    }
+
+    [Fact]
+    public async Task A_tv_that_leaves_standby_during_the_wake_window_gets_no_key()
+    {
+        var calls = 0;
+        // 1 initial read, 2 in the window report standby, then the TV is up.
+        _net.Http = () => ++calls <= 2 ? FakeTvTransport.State("standby") : FakeTvTransport.State("on");
+        var r = await Driver(o => { o.WakeWaitMilliseconds = 200; o.WakePollMilliseconds = 10; }).PowerOnAsync(Tv(), default);
+        Assert.Equal(TvActionOutcome.PoweredOn, r.Outcome);
+        Assert.Equal(0, _net.KeyCount);
+    }
+
+    [Fact]
+    public async Task A_tv_that_blips_out_of_standby_during_the_wake_window_gets_no_key()
+    {
+        var calls = 0;
+        _net.Http = () => ++calls == 3 ? FakeTvTransport.Down() : FakeTvTransport.State("standby");
+        var r = await Driver(o => { o.WakeWaitMilliseconds = 100; o.WakePollMilliseconds = 10; }).PowerOnAsync(Tv(), default);
+        Assert.Equal(TvActionOutcome.WakeSent, r.Outcome);
+        Assert.Equal(0, _net.KeyCount);
+        Assert.Empty(_net.Connects);
+    }
+
+    [Fact]
+    public async Task A_tv_that_wakes_between_the_window_and_the_key_gets_no_key()
+    {
+        var calls = 0;
+        // Standby for the initial read and the whole (single read) window, on at the re-read before the key.
+        _net.Http = () => ++calls <= 2 ? FakeTvTransport.State("standby") : FakeTvTransport.State("on");
+        var r = await Driver().PowerOnAsync(Tv(), default);
+        Assert.Equal(TvActionOutcome.PoweredOn, r.Outcome);
+        Assert.Equal(0, _net.KeyCount);
+    }
+
+    [Fact]
+    public async Task A_tv_in_standby_for_the_whole_window_is_read_several_times_before_the_key()
+    {
+        var power = "standby";
+        _net.Http = () => FakeTvTransport.State(power);
+        _net.OnKeyPower = () => power = "on";
+        _net.Incoming.Enqueue(FakeTvTransport.Connected());
+        var r = await Driver(o => { o.WakeWaitMilliseconds = 100; o.WakePollMilliseconds = 10; }).PowerOnAsync(Tv(), default);
+        Assert.Equal(TvActionOutcome.PoweredOn, r.Outcome);
+        Assert.Equal(1, _net.KeyCount);
+        Assert.True(_net.HttpRequests >= 5, $"expected several reads, got {_net.HttpRequests}");
     }
 
     [Fact]
@@ -327,7 +389,9 @@ public class TvDriverTests
     [Fact]
     public async Task Without_a_mac_a_standby_tv_still_gets_the_key()
     {
-        _net.Http = () => FakeTvTransport.State("standby");
+        var power = "standby";
+        _net.Http = () => FakeTvTransport.State(power);
+        _net.OnKeyPower = () => power = "on";
         _net.Incoming.Enqueue(FakeTvTransport.Connected());
         var r = await Driver().PowerOnAsync(Tv(mac: null), default);
         Assert.Equal(TvActionOutcome.PoweredOn, r.Outcome);

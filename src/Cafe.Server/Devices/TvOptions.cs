@@ -25,8 +25,11 @@ public sealed class TvOptions
     /// <summary>Wait between sending the power key and closing the channel, so the TV reads the frame.</summary>
     public int KeyFlushMilliseconds { get; set; } = 300;
 
-    /// <summary>Wait after the Wake-on-LAN packets before looking at the TV again.</summary>
-    public int WakeWaitMilliseconds { get; set; } = 4000;
+    /// <summary>How long to watch the TV after the Wake-on-LAN packets. A TV can report standby for several seconds while it boots.</summary>
+    public int WakeWaitMilliseconds { get; set; } = 8000;
+
+    /// <summary>Gap between state reads inside the wake window. 0 or less means a single read at the end.</summary>
+    public int WakePollMilliseconds { get; set; } = 1000;
 
     public int WolRounds { get; set; } = 3;
 

@@ -149,6 +149,21 @@ function Test-IsAdministrator {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+# True when the account is a direct member of the local Administrators group (S-1-5-32-544). Nested group
+# membership is not expanded; when the group cannot be read the answer is $false.
+function Test-IsLocalAdministrator {
+    param([string]$Sid)
+    try {
+        foreach ($member in @(Get-LocalGroupMember -SID 'S-1-5-32-544' -ErrorAction Stop)) {
+            if ($member.SID.Value -eq $Sid) { return $true }
+        }
+    }
+    catch {
+        Write-Verbose 'Could not read the local Administrators group.'
+    }
+    return $false
+}
+
 function Resolve-UserSid {
     param([string]$Account)
     try {
@@ -374,10 +389,30 @@ function Install-Agent {
     }
     $json = $settings | ConvertTo-Json
     $settingsPath = Join-Path $InstallPath 'agentsettings.json'
-    [System.IO.File]::WriteAllText($settingsPath, $json, (New-Object System.Text.UTF8Encoding($false)))
-    & icacls.exe $settingsPath /inheritance:r /grant:r '*S-1-5-18:F' '*S-1-5-32-544:F' ("*" + $sid.Value + ":R") | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "icacls failed with exit code $LASTEXITCODE while securing agentsettings.json."
+    # Create an empty temp file, lock its ACL down, and only then write the secrets into it, so the SharedKey and the
+    # emergency hash are never readable through the inherited Program Files ACL. The finished file replaces the old
+    # one by rename (a rename keeps the temp file's own ACL, so a previous gaming user's entry cannot linger).
+    $tempSettingsPath = Join-Path $InstallPath ('agentsettings.' + [Guid]::NewGuid().ToString('N') + '.tmp')
+    try {
+        [System.IO.File]::WriteAllBytes($tempSettingsPath, (New-Object byte[] 0))
+        & icacls.exe $tempSettingsPath /inheritance:r /grant:r '*S-1-5-18:F' '*S-1-5-32-544:F' ("*" + $sid.Value + ":R") | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "icacls failed with exit code $LASTEXITCODE while securing agentsettings.json."
+        }
+        [System.IO.File]::WriteAllText($tempSettingsPath, $json, (New-Object System.Text.UTF8Encoding($false)))
+        if (Test-Path -LiteralPath $settingsPath) {
+            Remove-Item -LiteralPath $settingsPath -Force
+        }
+        Move-Item -LiteralPath $tempSettingsPath -Destination $settingsPath -Force
+    }
+    finally {
+        if (Test-Path -LiteralPath $tempSettingsPath) {
+            Remove-Item -LiteralPath $tempSettingsPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+    if (Test-IsLocalAdministrator -Sid $sid.Value) {
+        Write-Warning "$account is a member of the local Administrators group. An administrator can edit agentsettings.json, stop the agent and re-enable Task Manager, so the lock is only a speed bump for that account."
+        Write-Warning 'For real protection run the gaming PC as a standard (non-administrator) account and pass it with -GamingUser.'
     }
     $logsPath = Join-Path $InstallPath 'logs'
     New-Item -ItemType Directory -Force -Path $logsPath | Out-Null

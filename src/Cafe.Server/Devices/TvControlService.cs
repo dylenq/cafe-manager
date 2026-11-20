@@ -22,6 +22,8 @@ public sealed class TvControlService(
 {
     public const string NoTvMessage = "This station has no TV configured";
 
+    public const string UnexpectedFailureMessage = "The TV command failed. Check the TV and try again";
+
     public Task<TvCommandResult> PowerOnAsync(int stationId, string source = "Manual", CancellationToken cancellationToken = default) =>
         ManualAsync(stationId, on: true, source, cancellationToken);
 
@@ -78,8 +80,10 @@ public sealed class TvControlService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning("TV {Command} for station {Station} failed: {Error}", kind, station.Name, ex.Message);
-            result = new TvActionResult(TvActionOutcome.Failed, TvPowerState.Unknown, ex.Message);
+            // Details stay in the log. The UI and the audit row get a short fixed message: an exception text could carry
+            // a URL with the pairing token.
+            logger.LogWarning("TV {Command} for station {Station} failed unexpectedly: {ExceptionType}: {Error}", kind, station.Name, ex.GetType().Name, ex.Message);
+            result = new TvActionResult(TvActionOutcome.Failed, TvPowerState.Unknown, UnexpectedFailureMessage);
         }
 
         cache.Set(station.Id, result.State);

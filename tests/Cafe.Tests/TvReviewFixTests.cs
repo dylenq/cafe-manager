@@ -129,6 +129,37 @@ public class TvReviewFixTests : SessionTestBase
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => handler.ExecuteAsync(station, cts.Token));
     }
 
+    // ---- IN-05 ----
+
+    private sealed class ThrowingDriver : ITvDriver
+    {
+        public Task<TvPairResult> PairAsync(Station station, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<TvPowerState> GetStateAsync(Station station, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<TvActionResult> PowerOnAsync(Station station, CancellationToken ct) => throw new InvalidOperationException("wss://10.0.0.5:8002/x?token=SECRET");
+
+        public Task<TvActionResult> PowerOffAsync(Station station, CancellationToken ct) => throw new InvalidOperationException("wss://10.0.0.5:8002/x?token=SECRET");
+    }
+
+    [Fact]
+    public async Task A_driver_exception_shows_a_short_message_and_keeps_the_details_out_of_the_ui_and_the_audit_log()
+    {
+        var id = await PairedConsoleAsync();
+        var dbFactory = Factory.Services.GetRequiredService<IDbContextFactory<CafeDbContext>>();
+        var control = new TvControlService(new ThrowingDriver(), dbFactory, new TvStateCache(TimeProvider.System, Options.Create(new TvOptions())),
+            TimeProvider.System, NullLogger<TvControlService>.Instance);
+
+        var result = await control.PowerOffAsync(id);
+
+        Assert.False(result.Success);
+        Assert.Equal(TvControlService.UnexpectedFailureMessage, result.Message);
+        await using var db = await DbAsync();
+        var row = Assert.Single(await db.AgentCommandLogs.AsNoTracking().ToListAsync());
+        Assert.DoesNotContain("SECRET", row.Details);
+        Assert.DoesNotContain("wss://", row.Details);
+    }
+
     [Fact]
     public async Task Unrelated_edits_keep_the_pairing_token()
     {

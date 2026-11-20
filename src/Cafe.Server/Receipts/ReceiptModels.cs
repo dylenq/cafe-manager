@@ -44,4 +44,5 @@ public sealed record ReceiptDocument(
     IReadOnlyList<ReceiptPayment> Payments,
     decimal Paid,
     decimal? Change,
-    decimal Remaining);
+    decimal Remaining,
+    int RootPaymentId = 0);

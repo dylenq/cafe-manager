@@ -7,7 +7,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Cafe.Server.Receipts;
 
 /// <summary>Loads the payments of one checkout and the things they paid for, then builds the receipt (POS-04).</summary>
-public class ReceiptService(IDbContextFactory<CafeDbContext> dbFactory, PricingConfigService pricing)
+public class ReceiptService(
+    IDbContextFactory<CafeDbContext> dbFactory, PricingConfigService pricing, ReceiptSettingsService receiptSettings)
 {
     public const string CafeNameKey = "Receipts:CafeName";
     public const string AddressKey = "Receipts:Address";
@@ -48,15 +49,9 @@ public class ReceiptService(IDbContextFactory<CafeDbContext> dbFactory, PricingC
             }
         }
 
-        var settings = await db.Settings.AsNoTracking()
-            .Where(s => s.Key == CafeNameKey || s.Key == AddressKey || s.Key == PhoneKey || s.Key == FooterKey)
-            .ToDictionaryAsync(s => s.Key, s => s.Value, cancellationToken);
-        string Get(string key, string fallback) =>
-            settings.TryGetValue(key, out var v) && !string.IsNullOrWhiteSpace(v) ? v.Trim() : fallback;
-
-        var lines = new[] { Get(AddressKey, string.Empty), Get(PhoneKey, string.Empty) }
-            .Where(l => l.Length > 0).ToList();
-        var header = new ReceiptHeader(Get(CafeNameKey, "Cafe"), lines, Get(FooterKey, "Thank you!"));
+        var settings = await receiptSettings.GetAsync(cancellationToken);
+        var lines = new[] { settings.Address, settings.Phone }.Where(l => l.Length > 0).ToList();
+        var header = new ReceiptHeader(settings.CafeName, lines, settings.Footer);
 
         var source = new ReceiptSource(
             payments[0].Id,

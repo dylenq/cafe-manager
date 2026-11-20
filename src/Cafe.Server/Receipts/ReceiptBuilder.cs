@@ -12,5 +12,6 @@ public static class ReceiptBuilder
         Payments: source.Payments,
         Paid: source.Payments.Sum(p => p.Amount),
         Change: source.ChangeGiven,
-        Remaining: source.Targets.Sum(t => t.Remaining));
+        Remaining: source.Targets.Sum(t => t.Remaining),
+        RootPaymentId: source.RootPaymentId);
 }

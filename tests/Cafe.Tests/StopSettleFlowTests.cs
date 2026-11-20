@@ -94,7 +94,7 @@ public class StopSettleFlowTests : PosTestBase
     }
 
     [Fact]
-    public async Task Stale_quote_after_an_extra_order_pays_nothing_and_leaves_every_item_in_open_tabs()
+    public async Task Stale_quote_after_an_extra_order_stops_nothing_pays_nothing_and_returns_the_changed_message()
     {
         var (sessionId, a, _) = await PrepaidWithTwoOrdersAsync();
         var quote = await QuoteAsync(sessionId);
@@ -103,20 +103,18 @@ public class StopSettleFlowTests : PosTestBase
 
         var result = await SettleAsync(sessionId, quote, quote.TotalDue, new TenderLine(PaymentMethod.Cash, quote.TotalDue));
 
-        // The service stops first (the session version is unchanged) and then refuses the stale amount: no money is
-        // taken, the card shows "stopped, items under Open tabs". The card re-quotes before calling so staff see a
-        // changed message instead (covered by the fresh quote below).
-        Assert.True(result.Success, result.Error);
-        Assert.Equal(SettlementService.ChangedMessage, result.Value!.PaymentError);
-        Assert.Null(result.Value.Settlement);
+        // WR-02: the full due (session + open orders) is checked under the settlement lock before the stop.
+        Assert.False(result.Success);
+        Assert.Equal(SettlementService.ChangedMessage, result.Error);
+        Assert.NotEqual(SessionStatus.Ended, (await LoadAsync(sessionId)).Status);
         Assert.Equal(OrderStatus.Open, (await LoadOrderAsync(a)).Status);
         await using (var db = await DbAsync())
         {
             Assert.Equal(0, await db.Payments.CountAsync());
         }
 
-        var tabs = await Svc(sp => sp.GetRequiredService<OpenTabsService>().GetOpenTabsAsync());
-        Assert.Equal(quote.TotalDue + 5000m, Assert.Single(tabs).TotalOutstanding);
+        var fresh = await QuoteAsync(sessionId);
+        Assert.Equal(quote.TotalDue + 5000m, fresh.TotalDue);
     }
 
     [Fact]

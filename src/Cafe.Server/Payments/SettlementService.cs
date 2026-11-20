@@ -47,6 +47,12 @@ public class SettlementService(IDbContextFactory<CafeDbContext> dbFactory, TimeP
         }
 
         using var _ = await settlementLock.AcquireAsync(cancellationToken);
+        return await SettleLockedAsync(request, cancellationToken);
+    }
+
+    /// <summary>The body of <see cref="SettleAsync"/>; the caller already holds <see cref="SettlementLock"/> and validated the tenders.</summary>
+    internal async Task<ServiceResult<SettleResult>> SettleLockedAsync(SettleRequest request, CancellationToken cancellationToken)
+    {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
 
         var loaded = await LoadAsync(db, request.Targets, cancellationToken);

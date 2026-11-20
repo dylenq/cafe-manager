@@ -316,10 +316,10 @@ public class SettlementServiceTests : PosTestBase
         var quote = (await Svc(sp => sp.GetRequiredService<CheckoutService>().QuoteStopAndSettleAsync(session.Id))).Value!;
 
         var result = await Svc(sp => sp.GetRequiredService<CheckoutService>().StopAndSettleAsync(
-            session.Id, quote.Stop.Version, quote.Stop.Amount, [new TenderLine(PaymentMethod.Cash, 6000m)], 5000m));
+            session.Id, quote.Stop.Version, quote.Stop.Amount, [new TenderLine(PaymentMethod.Cash, 7000m)], quote.TotalDue));
 
         Assert.True(result.Success, result.Error);
-        Assert.NotNull(result.Value!.PaymentError);
+        Assert.Equal(SettlementService.OverpayMessage, result.Value!.PaymentError);
         Assert.Null(result.Value.Settlement);
         Assert.Equal(SessionStatus.Ended, (await LoadAsync(session.Id)).Status);
     }

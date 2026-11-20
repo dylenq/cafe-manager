@@ -7,7 +7,7 @@ namespace Cafe.Server.Payments;
 
 /// <summary>Stops a session and settles its charge plus its tab orders (POS-03, "Stop &amp; settle").</summary>
 public class CheckoutService(
-    SessionService sessions, SettlementService settlement, IDbContextFactory<CafeDbContext> dbFactory)
+    SessionService sessions, SettlementService settlement, IDbContextFactory<CafeDbContext> dbFactory, SettlementLock settlementLock)
 {
     /// <summary>
     /// Reads what stopping and settling would cost right now: the stop quote plus the session's open orders that still
@@ -34,8 +34,10 @@ public class CheckoutService(
     }
 
     /// <summary>
-    /// Stops the session (refused with SessionService.ChangedMessage when the quote is stale) then pays the session
-    /// charge and every open order on it. With no tenders nothing is paid ("Stop, pay later"). If the stop succeeded
+    /// Stops the session then pays the session charge and every open order on it. Under <see cref="SettlementLock"/> and
+    /// before anything is stopped the full due (session charge plus open orders) is compared with
+    /// <paramref name="expectedDue"/>: a mismatch returns <see cref="SettlementService.ChangedMessage"/> and the session
+    /// keeps running. A stale session version or charge is refused with SessionService.ChangedMessage. With no tenders nothing is paid ("Stop, pay later"). If the stop succeeded
     /// but the payment is refused the result is still a success with <see cref="CheckoutResult.PaymentError"/> set:
     /// the session is already ended and the items stay outstanding, so no money is lost.
     /// </summary>
@@ -47,6 +49,28 @@ public class CheckoutService(
         decimal expectedDue,
         CancellationToken cancellationToken = default)
     {
+        var tenderError = tenders.Count == 0 ? null : SettlementService.ValidateTenders(tenders);
+        if (tenderError is not null)
+        {
+            return ServiceResult<CheckoutResult>.Fail(tenderError, new Dictionary<string, string> { ["Tenders"] = tenderError });
+        }
+
+        using var _ = await settlementLock.AcquireAsync(cancellationToken);
+
+        // Full-due guard before stopping: an order added, voided or paid since the quote does not bump the session version.
+        var current = await QuoteStopAndSettleAsync(sessionId, cancellationToken);
+        if (!current.Success)
+        {
+            return current.Kind == FailureKind.NotFound
+                ? ServiceResult<CheckoutResult>.NotFound(current.Error!)
+                : ServiceResult<CheckoutResult>.Fail(current.Error!);
+        }
+
+        if (current.Value!.TotalDue != expectedDue)
+        {
+            return ServiceResult<CheckoutResult>.Fail(SettlementService.ChangedMessage);
+        }
+
         var stopped = await sessions.StopAsync(sessionId, expectedVersion, expectedSessionCharge, cancellationToken);
         if (!stopped.Success)
         {
@@ -75,7 +99,7 @@ public class CheckoutService(
             return ServiceResult<CheckoutResult>.Ok(new CheckoutResult(charge, null, null));
         }
 
-        var settled = await settlement.SettleAsync(new SettleRequest(targets, tenders, expectedDue), cancellationToken);
+        var settled = await settlement.SettleLockedAsync(new SettleRequest(targets, tenders, expectedDue), cancellationToken);
         return ServiceResult<CheckoutResult>.Ok(settled.Success
             ? new CheckoutResult(charge, settled.Value, null)
             : new CheckoutResult(charge, null, settled.Error));

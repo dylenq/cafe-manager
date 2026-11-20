@@ -11,7 +11,7 @@ namespace Cafe.Server.Devices;
 
 /// <summary>
 /// Samsung Tizen driver: pairing and power key over the remote WebSocket channel, power state over the REST
-/// endpoint. KEY_POWER toggles, so a key is only ever sent after the state says the TV is On (or unknown), and
+/// endpoint. KEY_POWER toggles, so a key is only ever sent after the state says the TV is On (power off) or has stayed in Standby (power on), and
 /// actions on one TV never overlap. The pairing token is never logged.
 /// </summary>
 public sealed class SamsungTizenDriver(ITvTransport transport, IOptions<TvOptions> options, ILogger<SamsungTizenDriver> logger) : ITvDriver
@@ -92,12 +92,20 @@ public sealed class SamsungTizenDriver(ITvTransport transport, IOptions<TvOption
         try
         {
             var state = await ReadStateAsync(ip, cancellationToken);
+            if (state == TvPowerState.Unknown)
+            {
+                // KEY_POWER toggles: an unreadable state may be standby, and the key would switch the TV on. Ask once more.
+                state = await ReadStateAsync(ip, cancellationToken);
+            }
+
             switch (state)
             {
                 case TvPowerState.Standby:
                     return new TvActionResult(TvActionOutcome.AlreadyOff, state, "The TV is already off");
                 case TvPowerState.Unreachable:
                     return new TvActionResult(TvActionOutcome.Unreachable, state, "The TV did not respond");
+                case TvPowerState.Unknown:
+                    return new TvActionResult(TvActionOutcome.Failed, state, "The TV state could not be read, so the power key was not sent");
             }
 
             if (await SendPowerKeyAsync(ip, station.TvToken, cancellationToken) is { } failure)

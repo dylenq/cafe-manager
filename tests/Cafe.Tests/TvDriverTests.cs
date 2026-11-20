@@ -160,12 +160,38 @@ public class TvDriverTests
     }
 
     [Fact]
-    public async Task Unknown_state_sends_the_key()
+    public async Task Unknown_state_sends_no_key_and_fails_after_one_re_query()
     {
         _net.Http = () => new TvHttpResult(true, 500, null);
         _net.Incoming.Enqueue(FakeTvTransport.Connected());
         var r = await Driver().PowerOffAsync(Tv(), default);
-        Assert.Equal(TvActionOutcome.KeySent, r.Outcome);
+        Assert.Equal(TvActionOutcome.Failed, r.Outcome);
+        Assert.Equal(TvPowerState.Unknown, r.State);
+        Assert.Equal(0, _net.KeyCount);
+        Assert.Empty(_net.Connects);
+        Assert.Equal(2, _net.HttpRequests);
+    }
+
+    [Fact]
+    public async Task Unknown_then_standby_on_the_re_query_sends_no_key()
+    {
+        var calls = 0;
+        _net.Http = () => ++calls == 1 ? new TvHttpResult(true, 500, null) : FakeTvTransport.State("standby");
+        var r = await Driver().PowerOffAsync(Tv(), default);
+        Assert.Equal(TvActionOutcome.AlreadyOff, r.Outcome);
+        Assert.Equal(0, _net.KeyCount);
+    }
+
+    [Fact]
+    public async Task Unknown_then_on_on_the_re_query_sends_the_key()
+    {
+        var calls = 0;
+        var power = "on";
+        _net.Http = () => ++calls == 1 ? new TvHttpResult(true, 500, null) : FakeTvTransport.State(power);
+        _net.OnKeyPower = () => power = "standby";
+        _net.Incoming.Enqueue(FakeTvTransport.Connected());
+        var r = await Driver().PowerOffAsync(Tv(), default);
+        Assert.Equal(TvActionOutcome.PoweredOff, r.Outcome);
         Assert.Equal(1, _net.KeyCount);
     }
 

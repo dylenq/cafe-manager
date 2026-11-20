@@ -1,0 +1,16 @@
+.sound-toggle { display: inline-flex; }
+
+/* The label stays in the DOM for screen readers; on narrow toolbars only the glyph shows. */
+.sound-toggle-btn { position: relative; gap: .4rem; width: auto; padding: 0 .75rem; }
+.sound-toggle-label { font-size: var(--fs-subhead); }
+
+@media (max-width: 640px) {
+    .sound-toggle-btn { width: var(--control-h); padding: 0; justify-content: center; }
+    .sound-toggle-label {
+        position: absolute;
+        width: 1px; height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+}

@@ -5,22 +5,23 @@
     <div class="alert-strip" role="alert" aria-live="polite">
         @foreach (var alert in Alerts)
         {
-            <div class="alert-strip-row d-flex align-items-center justify-content-between gap-2 @(alert.Acknowledged ? "alert-strip-ack" : "alert-pulse-box")" @key="alert.StationId">
-                <div>
+            <div class="alert-strip-row @(alert.Acknowledged ? "alert-strip-ack" : "alert-pulse-box")" @key="alert.StationId">
+                <div class="alert-strip-text">
+                    <Icon Name="clock" Size="18" Class="alert-strip-icon" />
                     <strong>@alert.StationName</strong>
-                    <span class="ms-2">@(alert.Level == AlertLevel.TimeUp ? "TIME UP" : "Expiring")</span>
+                    <span class="alert-strip-level">@(alert.Level == AlertLevel.TimeUp ? "TIME UP" : "Expiring")</span>
                     @if (Details.TryGetValue(alert.StationId, out var detail))
                     {
-                        <span class="ms-2">@detail</span>
+                        <span class="alert-strip-detail">@detail</span>
                     }
                 </div>
                 @if (alert.Acknowledged)
                 {
-                    <span class="small">Acknowledged</span>
+                    <span class="alert-strip-state">Acknowledged</span>
                 }
                 else
                 {
-                    <button type="button" class="btn btn-sm btn-light" @onclick="() => OnAcknowledge.InvokeAsync(alert.StationId)">Acknowledge</button>
+                    <button type="button" class="btn btn-sm btn-secondary" @onclick="() => OnAcknowledge.InvokeAsync(alert.StationId)">Acknowledge</button>
                 }
             </div>
         }

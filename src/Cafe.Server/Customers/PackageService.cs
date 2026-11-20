@@ -1,4 +1,5 @@
 using Cafe.Server.Data;
+using Cafe.Server.Payments;
 using Cafe.Server.Stations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -127,12 +128,40 @@ public class PackageService(
     }
 
     /// <summary>
-    /// Sells a package: the PackageSale, the Payment and the ledger credit are added to one context and saved with a
-    /// single SaveChanges, so SQLite commits all three or none (CUST-04). When <paramref name="expectedPrice"/> is given
-    /// (the price the cashier saw) and the package price has changed since, nothing is sold.
+    /// Sells a package for one full-price payment of <paramref name="method"/> (Phase 5 entry point). It shares one code
+    /// path with <see cref="SellPaidAsync"/>, so the sale also writes its payment allocation. When
+    /// <paramref name="expectedPrice"/> is given (the price the cashier saw) and the package price has changed since,
+    /// nothing is sold.
     /// </summary>
     public async Task<ServiceResult<PackageSale>> SellAsync(
         int customerId, int packageId, PaymentMethod method, decimal? expectedPrice = null, CancellationToken cancellationToken = default)
+    {
+        var sold = await SellCoreAsync(
+            customerId, packageId, price => [new TenderLine(method, price)], expectedPrice, "Price changed — review the package and try again.", cancellationToken);
+        return sold.Success
+            ? ServiceResult<PackageSale>.Ok(sold.Value!.Sale)
+            : sold.Kind == FailureKind.NotFound ? ServiceResult<PackageSale>.NotFound(sold.Error!) : ServiceResult<PackageSale>.Fail(sold.Error!, sold.FieldErrors);
+    }
+
+    /// <summary>
+    /// Sells a package through the payment path (D-06): PackageSale, ledger credit, one Payment per tender line and the
+    /// allocations to the sale, all in one transaction. The sale must be paid in full; cash may be tendered above the
+    /// price (change is returned, never stored). <paramref name="expectedDue"/> is the price the cashier saw.
+    /// </summary>
+    public async Task<ServiceResult<SettleResult>> SellPaidAsync(
+        int customerId, int packageId, IReadOnlyList<TenderLine> tenders, decimal expectedDue, CancellationToken cancellationToken = default)
+    {
+        var sold = await SellCoreAsync(customerId, packageId, _ => tenders, expectedDue, SettlementService.ChangedMessage, cancellationToken);
+        return sold.Success
+            ? ServiceResult<SettleResult>.Ok(sold.Value!.Result)
+            : sold.Kind == FailureKind.NotFound ? ServiceResult<SettleResult>.NotFound(sold.Error!) : ServiceResult<SettleResult>.Fail(sold.Error!, sold.FieldErrors);
+    }
+
+    private sealed record Sold(PackageSale Sale, SettleResult Result);
+
+    private async Task<ServiceResult<Sold>> SellCoreAsync(
+        int customerId, int packageId, Func<decimal, IReadOnlyList<TenderLine>> tendersFor, decimal? expectedPrice,
+        string changedMessage, CancellationToken cancellationToken)
     {
         using var _ = await balanceLock.AcquireAsync(cancellationToken);
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
@@ -141,24 +170,46 @@ public class PackageService(
         if (!customer.Success)
         {
             return customer.Kind == FailureKind.NotFound
-                ? ServiceResult<PackageSale>.NotFound(customer.Error!)
-                : ServiceResult<PackageSale>.Fail(customer.Error!);
+                ? ServiceResult<Sold>.NotFound(customer.Error!)
+                : ServiceResult<Sold>.Fail(customer.Error!);
         }
 
         var package = await db.TimePackages.FirstOrDefaultAsync(p => p.Id == packageId, cancellationToken);
         if (package is null)
         {
-            return ServiceResult<PackageSale>.NotFound(Gone);
+            return ServiceResult<Sold>.NotFound(Gone);
         }
 
         if (!package.IsActive)
         {
-            return ServiceResult<PackageSale>.Fail("That package is no longer on sale.");
+            return ServiceResult<Sold>.Fail("That package is no longer on sale.");
         }
 
         if (expectedPrice is { } expected && expected != package.Price)
         {
-            return ServiceResult<PackageSale>.Fail("Price changed — review the package and try again.");
+            return ServiceResult<Sold>.Fail(changedMessage);
+        }
+
+        var tenders = tendersFor(package.Price);
+        if (package.Price == 0m)
+        {
+            // A free package still records its (zero) payment as in Phase 5; there is nothing to validate or allocate.
+            tenders = [new TenderLine(tenders.Count > 0 ? tenders[0].Method : PaymentMethod.Cash, 0m)];
+        }
+        else if (SettlementService.ValidateTenders(tenders) is { } tenderError)
+        {
+            return ServiceResult<Sold>.Fail(tenderError, new Dictionary<string, string> { ["Tenders"] = tenderError });
+        }
+
+        var applied = tenders.Sum(t => t.Amount);
+        if (applied < package.Price)
+        {
+            return ServiceResult<Sold>.Fail("A package must be paid in full.");
+        }
+
+        if (applied > package.Price)
+        {
+            return ServiceResult<Sold>.Fail(SettlementService.OverpayMessage, new Dictionary<string, string> { ["Tenders"] = SettlementService.OverpayMessage });
         }
 
         var now = time.GetUtcNow();
@@ -172,7 +223,18 @@ public class PackageService(
             AtUtc = now,
         };
         db.PackageSales.Add(sale);
-        db.Payments.Add(new Payment { Amount = package.Price, Method = method, AtUtc = now, PackageSale = sale });
+        var payments = new List<Payment>();
+        foreach (var tender in tenders)
+        {
+            var payment = new Payment
+            {
+                Amount = tender.Amount, Method = tender.Method, AtUtc = now, PackageSale = sale,
+                PrimaryPayment = payments.Count == 0 ? null : payments[0],
+            };
+            payments.Add(payment);
+            db.Payments.Add(payment);
+        }
+
         db.CustomerMinuteLedger.Add(new CustomerMinuteLedger
         {
             CustomerId = customerId,
@@ -185,16 +247,32 @@ public class PackageService(
 
         try
         {
+            // The sale id is only known after the first save, and the allocation has no foreign key to it, so the two
+            // saves share one transaction: SQLite commits the sale, ledger credit, payments and allocations or none.
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
+            var plan = AllocationPlanner.Plan([new PlanTarget(AllocationTargetType.PackageSale, sale.Id, sale.Price)], tenders.Select(t => t.Amount).ToList());
+            for (var i = 0; i < payments.Count; i++)
+            {
+                foreach (var part in plan[i])
+                {
+                    payments[i].Allocations.Add(new PaymentAllocation { TargetType = part.Type, TargetId = part.Id, Amount = part.Amount });
+                }
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
         catch (DbUpdateException ex)
         {
-            // One SaveChanges is one transaction: nothing was written. Report it instead of leaking the exception.
+            // Uncommitted transaction rolls back on dispose: nothing was written. Report it instead of leaking the exception.
             logger?.LogError(ex, "Package sale could not be saved (customer {CustomerId}, package {PackageId}).", customerId, packageId);
-            return ServiceResult<PackageSale>.Fail("The sale could not be saved, so nothing was recorded. Try again.");
+            return ServiceResult<Sold>.Fail("The sale could not be saved, so nothing was recorded. Try again.");
         }
 
-        return ServiceResult<PackageSale>.Ok(sale);
+        var change = tenders.Where(t => t.Method == PaymentMethod.Cash && t.Tendered is not null).Sum(t => t.Tendered!.Value - t.Amount);
+        var result = new SettleResult(payments.Select(p => p.Id).ToList(), payments[0].Id, package.Price, applied, 0m, change, []);
+        return ServiceResult<Sold>.Ok(new Sold(sale, result));
     }
 
     private const string Gone = "That package no longer exists. Refresh the list.";

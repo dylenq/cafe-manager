@@ -272,7 +272,7 @@ public class SettlementServiceTests : PosTestBase
 
         Assert.True(result.Success, result.Error);
         await using var db = await DbAsync();
-        var allocation = await db.PaymentAllocations.SingleAsync();
+        var allocation = await db.PaymentAllocations.Where(a => a.TargetType != AllocationTargetType.PackageSale).SingleAsync();
         Assert.Equal(AllocationTargetType.Order, allocation.TargetType);
         Assert.Equal(order.Id, allocation.TargetId);
     }

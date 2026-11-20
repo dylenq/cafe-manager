@@ -55,6 +55,44 @@ public class TvMonitorStatusTests : SessionTestBase
     }
 
     [Fact]
+    public void A_poll_that_started_before_an_action_result_is_discarded()
+    {
+        var cache = NewCache();
+        var marker = cache.BeginPoll();
+        cache.Set(7, TvPowerState.Standby); // a manual power action finished while the poll was in flight
+
+        Assert.False(cache.SetFromPoll(7, TvPowerState.On, marker));
+        Assert.Equal(TvPowerState.Standby, cache.Get(7));
+
+        // A poll that starts after the action is applied normally.
+        Assert.True(cache.SetFromPoll(7, TvPowerState.On, cache.BeginPoll()));
+        Assert.Equal(TvPowerState.On, cache.Get(7));
+    }
+
+    [Fact]
+    public async Task A_slow_poll_cannot_overwrite_a_newer_action_result()
+    {
+        var id = await ConsoleAsync("PS5-01");
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _driver.State = _ => TvPowerState.On; // what the stale poll saw
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _driver.StateHook = _ =>
+        {
+            started.TrySetResult();
+            return gate.Task;
+        };
+        var cache = NewCache();
+
+        var poll = Monitor(cache, rest: 30).PollOnceAsync(CancellationToken.None);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        cache.Set(id, TvPowerState.Standby); // a power-off completes while the poll is waiting on the TV
+        gate.SetResult();
+        await poll;
+
+        Assert.Equal(TvPowerState.Standby, cache.Get(id));
+    }
+
+    [Fact]
     public async Task One_hanging_tv_does_not_hold_up_the_others_and_reads_unreachable()
     {
         var hung = await ConsoleAsync("PS5-01");

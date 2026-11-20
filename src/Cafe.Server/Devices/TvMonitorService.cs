@@ -73,6 +73,7 @@ public sealed class TvMonitorService(
     private async Task PollOneAsync(Station station, CancellationToken cancellationToken)
     {
         var state = TvPowerState.Unreachable;
+        var marker = cache.BeginPoll();
         try
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -88,7 +89,12 @@ public sealed class TvMonitorService(
             logger.LogDebug("TV poll for station {StationId} failed: {Error}", station.Id, ex.Message);
         }
 
-        cache.Set(station.Id, state);
+        if (!cache.SetFromPoll(station.Id, state, marker))
+        {
+            logger.LogDebug("TV poll for station {StationId} discarded: a newer action result exists.", station.Id);
+            return;
+        }
+
         logger.LogDebug("TV of station {StationId} is {State}.", station.Id, state);
     }
 }

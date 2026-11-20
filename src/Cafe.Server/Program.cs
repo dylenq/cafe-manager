@@ -5,6 +5,7 @@ using Cafe.Server.Components;
 using Cafe.Server.Dashboard;
 using Cafe.Server.Data;
 using Cafe.Server.Devices;
+using Cafe.Server.Hosting;
 using Cafe.Server.Payments;
 using Cafe.Server.Receipts;
 using Cafe.Server.Reports;
@@ -26,13 +27,23 @@ builder.Host.UseWindowsService();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Connection string is read lazily so configuration overrides (e.g. the test factory) take effect.
-builder.Services.AddDbContextFactory<CafeDbContext>((sp, options) =>
+// Database/log/backup locations: an explicit ConnectionStrings:Cafe wins; Production or a Windows service
+// defaults to %ProgramData%\CafeManager; Development keeps cafe.db in the content root.
+var dataLocation = CafeDataPaths.Resolve(
+    builder.Configuration.GetConnectionString("Cafe"),
+    builder.Configuration["Cafe:DataDirectory"],
+    builder.Environment.IsProduction(),
+    Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceHelpers.IsWindowsService(),
+    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+    builder.Environment.ContentRootPath);
+dataLocation.EnsureDirectories();
+builder.Services.AddSingleton(dataLocation);
+if (dataLocation.UseProductionLayout)
 {
-    var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString("Cafe")
-                           ?? "Data Source=cafe.db";
-    options.UseSqlite(connectionString);
-});
+    builder.Logging.AddProvider(new FileLoggerProvider(dataLocation.LogDirectory, () => DateTimeOffset.Now));
+}
+
+builder.Services.AddDbContextFactory<CafeDbContext>(options => options.UseSqlite(dataLocation.ConnectionString));
 builder.Services.TryAddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<LoginThrottle>();
 builder.Services.AddScoped<AdminPasswordService>();
@@ -87,6 +98,9 @@ var app = builder.Build();
 
 // Currency and number formatting follows Cafe:Culture (empty = the server's culture).
 CafeCulture.Apply(CafeCulture.Resolve(app.Configuration[CafeCulture.Key], app.Logger));
+
+// Log only the database file path, never the raw connection string.
+app.Logger.LogInformation("Database: {DatabaseFile}; logs: {LogDirectory}", dataLocation.DatabaseFile, dataLocation.LogDirectory);
 
 using (var scope = app.Services.CreateScope())
 {

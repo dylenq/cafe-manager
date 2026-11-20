@@ -8,6 +8,9 @@ cafe.db-wal
 cafe-test-*.db*
 smoke.db*
 TestResults/
+logs/
+backups/
+dist/
 
 # Claude agent worktrees
 .claude/worktrees/

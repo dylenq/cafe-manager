@@ -1,0 +1,52 @@
+@page "/reports"
+@attribute [Authorize]
+@using System.Globalization
+@using Cafe.Server.Pricing
+@using Cafe.Server.Reports
+@inject ReportService ReportSvc
+@inject PricingConfigService Pricing
+@inject TimeProvider Time
+
+<PageTitle>Reports - Cafe Manager</PageTitle>
+
+<h1 class="h3 mb-3">Reports</h1>
+
+@if (data is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <p data-testid="report-summary">
+        Collected @data.Summary.Collected.ToString("C"), cash @data.Summary.Cash.ToString("C"), card @data.Summary.Card.ToString("C")
+    </p>
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr><th>Date</th><th class="text-end">Collected</th><th class="text-end">Cash</th><th class="text-end">Card</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var day in data.Days)
+                {
+                    <tr>
+                        <td>@day.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</td>
+                        <td class="text-end">@day.Collected.ToString("C")</td>
+                        <td class="text-end">@day.Cash.ToString("C")</td>
+                        <td class="text-end">@day.Card.ToString("C")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private ReportData? data;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(Time.GetUtcNow(), Pricing.TimeZone).DateTime);
+        var monday = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
+        data = await ReportSvc.GetAsync(new ReportRange(monday, monday.AddDays(6)));
+    }
+}

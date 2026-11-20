@@ -111,6 +111,11 @@ public class StationTypeService(IDbContextFactory<CafeDbContext> dbFactory)
                 $"Cannot delete '{entity.Name}': used by {ruleCount} rate rule(s). Delete or change those rules first.");
         }
 
+        if (await OtherReferencesAsync(db, entity) is { } referenced)
+        {
+            return ServiceResult.Fail(referenced);
+        }
+
         db.StationTypes.Remove(entity);
         try
         {
@@ -128,14 +133,38 @@ public class StationTypeService(IDbContextFactory<CafeDbContext> dbFactory)
             if (now == 0)
             {
                 var rules = await db.RateRules.CountAsync(r => r.StationTypeId == id);
+                if (rules > 0)
+                {
+                    return ServiceResult.Fail(
+                        $"Cannot delete '{entity.Name}': used by {rules} rate rule(s). Delete or change those rules first.");
+                }
+
                 return ServiceResult.Fail(
-                    $"Cannot delete '{entity.Name}': used by {Math.Max(rules, 1)} rate rule(s). Delete or change those rules first.");
+                    await OtherReferencesAsync(db, entity)
+                    ?? $"Cannot delete '{entity.Name}': it is still referenced by other records.");
             }
 
             return ServiceResult.Fail(InUse(entity.Name, now));
         }
 
         return ServiceResult.Ok();
+    }
+
+    /// <summary>Message for time packages or customer balance rows that still reference the type; null when none do.</summary>
+    private static async Task<string?> OtherReferencesAsync(CafeDbContext db, StationType entity)
+    {
+        var packages = await db.TimePackages.CountAsync(p => p.StationTypeId == entity.Id);
+        if (packages > 0)
+        {
+            return $"Cannot delete '{entity.Name}': used by {packages} time package(s). Delete or change those packages first.";
+        }
+
+        if (await db.CustomerMinuteLedger.AnyAsync(l => l.StationTypeId == entity.Id))
+        {
+            return $"Cannot delete '{entity.Name}': customers have prepaid minutes or history recorded against it.";
+        }
+
+        return null;
     }
 
     private static string InUse(string name, int count) =>

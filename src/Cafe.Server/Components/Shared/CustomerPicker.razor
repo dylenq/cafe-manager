@@ -4,28 +4,31 @@
 @inject CustomerService CustomerSvc
 @inject ILogger<CustomerPicker> Logger
 
-<div class="customer-picker small">
+<div class="customer-picker">
     @if (_picked is { } pick)
     {
-        <div class="d-flex align-items-center gap-1">
-            <span class="badge text-bg-light border customer-chip">@pick.Name</span>
+        <div class="picker-chip-row">
+            <span class="capsule capsule-gray customer-chip">@pick.Name</span>
             @if (pick.IsMember)
             {
-                <span class="badge text-bg-info">Member</span>
+                <span class="capsule capsule-blue">Member</span>
             }
-            <button type="button" class="btn btn-sm btn-outline-secondary py-0" aria-label="Clear customer" @onclick="ClearAsync">Clear</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" aria-label="Clear customer" @onclick="ClearAsync">Clear</button>
         </div>
     }
     else
     {
-        <input type="text" class="form-control form-control-sm" placeholder="Name or phone" aria-label="Customer search"
-               value="@_term" @oninput="OnInputAsync" />
+        <div class="search-field">
+            <Icon Name="magnifier" Size="18" />
+            <input type="text" class="form-control form-control-sm" placeholder="Name or phone" aria-label="Customer search"
+                   value="@_term" @oninput="OnInputAsync" />
+        </div>
         @if (_results.Count > 0)
         {
-            <div class="list-group mt-1 customer-results">
+            <div class="list-group customer-results">
                 @foreach (var r in _results)
                 {
-                    <button type="button" class="list-group-item list-group-item-action py-1" @onclick="() => PickAsync(r)">
+                    <button type="button" class="list-group-item list-group-item-action" @onclick="() => PickAsync(r)">
                         @r.Name@(string.IsNullOrEmpty(r.Phone) ? "" : " - " + PhoneDisplay.Format(r.Phone))@(r.IsMember ? " (Member)" : "")
                     </button>
                 }
@@ -33,13 +36,13 @@
         }
         else if (_searched && _term.Trim().Length >= 2)
         {
-            <div class="text-muted mt-1">No match.</div>
+            <div class="picker-note">No match.</div>
         }
 
-        <button type="button" class="btn btn-sm btn-link p-0 mt-1" @onclick="() => _quickAdd = !_quickAdd">Quick add</button>
+        <button type="button" class="btn btn-sm btn-link picker-quick" @onclick="() => _quickAdd = !_quickAdd">Quick add</button>
         @if (_quickAdd)
         {
-            <div class="mt-1 d-flex flex-column gap-1">
+            <div class="picker-quick-form">
                 <input type="text" class="form-control form-control-sm" placeholder="Name" aria-label="New customer name" maxlength="100" @bind="_newName" />
                 @FieldError("Name")
                 <input type="text" class="form-control form-control-sm" placeholder="Phone" aria-label="New customer phone" maxlength="40" @bind="_newPhone" />
@@ -51,7 +54,7 @@
 
     @if (_error is not null)
     {
-        <div class="text-danger mt-1" role="alert">@_error</div>
+        <div class="picker-error" role="alert">@_error</div>
     }
 </div>
 
@@ -85,7 +88,7 @@
         if (_fieldErrors.TryGetValue(field, out var message))
         {
             builder.OpenElement(0, "div");
-            builder.AddAttribute(1, "class", "text-danger");
+            builder.AddAttribute(1, "class", "picker-error");
             builder.AddContent(2, message);
             builder.CloseElement();
         }

@@ -151,7 +151,8 @@ function Uninstall-Server {
         Remove-Item -LiteralPath $InstallPath -Recurse -Force
     }
     $parent = Split-Path -Parent $InstallPath
-    if ($parent -and (Test-Path -LiteralPath $parent)) {
+    # Only tidy up the shared CafeManager folder, never an arbitrary parent (a drive root or an unrelated folder).
+    if ($parent -and ((Split-Path -Leaf $parent) -ieq 'CafeManager') -and (Test-Path -LiteralPath $parent)) {
         $remaining = @(Get-ChildItem -LiteralPath $parent -Force)
         if ($remaining.Count -eq 0) {
             Remove-Item -LiteralPath $parent -Force

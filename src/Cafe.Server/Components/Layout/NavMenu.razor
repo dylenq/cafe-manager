@@ -1,84 +1,58 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">Cafe Manager</a>
-    </div>
+<div class="brand">
+    <span class="brand-glyph" aria-hidden="true"><Icon Name="gamecontroller" Size="20" /></span>
+    <a class="brand-name" href="">Cafe Manager</a>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
-
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Dashboard
+<div class="nav-scrollable" onclick="if(event.target.closest('a')){document.getElementById('nav-toggle').checked=false;}">
+    <nav class="nav-groups" aria-label="Main">
+        <div class="nav-section">
+            <div class="nav-heading">Front Desk</div>
+            <NavLink class="nav-item-link" href="" Match="NavLinkMatch.All">
+                <Icon Name="house" /><span>Dashboard</span>
+            </NavLink>
+            <NavLink class="nav-item-link" href="sessions">
+                <Icon Name="clock" /><span>Sessions</span>
+            </NavLink>
+            <NavLink class="nav-item-link" href="pos">
+                <Icon Name="cart" /><span>POS</span>
+            </NavLink>
+            <NavLink class="nav-item-link" href="reports">
+                <Icon Name="chart" /><span>Reports</span>
             </NavLink>
         </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="stations">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Stations
+        <div class="nav-section">
+            <div class="nav-heading">Customers</div>
+            <NavLink class="nav-item-link" href="customers">
+                <Icon Name="people" /><span>Customers</span>
+            </NavLink>
+            <NavLink class="nav-item-link" href="packages">
+                <Icon Name="gift" /><span>Packages</span>
             </NavLink>
         </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="station-types">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Station Types
+        <div class="nav-section">
+            <div class="nav-heading">Setup</div>
+            <NavLink class="nav-item-link" href="stations">
+                <Icon Name="desktop" /><span>Stations</span>
             </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="sessions">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Sessions
+            <NavLink class="nav-item-link" href="station-types">
+                <Icon Name="gamecontroller" /><span>Station Types</span>
             </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="reports">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Reports
+            <NavLink class="nav-item-link" href="products">
+                <Icon Name="tag" /><span>Products</span>
             </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="pos">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> POS
+            <NavLink class="nav-item-link" href="rate-rules">
+                <Icon Name="slider" /><span>Rate Rules</span>
             </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="products">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Products
+            <NavLink class="nav-item-link" href="settings">
+                <Icon Name="gear" /><span>Settings</span>
             </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="customers">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Customers
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="packages">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Packages
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="rate-rules">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Rate Rules
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="settings">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Settings
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <form method="post" action="/logout">
-                <AntiforgeryToken />
-                <button type="submit" class="nav-link">Logout</button>
-            </form>
         </div>
     </nav>
+
+    <form method="post" action="/logout" class="nav-logout">
+        <AntiforgeryToken />
+        <button type="submit" class="nav-item-link"><Icon Name="logout" /><span>Log Out</span></button>
+    </form>
 </div>

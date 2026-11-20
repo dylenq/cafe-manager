@@ -1,0 +1,42 @@
+.auth-shell {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    background: var(--bg);
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 360px;
+    padding: 2rem 1.5rem 1.5rem;
+    background: var(--bg-2);
+    border-radius: 16px;
+}
+
+.auth-glyph {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 4rem;
+    height: 4rem;
+    margin: 0 auto 1rem;
+    border-radius: 14px;
+    background: var(--accent);
+    color: #fff;
+}
+
+.auth-card ::deep .auth-title {
+    margin: 0 0 1.25rem;
+    text-align: center;
+    font-size: var(--fs-title-2);
+    font-weight: 700;
+}
+
+.auth-card ::deep .auth-subtitle {
+    margin: -.75rem 0 1.25rem;
+    text-align: center;
+    font-size: var(--fs-subhead);
+    color: var(--label-2);
+}

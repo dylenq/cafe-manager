@@ -11,16 +11,16 @@
 
 <PageTitle>Set up Cafe Manager</PageTitle>
 
-<h1 class="h4 mb-3">Welcome to Cafe Manager</h1>
-<p class="text-muted">Choose the admin password staff will use to log in.</p>
+<h1 class="auth-title">Welcome to Cafe Manager</h1>
+<p class="auth-subtitle">Choose the admin password staff will use to log in.</p>
 
 <EditForm Model="Model!" FormName="setup" method="post" OnValidSubmit="SubmitAsync">
     <DataAnnotationsValidator />
-    <ValidationSummary class="text-danger" />
+    <ValidationSummary class="text-danger footnote" />
 
     @if (!string.IsNullOrEmpty(_error))
     {
-        <div class="text-danger mb-3" role="alert">@_error</div>
+        <div class="banner banner-danger" role="alert">@_error</div>
     }
 
     <div class="mb-3">

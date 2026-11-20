@@ -14,19 +14,19 @@
 
 <PageTitle>Log in - Cafe Manager</PageTitle>
 
-<h1 class="h4 mb-3">Cafe Manager</h1>
+<h1 class="auth-title">Cafe Manager</h1>
 
 <EditForm Model="Model!" FormName="login" method="post" OnValidSubmit="SubmitAsync">
     <DataAnnotationsValidator />
-    <ValidationSummary class="text-danger" />
+    <ValidationSummary class="text-danger footnote" />
 
     @if (_failed)
     {
-        <div class="text-danger mb-3" role="alert">Incorrect password.</div>
+        <div class="banner banner-danger" role="alert">Incorrect password.</div>
     }
     @if (_lockedMinutes is { } minutes)
     {
-        <div class="text-danger mb-3" role="alert">
+        <div class="banner banner-danger" role="alert">
             Too many failed attempts. Try again in @minutes minute@(minutes == 1 ? "" : "s").
         </div>
     }

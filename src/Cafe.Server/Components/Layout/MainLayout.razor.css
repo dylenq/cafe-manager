@@ -1,98 +1,184 @@
-.page {
+.shell {
     position: relative;
+    min-height: 100vh;
+}
+
+.nav-toggle {
+    display: none;
+}
+
+.workspace {
+    min-width: 0;
     display: flex;
     flex-direction: column;
+    min-height: 100vh;
 }
 
-main {
-    flex: 1;
-}
-
-.sidebar {
-    background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
-}
-
-.top-row {
-    background-color: #f7f7f7;
-    border-bottom: 1px solid #d6d5d5;
-    justify-content: flex-end;
-    height: 3.5rem;
+/* Sticky glass toolbar */
+.toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
     display: flex;
     align-items: center;
+    gap: .5rem;
+    height: var(--toolbar-h);
+    padding: 0 .75rem;
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border-bottom: 1px solid var(--glass-edge);
 }
 
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        white-space: nowrap;
-        margin-left: 1.5rem;
-        text-decoration: none;
-    }
-
-    .top-row ::deep a:hover, .top-row ::deep .btn-link:hover {
-        text-decoration: underline;
-    }
-
-    .top-row ::deep a:first-child {
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-@media (max-width: 640.98px) {
-    .top-row {
-        justify-content: space-between;
-    }
-
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        margin-left: 0;
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .toolbar {
+        background: var(--glass-fallback);
     }
 }
 
-@media (min-width: 641px) {
-    .page {
-        flex-direction: row;
-    }
+/* Scroll-edge fade under the toolbar */
+.toolbar::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 1rem;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, .35), transparent);
+    pointer-events: none;
+}
 
+.toolbar-title {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--fs-headline);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.toolbar-title:empty::before {
+    content: "Cafe Manager";
+}
+
+.toolbar-end {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex: none;
+}
+
+.content {
+    flex: 1;
+    width: 100%;
+    max-width: 90rem;
+    margin: 0 auto;
+    padding: 1.5rem 1rem 3rem;
+}
+
+/* Off-canvas sidebar at compact widths */
+.sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 50;
+    width: min(var(--sidebar-w), 86vw);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform .2s ease, visibility 0s linear .2s;
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border-right: 1px solid var(--glass-edge);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .sidebar {
-        width: 250px;
-        height: 100vh;
-        position: sticky;
-        top: 0;
+        background: var(--glass-fallback);
+    }
+}
+
+.nav-toggle:checked ~ .sidebar {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform .2s ease;
+}
+
+.nav-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: var(--scrim);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s ease;
+}
+
+.nav-toggle:checked ~ .nav-scrim {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+@media (min-width: 1024px) {
+    .sidebar {
+        transform: none;
+        visibility: visible;
+        transition: none;
+        width: var(--sidebar-w);
     }
 
-    .top-row {
-        position: sticky;
-        top: 0;
-        z-index: 1;
+    .workspace {
+        margin-left: var(--sidebar-w);
     }
 
-    .top-row.auth ::deep a:first-child {
-        flex: 1;
-        text-align: right;
-        width: 0;
+    .nav-toggle-btn,
+    .nav-scrim {
+        display: none;
     }
 
-    .top-row, article {
-        padding-left: 2rem !important;
-        padding-right: 1.5rem !important;
+    .toolbar {
+        padding: 0 1.5rem;
+    }
+
+    .content {
+        padding: 2rem 2rem 4rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar,
+    .nav-scrim {
+        transition: none;
     }
 }
 
 #blazor-error-ui {
-    color-scheme: light only;
-    background: lightyellow;
-    bottom: 0;
-    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    color-scheme: dark;
+    background: var(--bg-3);
+    color: var(--label);
+    border-top: 1px solid var(--separator);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, .5);
     box-sizing: border-box;
     display: none;
     left: 0;
-    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    padding: .75rem 3rem .75rem 1.25rem;
     position: fixed;
+    bottom: 0;
     width: 100%;
     z-index: 1000;
 }
 
-    #blazor-error-ui .dismiss {
-        cursor: pointer;
-        position: absolute;
-        right: 0.75rem;
-        top: 0.5rem;
-    }
+#blazor-error-ui .reload {
+    color: var(--accent);
+    margin-left: .5rem;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 1rem;
+    top: .75rem;
+    color: var(--label-2);
+}

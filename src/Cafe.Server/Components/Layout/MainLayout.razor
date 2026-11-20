@@ -1,19 +1,30 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
+<div class="shell">
+    <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-hidden="true" tabindex="-1" />
+    <label for="nav-toggle" class="nav-scrim" aria-hidden="true"></label>
+
+    <aside class="sidebar" id="app-sidebar">
         <NavMenu />
-    </div>
+    </aside>
 
-    <main>
-        <div class="top-row px-4">
-            <SoundToggle />
-        </div>
+    <div class="workspace">
+        <header class="toolbar">
+            <label for="nav-toggle" class="toolbar-btn nav-toggle-btn" role="button" tabindex="0"
+                   aria-label="Toggle navigation menu" aria-controls="app-sidebar"
+                   onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+                <Icon Name="sidebar" Size="22" />
+            </label>
+            <div class="toolbar-title"><SectionOutlet SectionName="page-title" /></div>
+            <div class="toolbar-end">
+                <SoundToggle />
+            </div>
+        </header>
 
-        <article class="content px-4">
+        <main class="content">
             @Body
-        </article>
-    </main>
+        </main>
+    </div>
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>

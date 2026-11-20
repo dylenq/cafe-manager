@@ -4,6 +4,9 @@ public enum SessionMode
 {
     Prepaid = 0,
     OpenEnded = 1,
+
+    /// <summary>Countdown session paid from the customer minute balance (ChargedAmount 0).</summary>
+    Balance = 2,
 }
 
 /// <summary>Explicit values: the filtered unique index on Sessions depends on Ended = 3.</summary>

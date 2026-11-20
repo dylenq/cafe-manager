@@ -27,7 +27,9 @@ public sealed record SessionCardModel(
     int GraceMinutes,
     int WarningWindowSeconds,
     decimal ChargeAmount,
-    DateTimeOffset SnapshotUtc);
+    DateTimeOffset SnapshotUtc,
+    string? CustomerName = null,
+    bool IsMemberPricing = false);
 
 /// <summary>An enabled station with no session, offered as a Move target.</summary>
 public sealed record IdleStation(int Id, string Name);

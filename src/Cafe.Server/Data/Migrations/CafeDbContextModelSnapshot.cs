@@ -51,10 +51,162 @@ namespace Cafe.Server.Data.Migrations
                     b.ToTable("AgentCommandLogs");
                 });
 
+            modelBuilder.Entity("Cafe.Server.Data.Customer", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("CreatedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsMember")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Phone")
+                        .IsUnique();
+
+                    b.ToTable("Customers");
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.CustomerMinuteLedger", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("AtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("MinutesDelta")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("PackageSaleId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Reason")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("SessionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("StationTypeId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PackageSaleId");
+
+                    b.HasIndex("SessionId");
+
+                    b.HasIndex("StationTypeId");
+
+                    b.HasIndex("CustomerId", "StationTypeId");
+
+                    b.ToTable("CustomerMinuteLedger", (string)null);
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.PackageSale", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("AtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Minutes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Price")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("StationTypeId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TimePackageId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("TimePackageId");
+
+                    b.ToTable("PackageSales");
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.Payment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Amount")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("AtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("PackageSaleId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("SessionId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PackageSaleId");
+
+                    b.HasIndex("SessionId");
+
+                    b.ToTable("Payments");
+                });
+
             modelBuilder.Entity("Cafe.Server.Data.RateRule", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("AppliesTo")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("DaysOfWeek")
@@ -104,6 +256,9 @@ namespace Cafe.Server.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("CustomerId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("EndReason")
                         .HasColumnType("INTEGER");
 
@@ -111,6 +266,9 @@ namespace Cafe.Server.Data.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<long?>("GraceStartedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsMemberPricing")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Mode")
@@ -137,6 +295,8 @@ namespace Cafe.Server.Data.Migrations
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
 
                     b.HasIndex("StationId")
                         .IsUnique()
@@ -279,6 +439,9 @@ namespace Cafe.Server.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("MemberHourlyRate")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -296,6 +459,107 @@ namespace Cafe.Server.Data.Migrations
                     b.ToTable("StationTypes");
                 });
 
+            modelBuilder.Entity("Cafe.Server.Data.TimePackage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Minutes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .UseCollation("NOCASE");
+
+                    b.Property<string>("Price")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("StationTypeId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("StationTypeId");
+
+                    b.ToTable("TimePackages");
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.CustomerMinuteLedger", b =>
+                {
+                    b.HasOne("Cafe.Server.Data.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Cafe.Server.Data.PackageSale", "PackageSale")
+                        .WithMany()
+                        .HasForeignKey("PackageSaleId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Cafe.Server.Data.Session", "Session")
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Cafe.Server.Data.StationType", null)
+                        .WithMany()
+                        .HasForeignKey("StationTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("PackageSale");
+
+                    b.Navigation("Session");
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.PackageSale", b =>
+                {
+                    b.HasOne("Cafe.Server.Data.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Cafe.Server.Data.TimePackage", "TimePackage")
+                        .WithMany()
+                        .HasForeignKey("TimePackageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("TimePackage");
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.Payment", b =>
+                {
+                    b.HasOne("Cafe.Server.Data.PackageSale", "PackageSale")
+                        .WithMany()
+                        .HasForeignKey("PackageSaleId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Cafe.Server.Data.Session", "Session")
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("PackageSale");
+
+                    b.Navigation("Session");
+                });
+
             modelBuilder.Entity("Cafe.Server.Data.RateRule", b =>
                 {
                     b.HasOne("Cafe.Server.Data.StationType", "StationType")
@@ -308,11 +572,18 @@ namespace Cafe.Server.Data.Migrations
 
             modelBuilder.Entity("Cafe.Server.Data.Session", b =>
                 {
+                    b.HasOne("Cafe.Server.Data.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Cafe.Server.Data.Station", "Station")
                         .WithMany()
                         .HasForeignKey("StationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Customer");
 
                     b.Navigation("Station");
                 });
@@ -346,6 +617,16 @@ namespace Cafe.Server.Data.Migrations
                         .HasForeignKey("StationTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("StationType");
+                });
+
+            modelBuilder.Entity("Cafe.Server.Data.TimePackage", b =>
+                {
+                    b.HasOne("Cafe.Server.Data.StationType", "StationType")
+                        .WithMany()
+                        .HasForeignKey("StationTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("StationType");
                 });

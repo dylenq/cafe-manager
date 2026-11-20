@@ -29,6 +29,14 @@ public class Session
     /// <summary>The instant remaining time reached zero, so a restart can resolve Grace from the wall clock.</summary>
     public DateTimeOffset? GraceStartedAtUtc { get; set; }
 
+    /// <summary>The linked customer, if any.</summary>
+    public int? CustomerId { get; set; }
+
+    public Customer? Customer { get; set; }
+
+    /// <summary>Snapshot of Customer.IsMember at start; never updated afterwards.</summary>
+    public bool IsMemberPricing { get; set; }
+
     /// <summary>Concurrency token incremented by every mutation.</summary>
     public int Version { get; set; }
 

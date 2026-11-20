@@ -28,6 +28,7 @@ public class DashboardService(
         var stationIds = stations.Select(s => s.Id).ToList();
         var sessions = await db.Sessions.AsNoTracking()
             .Include(s => s.Segments)
+            .Include(s => s.Customer)
             .Where(s => s.Status != SessionStatus.Ended && stationIds.Contains(s.StationId))
             .ToListAsync(cancellationToken);
         var byStation = sessions.ToDictionary(s => s.StationId);
@@ -80,6 +81,8 @@ public class DashboardService(
             settings.GracePeriodMinutes,
             settings.MaxWarningMinutes * 60,
             estimate ?? session.ChargedAmount,
-            now);
+            now,
+            session.Customer?.Name,
+            session.IsMemberPricing);
     }
 }

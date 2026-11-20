@@ -1,4 +1,5 @@
 using System.Globalization;
+using Cafe.Server.Customers;
 using Cafe.Server.Data;
 using Cafe.Server.Pricing;
 using Cafe.Server.Stations;
@@ -17,7 +18,8 @@ public class SessionService(
     SessionCharges charges,
     SessionNotifier notifier,
     ExpiryEvaluator expiry,
-    SessionSignalPublisher signals)
+    SessionSignalPublisher signals,
+    BalanceLock balanceLock)
 {
     public const int MinMinutes = 1;
     public const int MaxMinutes = 1440;
@@ -52,20 +54,10 @@ public class SessionService(
     private async Task<ServiceResult<Session>> StartAsync(int stationId, SessionMode mode, int? minutes, CancellationToken cancellationToken)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var station = await db.Stations.Include(s => s.StationType).FirstOrDefaultAsync(s => s.Id == stationId, cancellationToken);
+        var (station, failure) = await LoadStartableStationAsync(db, stationId, cancellationToken);
         if (station is null)
         {
-            return ServiceResult<Session>.NotFound("That station no longer exists. Refresh the dashboard.");
-        }
-
-        if (!station.IsEnabled)
-        {
-            return ServiceResult<Session>.Fail($"{station.Name} is disabled.");
-        }
-
-        if (await db.Sessions.AnyAsync(s => s.StationId == stationId && s.Status != SessionStatus.Ended, cancellationToken))
-        {
-            return ServiceResult<Session>.Fail(Busy);
+            return failure!;
         }
 
         var now = time.GetUtcNow();
@@ -107,6 +99,102 @@ public class SessionService(
         await signals.PublishAsync([new SessionSignal(SessionSignalKind.Started, stationId, session.Id)]);
         return ServiceResult<Session>.Ok(session);
     }
+
+    /// <summary>The station checks every start shares: it exists, is enabled and has no running session.</summary>
+    private static async Task<(Station? Station, ServiceResult<Session>? Failure)> LoadStartableStationAsync(
+        CafeDbContext db, int stationId, CancellationToken cancellationToken)
+    {
+        var station = await db.Stations.Include(s => s.StationType).FirstOrDefaultAsync(s => s.Id == stationId, cancellationToken);
+        if (station is null)
+        {
+            return (null, ServiceResult<Session>.NotFound("That station no longer exists. Refresh the dashboard."));
+        }
+
+        if (!station.IsEnabled)
+        {
+            return (null, ServiceResult<Session>.Fail($"{station.Name} is disabled."));
+        }
+
+        if (await db.Sessions.AnyAsync(s => s.StationId == stationId && s.Status != SessionStatus.Ended, cancellationToken))
+        {
+            return (null, ServiceResult<Session>.Fail(Busy));
+        }
+
+        return (station, null);
+    }
+
+    /// <summary>
+    /// Starts a Balance session: the minutes are debited from the customer's ledger (type bucket first, then the
+    /// any-type bucket) in the same SaveChanges as the session, so both commit or neither. ChargedAmount is 0.
+    /// </summary>
+    public async Task<ServiceResult<Session>> StartFromBalanceAsync(int stationId, int customerId, int minutes, CancellationToken cancellationToken = default)
+    {
+        if (minutes is < MinMinutes or > MaxMinutes)
+        {
+            return ServiceResult<Session>.Fail($"Minutes must be between {MinMinutes} and {MaxMinutes}.");
+        }
+
+        using var _ = await balanceLock.AcquireAsync(cancellationToken);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var (station, failure) = await LoadStartableStationAsync(db, stationId, cancellationToken);
+        if (station is null)
+        {
+            return failure!;
+        }
+
+        var loaded = await CustomerService.LoadLinkableAsync(db, customerId, cancellationToken);
+        if (!loaded.Success)
+        {
+            return loaded.Kind == FailureKind.NotFound
+                ? ServiceResult<Session>.NotFound(loaded.Error!)
+                : ServiceResult<Session>.Fail(loaded.Error!);
+        }
+
+        var customer = loaded.Value!;
+        var usable = await BalanceService.UsableMinutesAsync(db, customerId, station.StationTypeId, cancellationToken);
+        if (minutes > usable)
+        {
+            return ServiceResult<Session>.Fail($"Not enough balance: {usable} min available.");
+        }
+
+        var now = time.GetUtcNow();
+        var session = new Session
+        {
+            StationId = stationId,
+            Mode = SessionMode.Balance,
+            Status = SessionStatus.Active,
+            StartedAtUtc = now,
+            PurchasedMinutes = minutes,
+            ChargedAmount = 0m,
+            CustomerId = customerId,
+            IsMemberPricing = customer.IsMember,
+        };
+        var slices = await BalanceService.DebitAsync(db, customerId, station.StationTypeId, minutes, now, session, null, cancellationToken);
+        var split = string.Join(" + ", slices.Select(s => string.Create(CultureInfo.InvariantCulture,
+            $"{s.Minutes} {(s.StationTypeId is null ? "any" : station.StationType.Name)}")));
+        session.Segments.Add(new SessionSegment { StationId = stationId, StartUtc = now });
+        session.Events.Add(new SessionEvent
+        {
+            StationId = stationId, Type = SessionEventType.Started, AtUtc = now,
+            Details = Truncate(string.Create(CultureInfo.InvariantCulture, $"Balance {minutes} min ({split})")),
+        });
+        db.Sessions.Add(session);
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (InputValidation.IsUniqueViolation(ex))
+        {
+            return ServiceResult<Session>.Fail(Busy);
+        }
+
+        notifier.Raise(stationId);
+        await signals.PublishAsync([new SessionSignal(SessionSignalKind.Started, stationId, session.Id)]);
+        return ServiceResult<Session>.Ok(session);
+    }
+
+    private static string Truncate(string details) => details.Length <= 300 ? details : details[..300];
 
     /// <summary>Pauses an Active session: closes the open segment so paused time neither counts down nor bills.</summary>
     public async Task<ServiceResult<Session>> PauseAsync(int sessionId, CancellationToken cancellationToken = default)
@@ -321,8 +409,17 @@ public class SessionService(
             session.Status = SessionStatus.Ended;
             session.EndReason = SessionEndReason.Stopped;
             session.EndedAtUtc = ctx.Now;
-            AddEvent(session, SessionEventType.Stopped, session.StationId, ctx.Now,
-                string.Create(CultureInfo.InvariantCulture, $"Charge {session.ChargedAmount:0.00}"));
+            var stopDetails = string.Create(CultureInfo.InvariantCulture, $"Charge {session.ChargedAmount:0.00}");
+            if (session.Mode == SessionMode.Balance && session.PurchasedMinutes is { } bought)
+            {
+                // Unused whole minutes go back to the buckets they came from (refunds only credit, so no lock is needed).
+                var usedMinutes = (int)Math.Ceiling(ActiveSeconds(session, ctx.Now) / 60.0);
+                var unused = Math.Max(0, bought - usedMinutes);
+                var refunded = await BalanceService.RefundUnusedAsync(ctx.Db, session, unused, ctx.Now, ctx.Cancellation);
+                stopDetails = Truncate($"{stopDetails}, refunded {refunded} min");
+            }
+
+            AddEvent(session, SessionEventType.Stopped, session.StationId, ctx.Now, stopDetails);
             ctx.Signals.Add(new SessionSignal(SessionSignalKind.Stopped, session.StationId, session.Id));
             return ServiceResult<decimal>.Ok(session.ChargedAmount);
         }, cancellationToken);

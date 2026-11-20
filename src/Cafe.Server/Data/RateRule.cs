@@ -26,5 +26,8 @@ public class RateRule
     /// <summary>Higher wins when windows overlap; ties go to the lowest Id.</summary>
     public int Priority { get; set; }
 
+    /// <summary>Who the rule applies to.</summary>
+    public RateRuleAudience AppliesTo { get; set; }
+
     public bool IsEnabled { get; set; } = true;
 }

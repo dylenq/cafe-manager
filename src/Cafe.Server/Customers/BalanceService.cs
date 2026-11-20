@@ -1,6 +1,7 @@
 using Cafe.Server.Data;
 using Cafe.Server.Stations;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Cafe.Server.Customers;
 
@@ -12,7 +13,8 @@ public sealed record BalanceBucket(int? StationTypeId, int Minutes);
 /// MinutesDelta. Mutating helpers only add rows to the caller's context; the caller saves (so a session and its
 /// ledger rows commit together) and holds <see cref="BalanceLock"/> for debits.
 /// </summary>
-public class BalanceService(IDbContextFactory<CafeDbContext> dbFactory, TimeProvider time, BalanceLock balanceLock)
+public class BalanceService(
+    IDbContextFactory<CafeDbContext> dbFactory, TimeProvider time, BalanceLock balanceLock, ILogger<BalanceService>? logger = null)
 {
     /// <summary>Minutes a customer can spend on a station of this type: type bucket plus any-type bucket, negatives ignored.</summary>
     public async Task<int> GetUsableMinutesAsync(int customerId, int stationTypeId, CancellationToken cancellationToken = default)
@@ -140,8 +142,9 @@ public class BalanceService(IDbContextFactory<CafeDbContext> dbFactory, TimeProv
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex)
         {
+            logger?.LogError(ex, "Balance adjustment could not be saved (customer {CustomerId}).", customerId);
             return ServiceResult<CustomerMinuteLedger>.Fail("The adjustment could not be saved. Try again.");
         }
 

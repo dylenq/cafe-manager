@@ -1,10 +1,12 @@
 using Cafe.Server.Data;
 using Cafe.Server.Stations;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Cafe.Server.Customers;
 
-public class PackageService(IDbContextFactory<CafeDbContext> dbFactory, TimeProvider time, BalanceLock balanceLock)
+public class PackageService(
+    IDbContextFactory<CafeDbContext> dbFactory, TimeProvider time, BalanceLock balanceLock, ILogger<PackageService>? logger = null)
 {
     public async Task<List<TimePackage>> ListAsync(bool includeInactive = true, CancellationToken cancellationToken = default)
     {
@@ -185,9 +187,10 @@ public class PackageService(IDbContextFactory<CafeDbContext> dbFactory, TimeProv
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex)
         {
             // One SaveChanges is one transaction: nothing was written. Report it instead of leaking the exception.
+            logger?.LogError(ex, "Package sale could not be saved (customer {CustomerId}, package {PackageId}).", customerId, packageId);
             return ServiceResult<PackageSale>.Fail("The sale could not be saved, so nothing was recorded. Try again.");
         }
 

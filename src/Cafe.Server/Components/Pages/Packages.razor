@@ -1,0 +1,301 @@
+@page "/packages"
+@attribute [Authorize]
+@* CUST-03 (time packages define the minutes), CUST-04 (packages are what staff sell). *@
+@using System.Globalization
+@using Cafe.Server.Customers
+@using Cafe.Server.Data
+@using Cafe.Server.Stations
+@inject PackageService PackageSvc
+@inject StationTypeService TypeSvc
+@inject ILogger<Packages> Logger
+
+<PageTitle>Packages - Cafe Manager</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Time packages</h1>
+    @if (!showForm)
+    {
+        <button type="button" class="btn btn-primary" @onclick="StartAdd">Add package</button>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" aria-label="Close" @onclick="DismissError"></button>
+    </div>
+}
+
+@if (showForm)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">@(editingId is null ? "Add package" : "Edit package")</h2>
+            <EditForm Model="input" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="pkg-name">Name</label>
+                        <InputText id="pkg-name" class="form-control" @bind-Value="input.Name" />
+                        <ValidationMessage For="() => input.Name" class="text-danger" />
+                        @FieldError(nameof(TimePackageInput.Name))
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label" for="pkg-minutes">Minutes</label>
+                        <InputNumber id="pkg-minutes" class="form-control" @bind-Value="input.Minutes" />
+                        <ValidationMessage For="() => input.Minutes" class="text-danger" />
+                        @FieldError(nameof(TimePackageInput.Minutes))
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label" for="pkg-price">Price</label>
+                        <InputNumber id="pkg-price" class="form-control" @bind-Value="input.Price" />
+                        <ValidationMessage For="() => input.Price" class="text-danger" />
+                        @FieldError(nameof(TimePackageInput.Price))
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="pkg-type">Station type</label>
+                        <InputSelect id="pkg-type" class="form-select" @bind-Value="input.StationTypeId">
+                            <option value="">Any type</option>
+                            @foreach (var type in types)
+                            {
+                                <option value="@type.Id">@type.Name</option>
+                            }
+                        </InputSelect>
+                        @FieldError(nameof(TimePackageInput.StationTypeId))
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <InputCheckbox id="pkg-active" class="form-check-input" @bind-Value="input.IsActive" />
+                            <label class="form-check-label" for="pkg-active">Active (on sale)</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
+                    <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (packages is null)
+{
+    <p>Loading...</p>
+}
+else if (packages.Count == 0)
+{
+    <p class="text-muted">No packages yet.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th class="text-end">Minutes</th>
+                    <th class="text-end">Price</th>
+                    <th>Station type</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var package in packages)
+                {
+                    <tr>
+                        <td>@package.Name</td>
+                        <td class="text-end">@package.Minutes</td>
+                        <td class="text-end">@package.Price.ToString("C", CultureInfo.CurrentCulture)</td>
+                        <td>@TypeName(package.StationTypeId)</td>
+                        <td>
+                            @if (package.IsActive)
+                            {
+                                <span class="badge text-bg-success">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">Inactive</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex flex-column flex-sm-row gap-2 justify-content-end">
+                                @if (confirmingDeleteId == package.Id)
+                                {
+                                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(package.Id)">Confirm delete</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => confirmingDeleteId = null">Cancel</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(package)">Edit</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleActiveAsync(package)">
+                                        @(package.IsActive ? "Deactivate" : "Reactivate")
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => confirmingDeleteId = package.Id">Delete</button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<TimePackage>? packages;
+    private List<StationType> types = [];
+    private TimePackageInput input = new();
+    private IReadOnlyDictionary<string, string> fieldErrors = new Dictionary<string, string>();
+    private int? editingId;
+    private int? confirmingDeleteId;
+    private bool showForm;
+    private bool saving;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            types = await TypeSvc.ListAsync();
+            packages = await PackageSvc.ListAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load packages.");
+            packages ??= [];
+            errorMessage = "Could not load the list. Refresh the page and try again.";
+        }
+    }
+
+    private RenderFragment FieldError(string field) => builder =>
+    {
+        if (fieldErrors.TryGetValue(field, out var message))
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "text-danger small");
+            builder.AddContent(2, message);
+            builder.CloseElement();
+        }
+    };
+
+    private string TypeName(int? typeId) =>
+        typeId is null ? "Any type" : types.FirstOrDefault(t => t.Id == typeId)?.Name ?? "Unknown";
+
+    private void StartAdd()
+    {
+        input = new TimePackageInput { Minutes = 60 };
+        editingId = null;
+        ResetMessages();
+        showForm = true;
+    }
+
+    private void StartEdit(TimePackage package)
+    {
+        input = new TimePackageInput
+        {
+            Name = package.Name, Minutes = package.Minutes, Price = package.Price,
+            StationTypeId = package.StationTypeId, IsActive = package.IsActive,
+        };
+        editingId = package.Id;
+        confirmingDeleteId = null;
+        ResetMessages();
+        showForm = true;
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        editingId = null;
+        ResetMessages();
+    }
+
+    private void ResetMessages()
+    {
+        errorMessage = null;
+        fieldErrors = new Dictionary<string, string>();
+    }
+
+    private void DismissError() => errorMessage = null;
+
+    private async Task SaveAsync()
+    {
+        if (saving)
+        {
+            return;
+        }
+
+        saving = true;
+        try
+        {
+            ServiceResult<TimePackage> result = editingId is { } id
+                ? await PackageSvc.UpdateAsync(id, input)
+                : await PackageSvc.CreateAsync(input);
+
+            if (!result.Success)
+            {
+                errorMessage = result.Error;
+                fieldErrors = result.FieldErrors;
+                if (editingId is not null && result.Kind == FailureKind.NotFound)
+                {
+                    showForm = false;
+                    editingId = null;
+                    await LoadAsync();
+                }
+
+                return;
+            }
+
+            ResetMessages();
+            showForm = false;
+            editingId = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not save package.");
+            errorMessage = "Something went wrong. Try again.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task ToggleActiveAsync(TimePackage package)
+    {
+        try
+        {
+            var result = await PackageSvc.SetActiveAsync(package.Id, !package.IsActive);
+            errorMessage = result.Success ? null : result.Error;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not toggle package {PackageId}.", package.Id);
+            errorMessage = "Something went wrong. Try again.";
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        confirmingDeleteId = null;
+        try
+        {
+            var result = await PackageSvc.DeleteAsync(id);
+            errorMessage = result.Success ? null : result.Error;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not delete package {PackageId}.", id);
+            errorMessage = "Something went wrong. Try again.";
+        }
+
+        await LoadAsync();
+    }
+}

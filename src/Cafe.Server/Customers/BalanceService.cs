@@ -21,6 +21,14 @@ public class BalanceService(IDbContextFactory<CafeDbContext> dbFactory, TimeProv
         return await UsableMinutesAsync(db, customerId, stationTypeId, cancellationToken);
     }
 
+    /// <summary>Usable minutes on a specific station (looks up its station type); 0 when the station is unknown.</summary>
+    public async Task<int> GetUsableMinutesForStationAsync(int customerId, int stationId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var typeId = await db.Stations.AsNoTracking().Where(s => s.Id == stationId).Select(s => (int?)s.StationTypeId).FirstOrDefaultAsync(cancellationToken);
+        return typeId is { } id ? await UsableMinutesAsync(db, customerId, id, cancellationToken) : 0;
+    }
+
     /// <summary>All non-zero buckets of a customer.</summary>
     public async Task<List<BalanceBucket>> GetBucketsAsync(int customerId, CancellationToken cancellationToken = default)
     {

@@ -1,0 +1,308 @@
+@page "/customers"
+@attribute [Authorize]
+@* CUST-01 (create/find customers), CUST-02 (member flag), CUST-03 (balance entry via detail page). *@
+@using Cafe.Server.Customers
+@using Cafe.Server.Data
+@using Cafe.Server.Stations
+@inject CustomerService CustomerSvc
+@inject ILogger<Customers> Logger
+
+<PageTitle>Customers - Cafe Manager</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Customers</h1>
+    @if (!showForm)
+    {
+        <button type="button" class="btn btn-primary" @onclick="StartAdd">Add customer</button>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" aria-label="Close" @onclick="DismissError"></button>
+    </div>
+}
+
+@if (showForm)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">@(editingId is null ? "Add customer" : "Edit customer")</h2>
+            <EditForm Model="input" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="cust-name">Name</label>
+                        <InputText id="cust-name" class="form-control" @bind-Value="input.Name" />
+                        <ValidationMessage For="() => input.Name" class="text-danger" />
+                        @FieldError(nameof(CustomerInput.Name))
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="cust-phone">Phone</label>
+                        <InputText id="cust-phone" class="form-control" @bind-Value="input.Phone" />
+                        <ValidationMessage For="() => input.Phone" class="text-danger" />
+                        @FieldError(nameof(CustomerInput.Phone))
+                    </div>
+                    <div class="col-12 col-md-4 d-flex align-items-end">
+                        <div class="form-check">
+                            <InputCheckbox id="cust-member" class="form-check-input" @bind-Value="input.IsMember" />
+                            <label class="form-check-label" for="cust-member">Member</label>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="cust-notes">Notes</label>
+                        <InputTextArea id="cust-notes" class="form-control" rows="2" @bind-Value="input.Notes" />
+                        <ValidationMessage For="() => input.Notes" class="text-danger" />
+                        @FieldError(nameof(CustomerInput.Notes))
+                    </div>
+                </div>
+                <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
+                    <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<div class="row g-2 align-items-end mb-3">
+    <div class="col-12 col-md-6">
+        <label class="form-label" for="cust-search">Search</label>
+        <input id="cust-search" class="form-control" placeholder="Name or phone digits" aria-label="Search customers"
+               @bind="term" @bind:event="oninput" @onkeydown="OnSearchKey" />
+    </div>
+    <div class="col-auto">
+        <button type="button" class="btn btn-outline-primary" @onclick="SearchAsync">Search</button>
+    </div>
+    <div class="col-auto">
+        <div class="form-check mb-2">
+            <input id="cust-inactive" class="form-check-input" type="checkbox" checked="@showInactive"
+                   @onchange="OnShowInactiveChanged" />
+            <label class="form-check-label" for="cust-inactive">Show inactive</label>
+        </div>
+    </div>
+</div>
+
+@if (customers is null)
+{
+    <p>Loading...</p>
+}
+else if (customers.Count == 0)
+{
+    <p class="text-muted">No customers found.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <caption>Showing up to 50</caption>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Notes</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var customer in customers)
+                {
+                    <tr>
+                        <td>
+                            <a href="customers/@customer.Id">@customer.Name</a>
+                            @if (customer.IsMember)
+                            {
+                                <span class="badge text-bg-info ms-1">Member</span>
+                            }
+                        </td>
+                        <td>@PhoneDisplay.Format(customer.Phone)</td>
+                        <td>@NotesSnippet(customer.Notes)</td>
+                        <td>
+                            @if (customer.IsActive)
+                            {
+                                <span class="badge text-bg-success">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">Inactive</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex flex-column flex-sm-row gap-2 justify-content-end">
+                                @if (confirmingToggleId == customer.Id)
+                                {
+                                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => ToggleActiveAsync(customer)">
+                                        Confirm @(customer.IsActive ? "deactivate" : "reactivate")
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => confirmingToggleId = null">Cancel</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(customer)">Edit</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => confirmingToggleId = customer.Id">
+                                        @(customer.IsActive ? "Deactivate" : "Reactivate")
+                                    </button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<Customer>? customers;
+    private CustomerInput input = new();
+    private IReadOnlyDictionary<string, string> fieldErrors = new Dictionary<string, string>();
+    private string term = string.Empty;
+    private bool showInactive;
+    private int? editingId;
+    private int? confirmingToggleId;
+    private bool showForm;
+    private bool saving;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            customers = await CustomerSvc.SearchAsync(term, showInactive);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load customers.");
+            customers ??= [];
+            errorMessage = "Could not load the list. Refresh the page and try again.";
+        }
+    }
+
+    private RenderFragment FieldError(string field) => builder =>
+    {
+        if (fieldErrors.TryGetValue(field, out var message))
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "text-danger small");
+            builder.AddContent(2, message);
+            builder.CloseElement();
+        }
+    };
+
+    private static string NotesSnippet(string? notes) =>
+        string.IsNullOrEmpty(notes) ? string.Empty : notes.Length <= 60 ? notes : notes[..60] + "...";
+
+    private async Task SearchAsync() => await LoadAsync();
+
+    private async Task OnSearchKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task OnShowInactiveChanged(ChangeEventArgs e)
+    {
+        showInactive = e.Value is true;
+        await LoadAsync();
+    }
+
+    private void StartAdd()
+    {
+        input = new CustomerInput();
+        editingId = null;
+        ResetMessages();
+        showForm = true;
+    }
+
+    private void StartEdit(Customer customer)
+    {
+        input = new CustomerInput { Name = customer.Name, Phone = customer.Phone, IsMember = customer.IsMember, Notes = customer.Notes };
+        editingId = customer.Id;
+        confirmingToggleId = null;
+        ResetMessages();
+        showForm = true;
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        editingId = null;
+        ResetMessages();
+    }
+
+    private void ResetMessages()
+    {
+        errorMessage = null;
+        fieldErrors = new Dictionary<string, string>();
+    }
+
+    private void DismissError() => errorMessage = null;
+
+    private async Task SaveAsync()
+    {
+        if (saving)
+        {
+            return;
+        }
+
+        saving = true;
+        try
+        {
+            ServiceResult<Customer> result = editingId is { } id
+                ? await CustomerSvc.UpdateAsync(id, input)
+                : await CustomerSvc.CreateAsync(input);
+
+            if (!result.Success)
+            {
+                errorMessage = result.Error;
+                fieldErrors = result.FieldErrors;
+                if (editingId is not null && result.Kind == FailureKind.NotFound)
+                {
+                    showForm = false;
+                    editingId = null;
+                    await LoadAsync();
+                }
+
+                return;
+            }
+
+            ResetMessages();
+            showForm = false;
+            editingId = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not save customer.");
+            errorMessage = "Something went wrong. Try again.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task ToggleActiveAsync(Customer customer)
+    {
+        confirmingToggleId = null;
+        try
+        {
+            var result = await CustomerSvc.SetActiveAsync(customer.Id, !customer.IsActive);
+            errorMessage = result.Success ? null : result.Error;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not change active state of customer {CustomerId}.", customer.Id);
+            errorMessage = "Something went wrong. Try again.";
+        }
+
+        await LoadAsync();
+    }
+}

@@ -1,4 +1,5 @@
 using Cafe.Server.Data;
+using Cafe.Server.Sessions;
 
 namespace Cafe.Server.Payments;
 
@@ -45,3 +46,9 @@ public sealed record PlanTarget(AllocationTargetType Type, int Id, decimal Outst
 
 /// <summary>Part of one payment applied to one target.</summary>
 public sealed record PlannedAllocation(AllocationTargetType Type, int Id, decimal Amount);
+
+/// <summary>
+/// What "Stop &amp; settle" shows before confirming: the stop quote (with its version), the session's open orders that
+/// still owe, and the total due (stop charge plus open orders' outstanding).
+/// </summary>
+public sealed record StopSettleQuote(StopQuote Stop, IReadOnlyList<OutstandingItem> OpenOrders, decimal TotalDue);

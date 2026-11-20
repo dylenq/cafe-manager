@@ -13,6 +13,8 @@ public static class PosServiceCollectionExtensions
         services.AddScoped<OrderService>();
         services.AddScoped<SettlementService>();
         services.AddScoped<CheckoutService>();
+        services.AddScoped<OpenTabsService>();
+        services.AddScoped<PaymentHistoryService>();
         return services;
     }
 }

@@ -13,7 +13,10 @@ public class SettlementService(IDbContextFactory<CafeDbContext> dbFactory, TimeP
 {
     public const string ChangedMessage = "Amounts changed — review the new total.";
     public const string OverpayMessage = "Payment is more than the amount due.";
+    /// <summary>Same text as <see cref="OverpayMessage"/>; the name pages match on (D-04).</summary>
+    public const string OverDue = OverpayMessage;
     public const string NothingToPay = "Nothing to pay.";
+    public const decimal MaxLineAmount = 100_000_000m;
     public const string StopFirst = "Stop the session first.";
     private const string Gone = "One of the items no longer exists. Refresh and try again.";
 
@@ -56,14 +59,16 @@ public class SettlementService(IDbContextFactory<CafeDbContext> dbFactory, TimeP
 
         var owing = loaded.Value!.Where(t => t.Outstanding > 0m).ToList();
         var totalDue = owing.Sum(t => t.Outstanding);
-        if (totalDue <= 0m)
-        {
-            return ServiceResult<SettleResult>.Fail(NothingToPay);
-        }
-
+        // The expected-due check comes first: a second circuit paying an item the first just paid sees the
+        // changed-amounts message (D-05), not a bare "nothing to pay".
         if (totalDue != request.ExpectedDue)
         {
             return ServiceResult<SettleResult>.Fail(ChangedMessage);
+        }
+
+        if (totalDue <= 0m)
+        {
+            return ServiceResult<SettleResult>.Fail(NothingToPay);
         }
 
         var applied = request.Tenders.Sum(t => t.Amount);
@@ -134,7 +139,8 @@ public class SettlementService(IDbContextFactory<CafeDbContext> dbFactory, TimeP
         return of.Count == 1 ? of[0].Id : null;
     }
 
-    private static string? ValidateTenders(IReadOnlyList<TenderLine> tenders)
+    /// <summary>Tender rules shared with the package sale: positive amounts, cash-only tendered, tendered at least the amount.</summary>
+    internal static string? ValidateTenders(IReadOnlyList<TenderLine> tenders)
     {
         if (tenders.Count == 0)
         {
@@ -146,6 +152,11 @@ public class SettlementService(IDbContextFactory<CafeDbContext> dbFactory, TimeP
             if (tender.Amount <= 0m)
             {
                 return "Each payment must be more than zero.";
+            }
+
+            if (tender.Amount > MaxLineAmount || tender.Tendered > MaxLineAmount)
+            {
+                return "That payment amount is too large.";
             }
 
             if (tender.Tendered is { } tendered)

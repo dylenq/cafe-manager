@@ -75,7 +75,7 @@ public class ReceiptServiceTests : PosTestBase
     }
 
     [Fact]
-    public async Task Reprint_after_a_later_settle_shows_nothing_remaining_and_change_only_when_passed()
+    public async Task Reprint_after_a_later_settle_still_shows_the_remaining_as_of_that_receipt_and_change_only_when_passed()
     {
         var r = await RingTabAsync();
         var due = r.Quote.Amount + 60000m;
@@ -91,9 +91,15 @@ public class ReceiptServiceTests : PosTestBase
             [new TenderLine(PaymentMethod.Cash, 30000m)], 30000m)));
         Assert.True(settle.Success, settle.Error);
 
+        // WR-04: the reprint reconciles with the original receipt (Remaining 30000), not with today's balance.
         var after = (await ReceiptAsync(id, change: 1500m)).Value!;
-        Assert.Equal(0m, after.Remaining);
+        Assert.Equal(30000m, after.Remaining);
+        Assert.Equal(before.Subtotal - before.Paid, after.Remaining);
         Assert.Equal(1500m, after.Change);
+
+        // The later settlement's own receipt shows the debt cleared.
+        var later = (await ReceiptAsync(settle.Value!.ReceiptPaymentId)).Value!;
+        Assert.Equal(0m, later.Remaining);
         Assert.Null((await ReceiptAsync(id)).Value!.Change);
     }
 

@@ -35,12 +35,16 @@ public class ReceiptService(
             .Where(a => paymentIds.Contains(a.PaymentId)).ToListAsync(cancellationToken))
             .OrderBy(a => a.Id).ToList();
 
+        // "Remaining" is as of this receipt: only allocations up to the last payment of this checkout count (payment ids
+        // only grow), so a reprint after a later settlement still reconciles with the paper the customer holds.
+        var lastPaymentId = paymentIds.Max();
         var targets = new List<ReceiptTarget>();
         foreach (var key in mine.Select(a => (a.TargetType, a.TargetId)).Distinct())
         {
             var applied = mine.Where(a => a.TargetType == key.TargetType && a.TargetId == key.TargetId).Sum(a => a.Amount);
             var allocatedAll = (await db.PaymentAllocations.AsNoTracking()
-                .Where(a => a.TargetType == key.TargetType && a.TargetId == key.TargetId).ToListAsync(cancellationToken))
+                .Where(a => a.TargetType == key.TargetType && a.TargetId == key.TargetId && a.PaymentId <= lastPaymentId)
+                .ToListAsync(cancellationToken))
                 .Select(a => a.Amount).ToList();
             var target = await LoadTargetAsync(db, key.TargetType, key.TargetId, applied, allocatedAll, cancellationToken);
             if (target is not null)

@@ -20,18 +20,17 @@ public static class ReportServiceCollectionExtensions
                 return Results.BadRequest("from and to must be dates in yyyy-MM-dd format.");
             }
 
-            if (fromDate > toDate)
+            if (!ReportRange.TryResolve(ReportPreset.Custom, fromDate, fromDate, toDate, out var range, out var rangeError))
             {
-                return Results.BadRequest("From date must not be after To date.");
+                return Results.BadRequest(rangeError);
             }
 
-            var range = new ReportRange(fromDate, toDate);
             if (section != "days")
             {
                 return Results.NotFound();
             }
 
-            var data = await reports.GetAsync(range, ct);
+            var data = await reports.GetAsync(range!, ct);
             var csv = CsvWriter.Write(
                 ["Date", "Collected", "Cash", "Card"],
                 data.Days.Select(d => (IReadOnlyList<object?>)[d.Date, d.Collected, d.Cash, d.Card]));

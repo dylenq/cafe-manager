@@ -3,7 +3,10 @@ using System.Text;
 
 namespace Cafe.Server.Reports;
 
-/// <summary>Minimal CSV writer. Escape rules are completed in the next task.</summary>
+/// <summary>
+/// Minimal CSV writer with a spreadsheet formula-injection guard. Only text cells are neutralised (a leading
+/// = + - @ tab or CR gets a single quote prefix); numbers and dates are typed, so a negative amount stays "-5".
+/// </summary>
 public static class CsvWriter
 {
     public static string Write(IReadOnlyList<string> header, IEnumerable<IReadOnlyList<object?>> rows)
@@ -25,9 +28,16 @@ public static class CsvWriter
         int i => i.ToString(CultureInfo.InvariantCulture),
         long l => l.ToString(CultureInfo.InvariantCulture),
         DateOnly date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-        _ => Quote(value.ToString() ?? string.Empty),
+        _ => Text(value.ToString() ?? string.Empty),
     };
 
-    private static string Quote(string text) =>
-        text.IndexOfAny([',', '"', '\r', '\n']) >= 0 ? "\"" + text.Replace("\"", "\"\"") + "\"" : text;
+    private static string Text(string text)
+    {
+        if (text.Length > 0 && text[0] is '=' or '+' or '-' or '@' or '\t' or '\r')
+        {
+            text = "'" + text;
+        }
+
+        return text.IndexOfAny([',', '"', '\r', '\n']) >= 0 ? "\"" + text.Replace("\"", "\"\"") + "\"" : text;
+    }
 }

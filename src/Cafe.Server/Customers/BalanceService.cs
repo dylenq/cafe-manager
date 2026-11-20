@@ -1,4 +1,5 @@
 using Cafe.Server.Data;
+using Cafe.Server.Stations;
 using Microsoft.EntityFrameworkCore;
 
 namespace Cafe.Server.Customers;
@@ -11,7 +12,7 @@ public sealed record BalanceBucket(int? StationTypeId, int Minutes);
 /// MinutesDelta. Mutating helpers only add rows to the caller's context; the caller saves (so a session and its
 /// ledger rows commit together) and holds <see cref="BalanceLock"/> for debits.
 /// </summary>
-public class BalanceService(Microsoft.EntityFrameworkCore.IDbContextFactory<CafeDbContext> dbFactory)
+public class BalanceService(IDbContextFactory<CafeDbContext> dbFactory, TimeProvider time, BalanceLock balanceLock)
 {
     /// <summary>Minutes a customer can spend on a station of this type: type bucket plus any-type bucket, negatives ignored.</summary>
     public async Task<int> GetUsableMinutesAsync(int customerId, int stationTypeId, CancellationToken cancellationToken = default)
@@ -31,6 +32,116 @@ public class BalanceService(Microsoft.EntityFrameworkCore.IDbContextFactory<Cafe
             .Where(b => b.Minutes != 0)
             .ToListAsync(cancellationToken);
     }
+
+    /// <summary>Balance per bucket (non-zero only, any-type first) plus the total.</summary>
+    public async Task<BalanceSummary> GetBalanceAsync(int customerId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        return await SummaryAsync(db, customerId, cancellationToken);
+    }
+
+    /// <summary>Shared bucket sum used by the balance summary and the customer detail read model.</summary>
+    internal static async Task<BalanceSummary> SummaryAsync(CafeDbContext db, int customerId, CancellationToken ct)
+    {
+        var sums = await db.CustomerMinuteLedger.AsNoTracking()
+            .Where(l => l.CustomerId == customerId)
+            .GroupBy(l => l.StationTypeId)
+            .Select(g => new { StationTypeId = g.Key, Minutes = g.Sum(l => l.MinutesDelta) })
+            .Where(b => b.Minutes != 0)
+            .ToListAsync(ct);
+        if (sums.Count == 0)
+        {
+            return BalanceSummary.Empty;
+        }
+
+        var names = await db.StationTypes.AsNoTracking().ToDictionaryAsync(t => t.Id, t => t.Name, ct);
+        var rows = sums
+            .Select(b => new BalanceBucketRow(b.StationTypeId, b.StationTypeId is { } id ? names.GetValueOrDefault(id) : null, b.Minutes))
+            .OrderBy(b => b.StationTypeId is null ? 0 : 1)
+            .ThenBy(b => b.StationTypeName, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(b => b.StationTypeId)
+            .ToList();
+        return new BalanceSummary(rows, rows.Sum(r => r.Minutes));
+    }
+
+    public const int MaxAdjustmentMinutes = 100000;
+    public const int MaxNoteLength = 300;
+
+    /// <summary>
+    /// Staff correction: adds one ManualAdjustment ledger row. A negative delta may not exceed the bucket's current
+    /// minutes, so a bucket never goes below zero (T-05-06). Inactive customers may be adjusted. Runs under
+    /// <see cref="BalanceLock"/> so it cannot race a debit or a sale.
+    /// </summary>
+    public async Task<ServiceResult<CustomerMinuteLedger>> AdjustAsync(
+        int customerId, int? stationTypeId, int minutesDelta, string? note, CancellationToken cancellationToken = default)
+    {
+        var cleaned = note?.Trim() is { Length: > 0 } t ? t : null;
+        if (cleaned is null)
+        {
+            return Field("Note", "A note is required so the adjustment can be audited.");
+        }
+
+        if (cleaned.Length > MaxNoteLength)
+        {
+            return Field("Note", $"Note must be {MaxNoteLength} characters or fewer.");
+        }
+
+        if (minutesDelta == 0)
+        {
+            return Field("MinutesDelta", "Enter a number of minutes other than zero.");
+        }
+
+        if (Math.Abs((long)minutesDelta) > MaxAdjustmentMinutes)
+        {
+            return Field("MinutesDelta", $"Adjust by at most {MaxAdjustmentMinutes} minutes at a time.");
+        }
+
+        using var _ = await balanceLock.AcquireAsync(cancellationToken);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        if (!await db.Customers.AnyAsync(c => c.Id == customerId, cancellationToken))
+        {
+            return ServiceResult<CustomerMinuteLedger>.NotFound(CustomerService.Gone);
+        }
+
+        if (stationTypeId is { } typeId && !await db.StationTypes.AnyAsync(t => t.Id == typeId, cancellationToken))
+        {
+            return Field("StationTypeId", "That station type no longer exists.");
+        }
+
+        if (minutesDelta < 0)
+        {
+            var current = await BucketAsync(db, customerId, stationTypeId, cancellationToken);
+            if (current + minutesDelta < 0)
+            {
+                var message = $"That bucket has only {Math.Max(0, current)} min, so it cannot be reduced by {-minutesDelta}.";
+                return Field("MinutesDelta", message);
+            }
+        }
+
+        var row = new CustomerMinuteLedger
+        {
+            CustomerId = customerId,
+            StationTypeId = stationTypeId,
+            MinutesDelta = minutesDelta,
+            Reason = LedgerReason.ManualAdjustment,
+            Note = cleaned,
+            AtUtc = time.GetUtcNow(),
+        };
+        db.CustomerMinuteLedger.Add(row);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return ServiceResult<CustomerMinuteLedger>.Fail("The adjustment could not be saved. Try again.");
+        }
+
+        return ServiceResult<CustomerMinuteLedger>.Ok(row);
+    }
+
+    private static ServiceResult<CustomerMinuteLedger> Field(string field, string message) =>
+        ServiceResult<CustomerMinuteLedger>.Fail(message, new Dictionary<string, string> { [field] = message });
 
     internal static async Task<int> BucketAsync(CafeDbContext db, int customerId, int? stationTypeId, CancellationToken ct) =>
         await db.CustomerMinuteLedger

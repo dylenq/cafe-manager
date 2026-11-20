@@ -137,6 +137,67 @@ public class CustomerService(IDbContextFactory<CafeDbContext> dbFactory, TimePro
         return ids.Select(i => byId[i]).ToList();
     }
 
+    /// <summary>Everything /customers/{id} shows: balance per bucket, sales, ledger (newest 100) and the 20 latest sessions.</summary>
+    public async Task<ServiceResult<CustomerDetail>> GetDetailAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var customer = await db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+        if (customer is null)
+        {
+            return ServiceResult<CustomerDetail>.NotFound(Gone);
+        }
+
+        var balance = await BalanceService.SummaryAsync(db, id, cancellationToken);
+
+        var sales = await (
+                from s in db.PackageSales.AsNoTracking()
+                where s.CustomerId == id
+                join p in db.TimePackages.AsNoTracking() on s.TimePackageId equals p.Id
+                orderby s.AtUtc descending, s.Id descending
+                select new { s.Id, p.Name, s.Price, s.Minutes, s.StationTypeId, s.AtUtc })
+            .ToListAsync(cancellationToken);
+        var saleIds = sales.Select(s => s.Id).ToList();
+        var methods = await db.Payments.AsNoTracking()
+            .Where(p => p.PackageSaleId != null && saleIds.Contains(p.PackageSaleId.Value))
+            .Select(p => new { SaleId = p.PackageSaleId!.Value, p.Method })
+            .ToListAsync(cancellationToken);
+        var methodBySale = methods.GroupBy(m => m.SaleId).ToDictionary(g => g.Key, g => (PaymentMethod?)g.First().Method);
+        var saleRows = sales
+            .Select(s => new SaleRow(s.Id, s.Name, s.Price, s.Minutes, s.StationTypeId, methodBySale.GetValueOrDefault(s.Id), s.AtUtc))
+            .ToList();
+
+        var ledger = await db.CustomerMinuteLedger.AsNoTracking()
+            .Where(l => l.CustomerId == id)
+            .OrderByDescending(l => l.AtUtc).ThenByDescending(l => l.Id)
+            .Take(100)
+            .ToListAsync(cancellationToken);
+        var ledgerRows = ledger
+            .Select(l => new LedgerRow(l.Id, l.AtUtc, l.StationTypeId, l.MinutesDelta, l.Reason, ReasonText(l.Reason), l.SessionId, l.Note))
+            .ToList();
+
+        var sessions = await db.Sessions.AsNoTracking()
+            .Where(s => s.CustomerId == id)
+            .OrderByDescending(s => s.StartedAtUtc).ThenByDescending(s => s.Id)
+            .Take(20)
+            .ToListAsync(cancellationToken);
+        var stationNames = await db.Stations.AsNoTracking().ToDictionaryAsync(s => s.Id, s => s.Name, cancellationToken);
+        var sessionRows = sessions
+            .Select(s => new RecentSessionRow(
+                s.Id, stationNames.GetValueOrDefault(s.StationId, "Unknown station"), s.Mode, s.ChargedAmount, s.EndReason, s.StartedAtUtc, s.EndedAtUtc))
+            .ToList();
+
+        return ServiceResult<CustomerDetail>.Ok(new CustomerDetail(customer, balance, saleRows, ledgerRows, sessionRows));
+    }
+
+    public static string ReasonText(LedgerReason reason) => reason switch
+    {
+        LedgerReason.PackagePurchase => "Package purchase",
+        LedgerReason.SessionDebit => "Session",
+        LedgerReason.SessionRefund => "Refund",
+        LedgerReason.ManualAdjustment => "Manual adjustment",
+        _ => reason.ToString(),
+    };
+
     public async Task<Customer?> GetAsync(int id, CancellationToken cancellationToken = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);

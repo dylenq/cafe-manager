@@ -1,0 +1,42 @@
+@using System.Globalization
+@* Inline SVG bar chart: no JavaScript, no external assets. Colours come from CSS variables so it follows the theme. *@
+
+@if (Bars.Count == 0 || Bars.All(b => b.Value <= 0))
+{
+    <p class="text-muted small mb-0" data-testid="chart-empty">No revenue in this range.</p>
+}
+else
+{
+    var max = Bars.Max(b => b.Value);
+    var step = Bars.Count > 14 ? (int)Math.Ceiling(Bars.Count / 14d) : 1;
+    var slot = (double)Width / Bars.Count;
+    var barWidth = Math.Max(2d, slot * 0.7);
+    <svg class="revenue-chart" viewBox="0 0 @Width @(Height + 28)" role="img" aria-label="@Title" preserveAspectRatio="xMidYMid meet">
+        <title>@Title</title>
+        <line x1="0" y1="@Height" x2="@Width" y2="@Height" stroke="currentColor" stroke-opacity="0.4" stroke-width="1" />
+        @for (var i = 0; i < Bars.Count; i++)
+        {
+            var bar = Bars[i];
+            var h = bar.Value <= 0 ? 1d : Math.Max(1d, (double)(bar.Value / max) * (Height - 8));
+            var x = i * slot + (slot - barWidth) / 2;
+            <rect class="chart-bar" x="@F(x)" y="@F(Height - h)" width="@F(barWidth)" height="@F(h)">
+                <title>@bar.Label: @bar.Value.ToString("C")</title>
+            </rect>
+            @if (i % step == 0)
+            {
+                <!text class="chart-label" x="@F(x + barWidth / 2)" y="@(Height + 16)" text-anchor="middle" fill="currentColor">@bar.Label</!text>
+            }
+        }
+    </svg>
+}
+
+@code {
+    private const int Width = 700;
+    private const int Height = 160;
+
+    [Parameter] public IReadOnlyList<(string Label, decimal Value)> Bars { get; set; } = [];
+
+    [Parameter] public string Title { get; set; } = "Revenue by day";
+
+    private static string F(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+}

@@ -1,0 +1,15 @@
+.revenue-chart {
+    width: 100%;
+    height: auto;
+    max-height: 240px;
+    color: var(--bs-body-color, #212529);
+}
+
+.chart-bar {
+    fill: var(--bs-primary, #0d6efd);
+}
+
+.chart-label {
+    font-size: 11px;
+    fill: currentColor;
+}

@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 4
 current_phase_name: Samsung TV Control
 status: executing
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-11-20T06:35:15.130Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-11-20T06:40:51.165Z"
 last_activity: 2026-11-20
 last_activity_desc: Phase 4 execution started
-state_head: 28bc7f5200ec71d039fb4e4e749f4b8d9567d87d
+state_head: ade762647b0cdc335dec0dfa7f9e917b44073499
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 20
-  completed_plans: 15
+  total_plans: 22
+  completed_plans: 16
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 4 (Samsung TV Control) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-11-20 — Phase 4 execution started
 
@@ -67,6 +67,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 2 P05 | 25min | 3 tasks | 17 files |
 | Phase 3 P01 | 25min | 2 tasks | 40 files |
 | Phase 4 P04-01 | 35min | 2 tasks | 16 files |
+| Phase 4 P02 | 25min | 2 tasks | 17 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,7 @@ Recent decisions affecting current work:
 - [Phase 2]: Acknowledged alerts stay flagged on the card but stop pulsing; tracker beeps once per alert level change
 - [Phase 3]: Agent hub gated only by shared-key middleware; /hubs exempt from setup gate
 - [Phase 4]: TV no-token marker is '-'; certificate bypass only in SamsungTvTransport; state reads not serialised per TV
+- [Phase 4]: TV actions run through TvActionQueue (latest wins per station) and TvControlService (audit, cache, notice); AgentCommandKind TvPowerOn=5, TvPowerOff=6
 
 ### Pending Todos
 
@@ -110,6 +112,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-20T06:35:15.113Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-11-20T06:40:51.149Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None

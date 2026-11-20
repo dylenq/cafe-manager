@@ -94,7 +94,7 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
 
 **Plans**: TBD
 - [x] 04-01-PLAN.md
-- [ ] 04-02-PLAN.md
+- [x] 04-02-PLAN.md
 - [ ] 04-03-PLAN.md
 
 **UI hint**: yes
@@ -150,7 +150,7 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
 | 1. Foundation | 4/4 | In Progress | - |
 | 2. Session Engine & Pricing | 5/5 | In Progress | - |
 | 3. PC Agent | 5/5 | In Progress | - |
-| 4. Samsung TV Control | 1/3 | In Progress | - |
+| 4. Samsung TV Control | 2/3 | In Progress | - |
 | 5. Customers & Packages | 0/TBD | Not started | - |
 | 6. POS & Receipts | 0/TBD | Not started | - |
 | 7. Reports & Deployment | 0/TBD | Not started | - |

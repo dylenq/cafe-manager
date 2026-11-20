@@ -45,7 +45,7 @@
 
 - [x] **TVCT-01**: Staff can pair a Samsung Tizen TV from Settings (accept on the TV), and the token is stored for that station
 - [x] **TVCT-02**: When a console session expires (after grace), the TV powers off automatically
-- [ ] **TVCT-03**: Starting a console session wakes the TV with Wake-on-LAN
+- [x] **TVCT-03**: Starting a console session wakes the TV with Wake-on-LAN
 - [ ] **TVCT-04**: The dashboard shows TV reachability/power state and lets staff power it on or off manually
 
 ### Customers & Packages
@@ -123,7 +123,7 @@
 | AGNT-07 | Phase 3 | Pending |
 | TVCT-01 | Phase 4 | Complete |
 | TVCT-02 | Phase 4 | Complete |
-| TVCT-03 | Phase 4 | Pending |
+| TVCT-03 | Phase 4 | Complete |
 | TVCT-04 | Phase 4 | Pending |
 | CUST-01 | Phase 5 | Pending |
 | CUST-02 | Phase 5 | Pending |

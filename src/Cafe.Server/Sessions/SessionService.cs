@@ -385,6 +385,15 @@ public class SessionService(
                 return ServiceResult<int>.Fail("Only balance sessions can be extended from balance.");
             }
 
+            // Same rule as starting from balance: an inactive customer's balance cannot fund new minutes.
+            var linkable = await CustomerService.LoadLinkableAsync(ctx.Db, customerId, ctx.Cancellation);
+            if (!linkable.Success)
+            {
+                return linkable.Kind == FailureKind.NotFound
+                    ? ServiceResult<int>.NotFound(linkable.Error!)
+                    : ServiceResult<int>.Fail(linkable.Error!);
+            }
+
             var typeId = session.Station.StationTypeId;
             var usable = await BalanceService.UsableMinutesAsync(ctx.Db, customerId, typeId, ctx.Cancellation);
             if (minutes > usable)

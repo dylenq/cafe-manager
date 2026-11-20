@@ -375,6 +375,22 @@ public class BalanceSessionLifecycleTests : CustomerTestBase
     }
 
     [Fact]
+    public async Task Extend_from_balance_is_refused_for_an_inactive_customer_and_changes_nothing()
+    {
+        var customer = await CustomerWithAnyAsync(120);
+        var session = await StartBalanceAsync(await StationAsync(), customer, 30);
+        Assert.True((await InScopeAsync(sp => sp.GetRequiredService<CustomerService>().SetActiveAsync(customer, false))).Success);
+
+        var extend = await SvcAsync(s => s.ExtendFromBalanceAsync(session.Id, 30));
+
+        Assert.False(extend.Success);
+        Assert.Contains("inactive", extend.Error);
+        Assert.Equal(30, (await LoadAsync(session.Id)).PurchasedMinutes);
+        Assert.Single(await LedgerAsync(LedgerReason.SessionDebit));
+        Assert.Equal(90, await BalanceAsync(customer));
+    }
+
+    [Fact]
     public async Task Move_is_refused_when_type_specific_minutes_would_land_on_another_station_type()
     {
         var standard = await TypeAsync("Standard");

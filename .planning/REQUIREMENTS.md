@@ -66,8 +66,8 @@
 
 ### Reports & Deployment
 
-- [ ] **REPT-01**: Staff can view revenue by day and by week
-- [ ] **REPT-02**: Staff can view revenue broken down by station type, by product and by payment method
+- [x] **REPT-01**: Staff can view revenue by day and by week
+- [x] **REPT-02**: Staff can view revenue broken down by station type, by product and by payment method
 - [ ] **DEPL-01**: The server installs and runs as a Windows service on the front-desk PC and is reachable on the LAN
 - [ ] **DEPL-02**: An installer script sets up the agent on a gaming PC (logon scheduled task, Task Manager policy, server URL config)
 
@@ -136,8 +136,8 @@
 | POS-02 | Phase 6 | Complete |
 | POS-03 | Phase 6 | Complete |
 | POS-04 | Phase 6 | Complete |
-| REPT-01 | Phase 7 | Pending |
-| REPT-02 | Phase 7 | Pending |
+| REPT-01 | Phase 7 | Complete |
+| REPT-02 | Phase 7 | Complete |
 | DEPL-01 | Phase 7 | Pending |
 | DEPL-02 | Phase 7 | Pending |
 

@@ -38,26 +38,48 @@ public class SessionService(
     /// <summary>Test seam: runs just before SaveChanges so a test can make the loaded session stale.</summary>
     internal Func<Task>? BeforeSave { get; set; }
 
-    public Task<ServiceResult<Session>> StartPrepaidAsync(int stationId, int minutes, CancellationToken cancellationToken = default)
+    public Task<ServiceResult<Session>> StartPrepaidAsync(int stationId, int minutes, CancellationToken cancellationToken = default) =>
+        StartPrepaidAsync(stationId, minutes, null, cancellationToken);
+
+    /// <summary>Starts a prepaid session, optionally linked to an active customer (member status is snapshotted).</summary>
+    public Task<ServiceResult<Session>> StartPrepaidAsync(int stationId, int minutes, int? customerId, CancellationToken cancellationToken = default)
     {
         if (minutes is < MinMinutes or > MaxMinutes)
         {
             return Task.FromResult(ServiceResult<Session>.Fail($"Minutes must be between {MinMinutes} and {MaxMinutes}."));
         }
 
-        return StartAsync(stationId, SessionMode.Prepaid, minutes, cancellationToken);
+        return StartAsync(stationId, SessionMode.Prepaid, minutes, customerId, cancellationToken);
     }
 
     public Task<ServiceResult<Session>> StartOpenEndedAsync(int stationId, CancellationToken cancellationToken = default) =>
-        StartAsync(stationId, SessionMode.OpenEnded, null, cancellationToken);
+        StartAsync(stationId, SessionMode.OpenEnded, null, null, cancellationToken);
 
-    private async Task<ServiceResult<Session>> StartAsync(int stationId, SessionMode mode, int? minutes, CancellationToken cancellationToken)
+    /// <summary>Starts an open-ended session, optionally linked to an active customer (member status is snapshotted).</summary>
+    public Task<ServiceResult<Session>> StartOpenEndedAsync(int stationId, int? customerId, CancellationToken cancellationToken = default) =>
+        StartAsync(stationId, SessionMode.OpenEnded, null, customerId, cancellationToken);
+
+    private async Task<ServiceResult<Session>> StartAsync(int stationId, SessionMode mode, int? minutes, int? customerId, CancellationToken cancellationToken)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var (station, failure) = await LoadStartableStationAsync(db, stationId, cancellationToken);
         if (station is null)
         {
             return failure!;
+        }
+
+        var isMember = false;
+        if (customerId is { } linkId)
+        {
+            var loaded = await CustomerService.LoadLinkableAsync(db, linkId, cancellationToken);
+            if (!loaded.Success)
+            {
+                return loaded.Kind == FailureKind.NotFound
+                    ? ServiceResult<Session>.NotFound(loaded.Error!)
+                    : ServiceResult<Session>.Fail(loaded.Error!);
+            }
+
+            isMember = loaded.Value!.IsMember;
         }
 
         var now = time.GetUtcNow();
@@ -67,9 +89,10 @@ public class SessionService(
         {
             var rules = await pricing.GetEnabledRulesAsync(db, cancellationToken);
             quote = PricingEngine.Price(new PricingRequest(
-                [new PricedInterval(now, now.AddMinutes(m), station.StationTypeId, station.StationType.HourlyRate)],
+                [new PricedInterval(now, now.AddMinutes(m), station.StationTypeId, PricingEngine.BaseRate(station.StationType, isMember))],
                 rules,
-                pricing.TimeZone)).Total;
+                pricing.TimeZone,
+                isMember)).Total;
             details = string.Create(CultureInfo.InvariantCulture, $"Prepaid {m} min, charge {quote:0.00}");
         }
 
@@ -81,6 +104,8 @@ public class SessionService(
             StartedAtUtc = now,
             PurchasedMinutes = minutes,
             ChargedAmount = quote,
+            CustomerId = customerId,
+            IsMemberPricing = isMember,
         };
         session.Segments.Add(new SessionSegment { StationId = stationId, StartUtc = now });
         session.Events.Add(new SessionEvent { StationId = stationId, Type = SessionEventType.Started, AtUtc = now, Details = details });
@@ -296,9 +321,10 @@ public class SessionService(
             var rules = await pricing.GetEnabledRulesAsync(ctx.Db, ctx.Cancellation);
             var type = session.Station.StationType;
             var quote = PricingEngine.Price(new PricingRequest(
-                [new PricedInterval(plannedEnd, plannedEnd.AddMinutes(minutes), type.Id, type.HourlyRate)],
+                [new PricedInterval(plannedEnd, plannedEnd.AddMinutes(minutes), type.Id, PricingEngine.BaseRate(type, session.IsMemberPricing))],
                 rules,
-                pricing.TimeZone)).Total;
+                pricing.TimeZone,
+                session.IsMemberPricing)).Total;
 
             var wasGrace = session.Status == SessionStatus.Grace;
             session.PurchasedMinutes = purchased + minutes;
@@ -398,7 +424,7 @@ public class SessionService(
 
             CloseOpenSegments(session, ctx.Now);
             var charge = session.Mode == SessionMode.OpenEnded
-                ? await charges.OpenEndedAsync(ctx.Db, session.Segments, ctx.Now, cancellationToken: ctx.Cancellation)
+                ? await charges.OpenEndedAsync(ctx.Db, session.Segments, ctx.Now, cancellationToken: ctx.Cancellation, isMember: session.IsMemberPricing)
                 : session.ChargedAmount;
             if (expectedAmount is { } amount && amount != charge)
             {
@@ -448,7 +474,7 @@ public class SessionService(
 
         var amount = session.Mode != SessionMode.OpenEnded
             ? session.ChargedAmount
-            : await charges.OpenEndedAsync(db, session.Segments, time.GetUtcNow(), cancellationToken: cancellationToken);
+            : await charges.OpenEndedAsync(db, session.Segments, time.GetUtcNow(), cancellationToken: cancellationToken, isMember: session.IsMemberPricing);
         return ServiceResult<StopQuote>.Ok(new StopQuote(session.Id, session.Version, amount));
     }
 

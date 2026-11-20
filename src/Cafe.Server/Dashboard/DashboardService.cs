@@ -48,7 +48,7 @@ public class DashboardService(
                 {
                     // Same computation as StopAsync, so the card shows what a stop right now would charge.
                     rules ??= await pricing.GetEnabledRulesAsync(db, cancellationToken);
-                    estimate = await charges.OpenEndedAsync(db, entity.Segments, now, rules, cancellationToken);
+                    estimate = await charges.OpenEndedAsync(db, entity.Segments, now, rules, cancellationToken, entity.IsMemberPricing);
                 }
 
                 session = ToModel(entity, settings, now, estimate);

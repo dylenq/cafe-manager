@@ -8,7 +8,7 @@ namespace Cafe.Server.Sessions;
 public class SessionCharges(PricingConfigService pricing)
 {
     /// <summary>
-    /// Prices every segment at its own station's type base rate. An open segment counts up to <paramref name="now"/>,
+    /// Prices every segment at its own station's type base rate (the member rate when <paramref name="isMember"/>, the session's start-time snapshot). An open segment counts up to <paramref name="now"/>,
     /// so the result is both the running estimate and the amount a stop at <paramref name="now"/> would bill.
     /// </summary>
     public async Task<decimal> OpenEndedAsync(
@@ -16,7 +16,8 @@ public class SessionCharges(PricingConfigService pricing)
         IEnumerable<SessionSegment> segments,
         DateTimeOffset now,
         IReadOnlyList<RateRule>? rules = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool isMember = false)
     {
         var ordered = segments.OrderBy(s => s.StartUtc).ThenBy(s => s.Id).ToList();
         if (ordered.Count == 0)
@@ -36,11 +37,11 @@ public class SessionCharges(PricingConfigService pricing)
             .Select(s =>
             {
                 var station = stations[s.StationId];
-                return new PricedInterval(s.StartUtc, s.EndUtc ?? now, station.StationTypeId, station.StationType.HourlyRate);
+                return new PricedInterval(s.StartUtc, s.EndUtc ?? now, station.StationTypeId, PricingEngine.BaseRate(station.StationType, isMember));
             })
             .ToList();
 
         rules ??= await pricing.GetEnabledRulesAsync(db, cancellationToken);
-        return PricingEngine.Price(new PricingRequest(intervals, rules, pricing.TimeZone)).Total;
+        return PricingEngine.Price(new PricingRequest(intervals, rules, pricing.TimeZone, isMember)).Total;
     }
 }

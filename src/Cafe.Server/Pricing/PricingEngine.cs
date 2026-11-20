@@ -47,7 +47,9 @@ public static class PricingEngine
         var windows = new List<PricingWindow>();
         foreach (var span in spans)
         {
-            var applicable = rules.Where(r => r.StationTypeId is null || r.StationTypeId == span.TypeId).ToList();
+            var applicable = rules
+                .Where(r => (r.StationTypeId is null || r.StationTypeId == span.TypeId) && AudienceMatches(r, request.IsMember))
+                .ToList();
             var cuts = CutPoints(span, applicable, tz);
             for (var k = 0; k < cuts.Count - 1; k++)
             {
@@ -64,6 +66,17 @@ public static class PricingEngine
         var sum = windows.Sum(w => w.Amount);
         return new PricingResult(Math.Round(sum, 2, MidpointRounding.AwayFromZero), windows);
     }
+
+    /// <summary>Base hourly rate for the audience: a member pays the member rate when set, a guest always the base rate.</summary>
+    public static decimal BaseRate(StationType type, bool isMember) =>
+        isMember ? (type.MemberHourlyRate ?? type.HourlyRate) : type.HourlyRate;
+
+    private static bool AudienceMatches(RateRule r, bool isMember) => r.AppliesTo switch
+    {
+        RateRuleAudience.MembersOnly => isMember,
+        RateRuleAudience.GuestsOnly => !isMember,
+        _ => true,
+    };
 
     private static void AddSlice(List<PricingWindow> windows, long from, long to, int typeId, decimal rate, int? ruleId)
     {

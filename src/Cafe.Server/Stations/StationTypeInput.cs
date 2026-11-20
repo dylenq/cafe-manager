@@ -11,5 +11,9 @@ public class StationTypeInput
     [Range(0.0, 1000000.0, ErrorMessage = "Hourly rate must be 0 or more.")]
     public decimal HourlyRate { get; set; }
 
+    /// <summary>Optional member rate; null means members pay the base rate.</summary>
+    [Range(0.0, 1000000.0, ErrorMessage = "Member rate must be 0 or more.")]
+    public decimal? MemberHourlyRate { get; set; }
+
     public int SortOrder { get; set; }
 }

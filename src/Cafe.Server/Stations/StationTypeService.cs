@@ -35,7 +35,7 @@ public class StationTypeService(IDbContextFactory<CafeDbContext> dbFactory)
             return Duplicate(name);
         }
 
-        var entity = new StationType { Name = name, HourlyRate = input.HourlyRate, SortOrder = input.SortOrder };
+        var entity = new StationType { Name = name, HourlyRate = input.HourlyRate, MemberHourlyRate = input.MemberHourlyRate, SortOrder = input.SortOrder };
         db.StationTypes.Add(entity);
         try
         {
@@ -71,6 +71,7 @@ public class StationTypeService(IDbContextFactory<CafeDbContext> dbFactory)
 
         entity.Name = name;
         entity.HourlyRate = input.HourlyRate;
+        entity.MemberHourlyRate = input.MemberHourlyRate;
         entity.SortOrder = input.SortOrder;
         try
         {

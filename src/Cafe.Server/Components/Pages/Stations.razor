@@ -139,6 +139,10 @@ else
                         <td>@(station.IsEnabled ? "Yes" : "No")</td>
                         <td class="text-end">@station.SortOrder</td>
                         <td class="text-end">
+                            @if (station.Kind == StationKind.Console && !string.IsNullOrWhiteSpace(station.TvIpAddress))
+                            {
+                                <TvPairControl StationId="station.Id" StationName="@station.Name" Paired="@(!string.IsNullOrWhiteSpace(station.TvToken))" OnPaired="LoadAsync" />
+                            }
                             <div class="d-flex flex-column flex-sm-row gap-2 justify-content-end">
                                 @if (confirmingDeleteId == station.Id)
                                 {

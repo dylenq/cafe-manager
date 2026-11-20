@@ -1,0 +1,102 @@
+@using Cafe.Server.Devices
+@inject TvPairingService Pairing
+@inject TvControlService Control
+@inject ILogger<TvPairControl> Logger
+
+<div class="tv-pair-control d-flex flex-column gap-1 mb-2" data-station-id="@StationId">
+    <div class="d-flex flex-wrap align-items-center gap-2 justify-content-end">
+        <span class="badge @(Paired ? "text-bg-success" : "text-bg-secondary") tv-paired-badge">@(Paired ? "Paired" : "Not paired")</span>
+        <button type="button" class="btn btn-sm btn-outline-primary tv-pair-button" disabled="@_busy" @onclick="PairAsync">@(Paired ? "Re-pair TV" : "Pair TV")</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary tv-test-button" disabled="@_busy" @onclick="TestAsync">Test</button>
+    </div>
+    @if (_busy && _pairing)
+    {
+        <div class="small text-muted tv-pair-wait">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            Accept the prompt on the TV...
+        </div>
+    }
+    else if (_message is not null)
+    {
+        <div class="small @(_ok ? "text-success" : "text-danger") tv-pair-message" role="status">@_message</div>
+    }
+</div>
+
+@code {
+    private bool _busy;
+    private bool _pairing;
+    private bool _ok;
+    private string? _message;
+
+    [Parameter, EditorRequired] public int StationId { get; set; }
+
+    [Parameter] public string StationName { get; set; } = string.Empty;
+
+    [Parameter] public bool Paired { get; set; }
+
+    [Parameter] public EventCallback OnPaired { get; set; }
+
+    private async Task PairAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _pairing = true;
+        _message = null;
+        var paired = false;
+        try
+        {
+            var result = await Pairing.PairAsync(StationId);
+            _ok = result.Success;
+            _message = result.Success ? "Paired. The TV token is saved." : result.Error;
+            paired = result.Success;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogError(ex, "Could not pair the TV of station {StationId}.", StationId);
+            _ok = false;
+            _message = "Something went wrong. Try again.";
+        }
+        finally
+        {
+            _busy = false;
+            _pairing = false;
+        }
+
+        if (paired && OnPaired.HasDelegate)
+        {
+            await OnPaired.InvokeAsync();
+        }
+    }
+
+    private async Task TestAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _pairing = false;
+        _message = null;
+        try
+        {
+            var result = await Control.TestAsync(StationId);
+            _ok = result.Success;
+            _message = result.Message;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogError(ex, "Could not test the TV of station {StationId}.", StationId);
+            _ok = false;
+            _message = "Something went wrong. Try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

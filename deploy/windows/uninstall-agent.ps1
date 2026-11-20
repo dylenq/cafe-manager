@@ -89,6 +89,22 @@ function Resolve-UserSid {
     }
 }
 
+function Invoke-RegExe {
+    # Runs reg.exe and returns its exit code. In Windows PowerShell 5.1 a native command's stderr output becomes a
+    # terminating error when $ErrorActionPreference is 'Stop' and the stream is redirected, so relax it for the call
+    # and judge success by the exit code only.
+    param([string[]]$Arguments)
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & reg.exe @Arguments *> $null
+        return $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
+}
+
 function Invoke-WithUserHive {
     # Runs $Action with the registry root of the user's hive: HKEY_USERS\<SID> when loaded, else the user's
     # NTUSER.DAT temporarily loaded. Returns $false when the user has no profile.
@@ -109,25 +125,31 @@ function Invoke-WithUserHive {
     $hiveFile = Join-Path $profilePath 'NTUSER.DAT'
     if (-not (Test-Path -LiteralPath $hiveFile)) { return $false }
 
-    & reg.exe load "HKU\$TempHiveName" $hiveFile | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Could not load the registry hive $hiveFile (exit code $LASTEXITCODE). Is the user logging on right now?"
+    $loadExit = Invoke-RegExe -Arguments @('load', "HKU\$TempHiveName", $hiveFile)
+    if ($loadExit -ne 0) {
+        throw "Could not load the registry hive $hiveFile (exit code $loadExit). Is the user logging on right now?"
     }
     try {
         & $Action "Registry::HKEY_USERS\$TempHiveName"
     }
     finally {
+        # Always try to unload (also when the action threw). Open registry handles from the action can make the first
+        # attempts fail with "access denied", so collect garbage, wait and retry. This block must never throw.
         $unloaded = $false
-        for ($attempt = 1; $attempt -le 3 -and -not $unloaded; $attempt++) {
-            [GC]::Collect()
-            [GC]::WaitForPendingFinalizers()
-            & reg.exe unload "HKU\$TempHiveName" 2>&1 | Out-Null
-            if ($LASTEXITCODE -eq 0) {
-                $unloaded = $true
+        try {
+            for ($attempt = 1; $attempt -le 5 -and -not $unloaded; $attempt++) {
+                [GC]::Collect()
+                [GC]::WaitForPendingFinalizers()
+                if ((Invoke-RegExe -Arguments @('unload', "HKU\$TempHiveName")) -eq 0) {
+                    $unloaded = $true
+                }
+                else {
+                    Start-Sleep -Seconds 2
+                }
             }
-            else {
-                Start-Sleep -Seconds 2
-            }
+        }
+        catch {
+            Write-Verbose ('Unloading the temporary registry hive failed: ' + $_.Exception.Message)
         }
         if (-not $unloaded) {
             Write-Warning "The temporary registry hive HKU\$TempHiveName could not be unloaded. Restart the PC or run: reg.exe unload HKU\$TempHiveName"

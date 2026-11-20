@@ -108,7 +108,28 @@ foreach ($logDir in @(Get-ChildItem -LiteralPath $Stage -Recurse -Directory -Fil
 }
 
 Write-Host "[h] Zipping $Zip"
-Compress-Archive -Path $BundlePath -DestinationPath $Zip -CompressionLevel Optimal
+# Build the zip entry by entry: Compress-Archive in Windows PowerShell 5.1 stores backslash separators and fails on
+# files held open, which gives a different layout than build-release.sh. Entry names are written explicitly with
+# forward slashes and start with the bundle folder name, exactly like "zip -r" in the .sh script.
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zipStream = [System.IO.File]::Open($Zip, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::ReadWrite)
+try {
+    $archive = New-Object System.IO.Compression.ZipArchive($zipStream, [System.IO.Compression.ZipArchiveMode]::Create)
+    try {
+        $prefixLength = $Stage.TrimEnd('\').Length + 1
+        foreach ($file in @(Get-ChildItem -LiteralPath $BundlePath -Recurse -File | Sort-Object FullName)) {
+            $entryName = $file.FullName.Substring($prefixLength).Replace('\', '/')
+            [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $file.FullName, $entryName, [System.IO.Compression.CompressionLevel]::Optimal)
+        }
+    }
+    finally {
+        $archive.Dispose()
+    }
+}
+finally {
+    $zipStream.Dispose()
+}
 
 Write-Host '[i] Result'
 $item = Get-Item -LiteralPath $Zip

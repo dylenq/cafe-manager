@@ -105,7 +105,9 @@ done < <(find "$STAGE" -type d -name logs -print)
 echo "[h] Zipping ${ZIP}"
 mkdir -p dist
 if command -v zip >/dev/null 2>&1; then
-  (cd "$STAGE" && zip -r -X -q "../${BUNDLE}.zip" "$BUNDLE")
+  ZIP_ABS="$(pwd)/${ZIP}"
+  rm -f "$ZIP_ABS"
+  (cd "$STAGE" && zip -r -X -q "$ZIP_ABS" "$BUNDLE")
 elif command -v ditto >/dev/null 2>&1; then
   ditto -c -k --keepParent "$STAGE/$BUNDLE" "$ZIP"
 else

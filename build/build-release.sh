@@ -110,5 +110,5 @@ echo "[i] Result"
 echo "Zip:    $ROOT/$ZIP"
 echo "Size:   $(du -h "$ZIP" | cut -f1)"
 echo "Agent:  $AGENT_MODE"
-unzip -l "$ZIP" | head -n 40
+unzip -l "$ZIP" | sed -n '1,40p'
 echo "SHA-256: $(shasum -a 256 "$ZIP" | cut -d' ' -f1)"

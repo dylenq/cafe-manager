@@ -1,0 +1,300 @@
+@page "/products"
+@using Cafe.Server.Data
+@using Cafe.Server.Products
+@using Cafe.Server.Stations
+@inject ProductService ProductSvc
+@inject ILogger<Products> Logger
+
+<PageTitle>Products - Cafe Manager</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Products</h1>
+    <div class="d-flex flex-wrap align-items-center gap-3">
+        <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="show-inactive" checked="@showInactive" @onchange="ToggleInactiveAsync" />
+            <label class="form-check-label" for="show-inactive">Show inactive</label>
+        </div>
+        @if (!showForm)
+        {
+            <button type="button" class="btn btn-primary" @onclick="StartAdd">Add product</button>
+        }
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" aria-label="Close" @onclick="DismissError"></button>
+    </div>
+}
+
+@if (showForm)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">@(editingId is null ? "Add product" : "Edit product")</h2>
+            <EditForm Model="input" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-12 col-md-5">
+                        <label class="form-label" for="product-name">Name</label>
+                        <InputText id="product-name" class="form-control" @bind-Value="input.Name" />
+                        <ValidationMessage For="() => input.Name" class="text-danger" />
+                        @FieldError("Name")
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="product-category">Category</label>
+                        <InputText id="product-category" class="form-control" list="product-categories" @bind-Value="input.Category" />
+                        <datalist id="product-categories">
+                            @foreach (var category in categories)
+                            {
+                                <option value="@category"></option>
+                            }
+                        </datalist>
+                        <ValidationMessage For="() => input.Category" class="text-danger" />
+                        @FieldError("Category")
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="product-price">Price</label>
+                        <InputNumber id="product-price" class="form-control" @bind-Value="input.Price" />
+                        <ValidationMessage For="() => input.Price" class="text-danger" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="product-sort">Sort order</label>
+                        <InputNumber id="product-sort" class="form-control" @bind-Value="input.SortOrder" />
+                        <ValidationMessage For="() => input.SortOrder" class="text-danger" />
+                    </div>
+                    <div class="col-12 col-md-3 d-flex align-items-end">
+                        <div class="form-check">
+                            <InputCheckbox id="product-active" class="form-check-input" @bind-Value="input.IsActive" />
+                            <label class="form-check-label" for="product-active">Active</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
+                    <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (products is null)
+{
+    <p>Loading...</p>
+}
+else if (products.Count == 0)
+{
+    <p class="text-muted">No products yet. Add one to start selling.</p>
+}
+else
+{
+    @foreach (var group in products.GroupBy(p => p.Category, StringComparer.CurrentCultureIgnoreCase))
+    {
+        <h2 class="h5 mt-3">@group.Key</h2>
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th class="text-end">Price</th>
+                        <th class="text-end">Sort order</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var product in group)
+                    {
+                        <tr>
+                            <td>
+                                @product.Name
+                                @if (!product.IsActive)
+                                {
+                                    <span class="badge text-bg-secondary ms-1">Inactive</span>
+                                }
+                            </td>
+                            <td class="text-end">@product.Price.ToString("C")</td>
+                            <td class="text-end">@product.SortOrder</td>
+                            <td class="text-end">
+                                <div class="d-flex flex-column flex-sm-row gap-2 justify-content-end">
+                                    @if (confirmingDeleteId == product.Id)
+                                    {
+                                        <span class="align-self-center">Delete?</span>
+                                        <button type="button" class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(product.Id)">Yes</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => confirmingDeleteId = null">No</button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(product)">Edit</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleActiveAsync(product)">
+                                            @(product.IsActive ? "Deactivate" : "Activate")
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => confirmingDeleteId = product.Id">Delete</button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    private List<Product>? products;
+    private List<string> categories = [];
+    private ProductInput input = new();
+    private IReadOnlyDictionary<string, string> fieldErrors = new Dictionary<string, string>();
+    private int? editingId;
+    private int? confirmingDeleteId;
+    private bool showForm;
+    private bool showInactive;
+    private bool saving;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            products = await ProductSvc.ListAsync(showInactive);
+            categories = await ProductSvc.CategoriesAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load products.");
+            products ??= [];
+            errorMessage = "Could not load the list. Refresh the page and try again.";
+        }
+    }
+
+    private RenderFragment FieldError(string field) => builder =>
+    {
+        if (fieldErrors.TryGetValue(field, out var message))
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "text-danger");
+            builder.AddContent(2, message);
+            builder.CloseElement();
+        }
+    };
+
+    private async Task ToggleInactiveAsync(ChangeEventArgs e)
+    {
+        showInactive = e.Value is true;
+        await LoadAsync();
+    }
+
+    private void StartAdd()
+    {
+        input = new ProductInput();
+        editingId = null;
+        errorMessage = null;
+        fieldErrors = new Dictionary<string, string>();
+        showForm = true;
+    }
+
+    private void StartEdit(Product product)
+    {
+        input = new ProductInput
+        {
+            Name = product.Name, Category = product.Category, Price = product.Price,
+            IsActive = product.IsActive, SortOrder = product.SortOrder,
+        };
+        editingId = product.Id;
+        confirmingDeleteId = null;
+        errorMessage = null;
+        fieldErrors = new Dictionary<string, string>();
+        showForm = true;
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        editingId = null;
+        errorMessage = null;
+    }
+
+    private void DismissError() => errorMessage = null;
+
+    private async Task SaveAsync()
+    {
+        if (saving)
+        {
+            return;
+        }
+
+        saving = true;
+        try
+        {
+            ServiceResult result = editingId is { } id
+                ? await ProductSvc.UpdateAsync(id, input)
+                : await ProductSvc.CreateAsync(input);
+
+            if (!result.Success)
+            {
+                errorMessage = result.Error;
+                fieldErrors = result.FieldErrors ?? new Dictionary<string, string>();
+                if (editingId is not null && result.Kind == FailureKind.NotFound)
+                {
+                    showForm = false;
+                    editingId = null;
+                    await LoadAsync();
+                }
+
+                return;
+            }
+
+            errorMessage = null;
+            showForm = false;
+            editingId = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not save product.");
+            errorMessage = "Something went wrong. Try again.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task ToggleActiveAsync(Product product)
+    {
+        try
+        {
+            var result = await ProductSvc.SetActiveAsync(product.Id, !product.IsActive);
+            errorMessage = result.Success ? null : result.Error;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not change product {ProductId}.", product.Id);
+            errorMessage = "Something went wrong. Try again.";
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        confirmingDeleteId = null;
+        try
+        {
+            var result = await ProductSvc.DeleteAsync(id);
+            errorMessage = result.Success ? null : result.Error;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not delete product {ProductId}.", id);
+            errorMessage = "Something went wrong. Try again.";
+        }
+
+        await LoadAsync();
+    }
+}

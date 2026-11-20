@@ -23,29 +23,14 @@ public class CheckoutService(
                 : ServiceResult<StopSettleQuote>.Fail(quote.Error!);
         }
 
-        List<int> orderIds;
-        await using (var db = await dbFactory.CreateDbContextAsync(cancellationToken))
+        var owing = await OwingOrdersAsync(sessionId, cancellationToken);
+        if (!owing.Success)
         {
-            orderIds = await db.Orders.AsNoTracking()
-                .Where(o => o.SessionId == sessionId && o.Status == OrderStatus.Open)
-                .OrderBy(o => o.Id).Select(o => o.Id).ToListAsync(cancellationToken);
-        }
-
-        IReadOnlyList<OutstandingItem> owing = [];
-        if (orderIds.Count > 0)
-        {
-            var preview = await settlement.PreviewAsync(
-                orderIds.Select(id => new SettleTarget(AllocationTargetType.Order, id)).ToList(), cancellationToken);
-            if (!preview.Success)
-            {
-                return ServiceResult<StopSettleQuote>.Fail(preview.Error!);
-            }
-
-            owing = preview.Value!.Where(i => i.Outstanding > 0m).ToList();
+            return ServiceResult<StopSettleQuote>.Fail(owing.Error!);
         }
 
         return ServiceResult<StopSettleQuote>.Ok(new StopSettleQuote(
-            quote.Value!, owing, quote.Value!.Amount + owing.Sum(i => i.Outstanding)));
+            quote.Value!, owing.Value!, quote.Value!.Amount + owing.Value!.Sum(i => i.Outstanding)));
     }
 
     /// <summary>
@@ -62,6 +47,17 @@ public class CheckoutService(
         decimal expectedDue,
         CancellationToken cancellationToken = default)
     {
+        // Refuse before stopping when the open orders changed since the quote (an order added or paid meanwhile), so a
+        // stale amount never stops a session it could not settle.
+        if (tenders.Count > 0)
+        {
+            var owing = await OwingOrdersAsync(sessionId, cancellationToken);
+            if (owing.Success && expectedSessionCharge + owing.Value!.Sum(i => i.Outstanding) != expectedDue)
+            {
+                return ServiceResult<CheckoutResult>.Fail(SettlementService.ChangedMessage);
+            }
+        }
+
         var stopped = await sessions.StopAsync(sessionId, expectedVersion, expectedSessionCharge, cancellationToken);
         if (!stopped.Success)
         {
@@ -94,5 +90,27 @@ public class CheckoutService(
         return ServiceResult<CheckoutResult>.Ok(settled.Success
             ? new CheckoutResult(charge, settled.Value, null)
             : new CheckoutResult(charge, null, settled.Error));
+    }
+
+    private async Task<ServiceResult<IReadOnlyList<OutstandingItem>>> OwingOrdersAsync(int sessionId, CancellationToken cancellationToken)
+    {
+        List<int> orderIds;
+        await using (var db = await dbFactory.CreateDbContextAsync(cancellationToken))
+        {
+            orderIds = await db.Orders.AsNoTracking()
+                .Where(o => o.SessionId == sessionId && o.Status == OrderStatus.Open)
+                .OrderBy(o => o.Id).Select(o => o.Id).ToListAsync(cancellationToken);
+        }
+
+        if (orderIds.Count == 0)
+        {
+            return ServiceResult<IReadOnlyList<OutstandingItem>>.Ok([]);
+        }
+
+        var preview = await settlement.PreviewAsync(
+            orderIds.Select(id => new SettleTarget(AllocationTargetType.Order, id)).ToList(), cancellationToken);
+        return preview.Success
+            ? ServiceResult<IReadOnlyList<OutstandingItem>>.Ok(preview.Value!.Where(i => i.Outstanding > 0m).ToList())
+            : ServiceResult<IReadOnlyList<OutstandingItem>>.Fail(preview.Error!);
     }
 }

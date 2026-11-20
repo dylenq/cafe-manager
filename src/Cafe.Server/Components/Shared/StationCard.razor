@@ -1,10 +1,12 @@
 @using Cafe.Server.Customers
 @using Cafe.Server.Dashboard
 @using Cafe.Server.Data
+@using Cafe.Server.Payments
 @using Cafe.Server.Sessions
 @using Cafe.Server.Stations
 @using Cafe.Shared
 @inject SessionService Sessions
+@inject CheckoutService Checkout
 @inject BalanceService Balances
 @inject TimeProvider Time
 @inject ILogger<StationCard> Logger
@@ -77,8 +79,29 @@
                         {
                             <div class="small stop-refund">Refund @_confirmRefund min to balance</div>
                         }
-                        <button type="button" class="btn btn-sm btn-danger mt-1" disabled="@_busy"
-                                @onclick="() => ConfirmStopAsync(session.SessionId)">Confirm stop</button>
+                        @if (_confirmOrders.Count > 0)
+                        {
+                            <div class="small mt-1 stop-orders">
+                                <div class="d-flex justify-content-between"><span>Session charge</span><span>@quote.ToString("C")</span></div>
+                                @foreach (var order in _confirmOrders)
+                                {
+                                    <div class="d-flex justify-content-between"><span>@order.Label</span><span>@order.Outstanding.ToString("C")</span></div>
+                                }
+                            </div>
+                        }
+                        @if (_confirmTotalDue > 0m)
+                        {
+                            <div class="fw-semibold stop-total-due">Total due: @_confirmTotalDue.ToString("C")</div>
+                            <button type="button" class="btn btn-sm btn-primary mt-1" disabled="@_busy"
+                                    @onclick="BeginSettle">Stop &amp; settle</button>
+                            <button type="button" class="btn btn-sm btn-danger mt-1" disabled="@_busy"
+                                    @onclick="() => ConfirmStopAsync(session.SessionId)">Stop, pay later</button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-sm btn-danger mt-1" disabled="@_busy"
+                                    @onclick="() => ConfirmStopAsync(session.SessionId)">Confirm stop</button>
+                        }
                         <button type="button" class="btn btn-sm btn-outline-secondary mt-1" disabled="@_busy"
                                 @onclick="ClearConfirm">Cancel</button>
                     </div>
@@ -203,6 +226,12 @@
             </div>
         }
 
+        @if (_settleOpen && _confirmQuote is { } settleCharge)
+        {
+            <PaymentDialog Title="@($"Stop & settle - {Model.Name}")" Items="SettleItems()" Due="_confirmTotalDue"
+                           OnConfirm="ConfirmSettleAsync" OnClosed="SettleClosedAsync" />
+        }
+
         @if (_error is not null)
         {
             <div class="alert alert-danger py-1 px-2 mt-2 mb-0 small" role="alert">@_error</div>
@@ -231,6 +260,12 @@
     private int? _customExtend;
     private int _moveTarget;
     private int _confirmRefund;
+    private IReadOnlyList<OutstandingItem> _confirmOrders = [];
+    private decimal _confirmTotalDue;
+    private bool _settleOpen;
+    private bool _settleStoppedUnpaid;
+    private bool _settleChanged;
+    private string? _settleChangedMessage;
     private CustomerPick? _pick;
     private int _usable;
     private int? _balanceMinutes;
@@ -250,7 +285,8 @@
     // a different session or none, so a stale "Final charge" panel can never confirm a stop on another session.
     protected override void OnParametersSet()
     {
-        if (_confirmQuote is not null && Model.Session?.SessionId != _confirmSessionId)
+        // An open payment dialog outlives the session it stopped: it is closed by staff, not by a refresh.
+        if (!_settleOpen && _confirmQuote is not null && Model.Session?.SessionId != _confirmSessionId)
         {
             ClearConfirm();
         }
@@ -272,6 +308,12 @@
         _confirmQuote = null;
         _confirmSessionId = null;
         _confirmRefund = 0;
+        _confirmOrders = [];
+        _confirmTotalDue = 0m;
+        _settleOpen = false;
+        _settleStoppedUnpaid = false;
+        _settleChanged = false;
+        _settleChangedMessage = null;
     }
 
     private void ClearPick()
@@ -452,7 +494,7 @@
         _error = null;
         try
         {
-            var quote = await Sessions.QuoteStopAsync(sessionId);
+            var quote = await Checkout.QuoteStopAndSettleAsync(sessionId);
             if (quote.Success)
             {
                 ShowQuote(quote.Value!);
@@ -473,12 +515,120 @@
         }
     }
 
-    private void ShowQuote(StopQuote quote)
+    private void ShowQuote(StopSettleQuote quote)
     {
-        _confirmQuote = quote.Amount;
-        _confirmRefund = quote.RefundMinutes;
-        _confirmSessionId = quote.SessionId;
-        _confirmVersion = quote.Version;
+        var stop = quote.Stop;
+        _confirmQuote = stop.Amount;
+        _confirmRefund = stop.RefundMinutes;
+        _confirmSessionId = stop.SessionId;
+        _confirmVersion = stop.Version;
+        _confirmOrders = quote.OpenOrders;
+        _confirmTotalDue = quote.TotalDue;
+    }
+
+    private void BeginSettle()
+    {
+        if (_confirmQuote is null || _confirmSessionId is null || _confirmTotalDue <= 0m)
+        {
+            return;
+        }
+
+        _settleStoppedUnpaid = false;
+        _settleChanged = false;
+        _settleChangedMessage = null;
+        _settleOpen = true;
+    }
+
+    private IReadOnlyList<OutstandingItem> SettleItems()
+    {
+        var items = new List<OutstandingItem>();
+        if (_confirmQuote is > 0m and var charge && _confirmSessionId is { } sessionId)
+        {
+            items.Add(new OutstandingItem(AllocationTargetType.Session, sessionId, Model.Name, charge, 0m, charge));
+        }
+
+        items.AddRange(_confirmOrders);
+        return items;
+    }
+
+    // The session is stopped only inside this call, so cancelling the dialog stops nothing.
+    private async Task<PaymentDialogResult> ConfirmSettleAsync(IReadOnlyList<TenderLine> tenders)
+    {
+        if (_confirmSessionId is not { } sessionId || _confirmQuote is not { } charge)
+        {
+            return new PaymentDialogResult(false, "Close this window and try again.", null);
+        }
+
+        var result = await Checkout.StopAndSettleAsync(sessionId, _confirmVersion, charge, tenders, _confirmTotalDue);
+        if (!result.Success)
+        {
+            if (result.Error == SessionService.ChangedMessage || result.Error == SettlementService.ChangedMessage)
+            {
+                _settleChanged = true;
+                _settleChangedMessage = result.Error;
+            }
+
+            return new PaymentDialogResult(false, result.Error, null);
+        }
+
+        if (result.Value!.PaymentError is { } paymentError)
+        {
+            Logger.LogWarning("Session {SessionId} stopped but its payment was refused: {Error}", sessionId, paymentError);
+            _settleStoppedUnpaid = true;
+            return new PaymentDialogResult(true, null, null);
+        }
+
+        return new PaymentDialogResult(true, null, result.Value.Settlement);
+    }
+
+    private async Task SettleClosedAsync(bool recorded)
+    {
+        var sessionId = _confirmSessionId;
+        var stoppedUnpaid = _settleStoppedUnpaid;
+        var changed = _settleChanged;
+        var changedMessage = _settleChangedMessage;
+        _settleOpen = false;
+        _settleChanged = false;
+        _settleChangedMessage = null;
+        _settleStoppedUnpaid = false;
+
+        if (recorded)
+        {
+            ClearConfirm();
+            if (stoppedUnpaid)
+            {
+                _error = $"{Model.Name} stopped, but the payment failed. The items are under Open tabs.";
+            }
+            else
+            {
+                await OnNotice.InvokeAsync($"{Model.Name} stopped and settled.");
+            }
+
+            return;
+        }
+
+        if (changed && sessionId is { } id)
+        {
+            ClearConfirm();
+            _error = changedMessage;
+            await RequoteAsync(id);
+        }
+    }
+
+    private async Task RequoteAsync(int sessionId)
+    {
+        try
+        {
+            var fresh = await Checkout.QuoteStopAndSettleAsync(sessionId);
+            if (fresh.Success)
+            {
+                ShowQuote(fresh.Value!);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not re-quote the stop of session {SessionId}.", sessionId);
+        }
     }
 
     private async Task ConfirmStopAsync(int sessionId)
@@ -494,23 +644,21 @@
         try
         {
             var shownRefund = _confirmRefund;
+            var leftOwing = _confirmOrders.Count + (shown > 0m ? 1 : 0);
             var result = await Sessions.StopAsync(sessionId, _confirmVersion, shown);
             if (result.Success)
             {
                 ClearConfirm();
                 var refundText = shownRefund > 0 ? $" Refunded {shownRefund} min to balance." : string.Empty;
-                await OnNotice.InvokeAsync($"{Model.Name} stopped. Final charge: {result.Value.ToString("C")}{refundText}");
+                var tabText = leftOwing > 0 ? $" Stopped. {leftOwing} item(s) left under Open tabs." : string.Empty;
+                await OnNotice.InvokeAsync($"{Model.Name} stopped. Final charge: {result.Value.ToString("C")}{refundText}{tabText}");
             }
             else if (result.Error == SessionService.ChangedMessage)
             {
                 // Show the new charge and require another confirmation.
                 ClearConfirm();
                 _error = result.Error;
-                var fresh = await Sessions.QuoteStopAsync(sessionId);
-                if (fresh.Success)
-                {
-                    ShowQuote(fresh.Value!);
-                }
+                await RequoteAsync(sessionId);
             }
             else
             {

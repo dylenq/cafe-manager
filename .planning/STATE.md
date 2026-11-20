@@ -1,18 +1,18 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 4
-current_phase_name: Samsung TV Control
-status: verifying
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-11-20T06:49:54.436Z"
+current_phase: 5
+current_phase_name: Customers & Packages
+status: executing
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-11-20T06:55:30.063Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 4 execution started
-state_head: 447feaeba2fc4bea650e0057c8a74328995ba833
+last_activity_desc: Phase 5 execution started
+state_head: 0c310f8b1fcb16dd38e42e15fb87f86bba5d0de5
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 27
-  completed_plans: 17
+  total_plans: 30
+  completed_plans: 18
   percent: 0
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** Staff can start a timed session on any station, and that station reliably stops being usable when the paid time runs out: the PC locks or the TV powers off.
-**Current focus:** Phase 4 — Samsung TV Control
+**Current focus:** Phase 5 — Customers & Packages
 
 ## Current Position
 
-Phase: 4 (Samsung TV Control) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
-Last activity: 2026-11-20 — Phase 4 execution started
+Phase: 5 (Customers & Packages) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-11-20 — Phase 5 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -69,6 +69,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 4 P04-01 | 35min | 2 tasks | 16 files |
 | Phase 4 P02 | 25min | 2 tasks | 17 files |
 | Phase 4 P03 | 25min | 3 tasks | 9 files |
+| Phase 5 P05-01 | 35min | 2 tasks | 35 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,7 @@ Recent decisions affecting current work:
 - [Phase 4]: TV no-token marker is '-'; certificate bypass only in SamsungTvTransport; state reads not serialised per TV
 - [Phase 4]: TV actions run through TvActionQueue (latest wins per station) and TvControlService (audit, cache, notice); AgentCommandKind TvPowerOn=5, TvPowerOff=6
 - [Phase 4]: 04-03: Home Notice gains optional Warning flag for TV failure notices
+- [Phase 5]: Balance ledger is append-only; debit type bucket first, refund last-drawn first; expiry never refunds
 
 ### Pending Todos
 
@@ -114,6 +116,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-20T06:49:54.419Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-11-20T06:55:30.045Z
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None

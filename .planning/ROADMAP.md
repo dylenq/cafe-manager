@@ -112,6 +112,12 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
   4. A session linked to a member is charged the member rate and a guest session is charged the guest rate
 
 **Plans**: TBD
+- [x] 05-01-PLAN.md
+- [ ] 05-02-PLAN.md
+- [ ] 05-03-PLAN.md
+- [ ] 05-04-PLAN.md
+- [ ] 05-05-PLAN.md
+
 **UI hint**: yes
 
 ### Phase 6: POS & Receipts
@@ -151,6 +157,6 @@ Cafe Manager is built as seven vertical phases. It starts with a bootable admin 
 | 2. Session Engine & Pricing | 5/5 | In Progress | - |
 | 3. PC Agent | 5/5 | In Progress | - |
 | 4. Samsung TV Control | 3/3 | In Progress | - |
-| 5. Customers & Packages | 0/TBD | Not started | - |
+| 5. Customers & Packages | 1/5 | In Progress | - |
 | 6. POS & Receipts | 0/TBD | Not started | - |
 | 7. Reports & Deployment | 0/TBD | Not started | - |

@@ -1,0 +1,154 @@
+@using Cafe.Server.Data
+@using Cafe.Server.Orders
+@using Cafe.Server.Payments
+@inject OpenTabsService TabsService
+@inject SettlementService Settlement
+@inject OrderService Orders
+@inject ILogger<OpenTabsPanel> Logger
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h2 class="h5 card-title">Open tabs</h2>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible" role="alert">
+                @errorMessage
+                <button type="button" class="btn-close" aria-label="Close" @onclick="() => errorMessage = null"></button>
+            </div>
+        }
+
+        @if (groups is null)
+        {
+            <p class="mb-0">Loading...</p>
+        }
+        else if (groups.Count == 0)
+        {
+            <p class="text-muted mb-0">No open tabs</p>
+        }
+        else
+        {
+            @foreach (var group in groups)
+            {
+                <div class="border rounded p-2 mb-2">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div class="fw-semibold">@group.Header</div>
+                        <div class="fw-bold text-nowrap">@group.TotalOutstanding.ToString("C")</div>
+                    </div>
+                    @if (IsRunning(group))
+                    {
+                        <div class="small text-muted">Session still running</div>
+                    }
+                    <ul class="list-unstyled small mb-2 mt-1">
+                        @foreach (var item in group.Items)
+                        {
+                            <li class="d-flex justify-content-between align-items-center gap-2 py-1">
+                                <span>@(item.Type == AllocationTargetType.Session ? $"Session charge ({item.Label})" : item.Label)</span>
+                                <span class="d-flex align-items-center gap-2">
+                                    <span>@item.Outstanding.ToString("C")@(item.Paid > 0m ? $" of {item.Total:C}" : "")</span>
+                                    @if (item.Type == AllocationTargetType.Order)
+                                    {
+                                        @if (confirmingVoidId == item.Id)
+                                        {
+                                            <span>Void this order?</span>
+                                            <button type="button" class="btn btn-sm btn-danger" disabled="@busy" @onclick="() => VoidAsync(item.Id)">Yes</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => confirmingVoidId = null">No</button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => confirmingVoidId = item.Id">Void</button>
+                                        }
+                                    }
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                    <button type="button" class="btn btn-success" disabled="@busy" @onclick="() => settling = group">Settle</button>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@if (settling is { } current)
+{
+    <PaymentDialog Title="@($"Settle {current.Header}")" Items="current.Items" Due="current.TotalOutstanding"
+                   OnConfirm="tenders => SettleAsync(current, tenders)" OnClosed="SettleClosedAsync" />
+}
+
+@code {
+    private const string RunningSuffix = " - open session";
+
+    private IReadOnlyList<OpenTabGroup>? groups;
+    private OpenTabGroup? settling;
+    private int? confirmingVoidId;
+    private bool busy;
+    private string? errorMessage;
+
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    protected override async Task OnInitializedAsync() => await RefreshAsync();
+
+    private static bool IsRunning(OpenTabGroup group) => group.SessionId is not null && group.Header.EndsWith(RunningSuffix, StringComparison.Ordinal);
+
+    public async Task RefreshAsync()
+    {
+        try
+        {
+            groups = await TabsService.GetOpenTabsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load open tabs.");
+            groups ??= [];
+            errorMessage = "Could not load the open tabs. Refresh the page and try again.";
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task<PaymentDialogResult> SettleAsync(OpenTabGroup group, IReadOnlyList<TenderLine> tenders)
+    {
+        var targets = group.Items.Select(i => new SettleTarget(i.Type, i.Id)).ToList();
+        var result = await Settlement.SettleAsync(new SettleRequest(targets, tenders, group.TotalOutstanding));
+        return new PaymentDialogResult(result.Success, result.Error, result.Value);
+    }
+
+    private async Task SettleClosedAsync(bool recorded)
+    {
+        settling = null;
+        await RefreshAsync();
+        if (recorded)
+        {
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task VoidAsync(int orderId)
+    {
+        if (busy)
+        {
+            return;
+        }
+
+        busy = true;
+        confirmingVoidId = null;
+        try
+        {
+            var result = await Orders.VoidAsync(orderId);
+            errorMessage = result.Success ? null : result.Error;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not void order {OrderId}.", orderId);
+            errorMessage = "Something went wrong. Try again.";
+        }
+        finally
+        {
+            busy = false;
+        }
+
+        await RefreshAsync();
+        await OnChanged.InvokeAsync();
+    }
+}

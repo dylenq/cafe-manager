@@ -1,4 +1,6 @@
 using System.Net;
+using Cafe.Server.Customers;
+using Cafe.Server.Orders;
 using Cafe.Server.Products;
 using Cafe.Tests.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +15,7 @@ public class PosPagesTests : IDisposable
 
     [Theory]
     [InlineData("/products")]
+    [InlineData("/pos")]
     public async Task Anonymous_request_redirects_to_login(string path)
     {
         using var auth = await _factory.CreateAuthenticatedClientAsync();
@@ -62,12 +65,73 @@ public class PosPagesTests : IDisposable
         using var scope = _factory.Services.CreateScope();
         var products = scope.ServiceProvider.GetRequiredService<ProductService>();
         var id = (await products.CreateAsync(new ProductInput { Name = "Cake", Category = "Food", Price = 4m })).Value!.Id;
-        var orders = scope.ServiceProvider.GetRequiredService<Cafe.Server.Orders.OrderService>();
-        Assert.True((await orders.CreateAsync(new Cafe.Server.Orders.OrderDraft([new(id, 1)], null, null))).Success);
+        var orders = scope.ServiceProvider.GetRequiredService<OrderService>();
+        Assert.True((await orders.CreateAsync(new OrderDraft([new(id, 1)], null, null))).Success);
 
         var result = await products.DeleteAsync(id);
 
         Assert.False(result.Success);
         Assert.Contains("Deactivate", result.Error);
+    }
+
+    [Fact]
+    public async Task Pos_empty_install_renders_core_controls()
+    {
+        using var client = await _factory.CreateAuthenticatedClientAsync();
+        var response = await client.GetAsync("/pos");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Open tabs", body);
+        Assert.Contains("Walk-in", body);
+        Assert.Contains("Charge now", body);
+        Assert.Contains("Add to tab", body);
+    }
+
+    [Fact]
+    public async Task Pos_shows_active_products_as_tiles()
+    {
+        using var client = await _factory.CreateAuthenticatedClientAsync();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var products = scope.ServiceProvider.GetRequiredService<ProductService>();
+            await products.CreateAsync(new ProductInput { Name = "Iced Tea", Category = "Cold drinks", Price = 2.5m });
+            await products.CreateAsync(new ProductInput { Name = "Nachos", Category = "Snacks", Price = 5m });
+            var hidden = (await products.CreateAsync(new ProductInput { Name = "Hidden Item", Category = "Snacks", Price = 1m })).Value!;
+            await products.SetActiveAsync(hidden.Id, false);
+        }
+
+        var body = await (await client.GetAsync("/pos")).Content.ReadAsStringAsync();
+
+        Assert.Contains("pos-tile", body);
+        Assert.Contains("Iced Tea", body);
+        Assert.Contains("Nachos", body);
+        Assert.Contains("Cold drinks", body);
+        Assert.DoesNotContain("Hidden Item", body);
+    }
+
+    [Fact]
+    public async Task Pos_open_tabs_panel_lists_customer_orders_and_hides_voided()
+    {
+        using var client = await _factory.CreateAuthenticatedClientAsync();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var sp = scope.ServiceProvider;
+            var productId = (await sp.GetRequiredService<ProductService>()
+                .CreateAsync(new ProductInput { Name = "Burger", Category = "Food", Price = 8m })).Value!.Id;
+            var alice = (await sp.GetRequiredService<CustomerService>()
+                .CreateAsync(new CustomerInput { Name = "Alice Tabs" })).Value!.Id;
+            var bob = (await sp.GetRequiredService<CustomerService>()
+                .CreateAsync(new CustomerInput { Name = "Bob Voided" })).Value!.Id;
+            var orders = sp.GetRequiredService<OrderService>();
+            Assert.True((await orders.CreateAsync(new OrderDraft([new(productId, 2)], alice, null))).Success);
+            var voided = (await orders.CreateAsync(new OrderDraft([new(productId, 1)], bob, null))).Value!;
+            Assert.True((await orders.VoidAsync(voided.Id)).Success);
+        }
+
+        var body = await (await client.GetAsync("/pos")).Content.ReadAsStringAsync();
+
+        Assert.Contains("Alice Tabs", body);
+        Assert.Contains("Settle", body);
+        Assert.DoesNotContain("Bob Voided", body);
     }
 }

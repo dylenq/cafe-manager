@@ -1,0 +1,21 @@
+.pos-tile {
+    min-height: 96px;
+    width: 100%;
+    white-space: normal;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.25rem;
+    touch-action: manipulation;
+}
+
+.pos-tile-price {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.cart-qty-btn {
+    min-width: 44px;
+    min-height: 44px;
+}

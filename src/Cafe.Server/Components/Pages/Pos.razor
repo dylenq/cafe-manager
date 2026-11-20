@@ -1,0 +1,453 @@
+@page "/pos"
+@using Cafe.Server.Customers
+@using Cafe.Server.Data
+@using Cafe.Server.Orders
+@using Cafe.Server.Payments
+@using Cafe.Server.Products
+@using Cafe.Server.Stations
+@inject ProductService ProductSvc
+@inject OrderService OrderSvc
+@inject OpenTabsService TabsSvc
+@inject SettlementService SettlementSvc
+@inject PaymentHistoryService HistorySvc
+@inject ILogger<Pos> Logger
+
+<PageTitle>POS - Cafe Manager</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">POS</h1>
+    <button type="button" class="btn btn-outline-secondary" @onclick="RefreshAllAsync">Refresh</button>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" aria-label="Close" @onclick="() => errorMessage = null"></button>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(notice))
+{
+    <div class="alert alert-success alert-dismissible" role="status">
+        @notice
+        <button type="button" class="btn-close" aria-label="Close" @onclick="() => notice = null"></button>
+    </div>
+}
+
+<div class="row g-3">
+    <div class="col-12 col-lg-7">
+        <div class="card">
+            <div class="card-body">
+                @if (products is null)
+                {
+                    <p class="mb-0">Loading...</p>
+                }
+                else if (products.Count == 0)
+                {
+                    <p class="text-muted mb-0">No products yet. <a href="products">Add products</a> to start selling.</p>
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap gap-2 mb-3" role="tablist">
+                        <button type="button" role="tab" class="btn @(selectedCategory is null ? "btn-dark" : "btn-outline-dark")"
+                                @onclick="() => selectedCategory = null">All</button>
+                        @foreach (var category in categories)
+                        {
+                            <button type="button" role="tab" class="btn @(selectedCategory == category ? "btn-dark" : "btn-outline-dark")"
+                                    @onclick="() => selectedCategory = category">@category</button>
+                        }
+                    </div>
+                    <div class="row row-cols-2 row-cols-md-3 row-cols-xl-4 g-2">
+                        @foreach (var product in VisibleProducts)
+                        {
+                            <div class="col">
+                                <button type="button" class="btn @TileClass(product.Category) pos-tile" @onclick="() => AddToCart(product)">
+                                    <span class="fw-semibold">@product.Name</span>
+                                    <span class="pos-tile-price">@product.Price.ToString("C")</span>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-5">
+        <div class="card mb-3">
+            <div class="card-body">
+                <h2 class="h5 card-title">Cart</h2>
+                @if (cart.IsEmpty)
+                {
+                    <p class="text-muted">The cart is empty. Tap a product to add it.</p>
+                }
+                else
+                {
+                    <ul class="list-group mb-3">
+                        @foreach (var line in cart.Lines)
+                        {
+                            <li class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">@line.Name</div>
+                                    <div class="small text-muted">@line.UnitPrice.ToString("C") each</div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <button type="button" class="btn btn-outline-secondary cart-qty-btn" aria-label="Fewer @line.Name" @onclick="() => cart.Decrement(line.ProductId)">-</button>
+                                    <span class="fw-bold px-1">@line.Quantity</span>
+                                    <button type="button" class="btn btn-outline-secondary cart-qty-btn" aria-label="More @line.Name" @onclick="() => cart.Increment(line.ProductId)">+</button>
+                                    <span class="text-end" style="min-width:5rem">@line.LineTotal.ToString("C")</span>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => cart.Remove(line.ProductId)">Remove</button>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+
+                <div class="d-flex justify-content-between align-items-baseline mb-3">
+                    <span class="text-muted">Total</span>
+                    <span class="fs-3 fw-bold">@cart.Total.ToString("C")</span>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-label mb-1">Attach to</div>
+                    <div class="d-flex flex-wrap gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="attach" id="attach-walkin" checked="@(attachMode == AttachMode.WalkIn)" @onchange="() => attachMode = AttachMode.WalkIn" />
+                            <label class="form-check-label" for="attach-walkin">Walk-in</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="attach" id="attach-session" checked="@(attachMode == AttachMode.Session)" @onchange="() => attachMode = AttachMode.Session" />
+                            <label class="form-check-label" for="attach-session">Active session</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="attach" id="attach-customer" checked="@(attachMode == AttachMode.Customer)" @onchange="() => attachMode = AttachMode.Customer" />
+                            <label class="form-check-label" for="attach-customer">Customer</label>
+                        </div>
+                    </div>
+
+                    @if (attachMode == AttachMode.Session)
+                    {
+                        <select class="form-select mt-2" aria-label="Active session" @bind="sessionId">
+                            <option value="">Choose a session</option>
+                            @foreach (var s in sessions)
+                            {
+                                <option value="@s.SessionId">@(s.CustomerName is { Length: > 0 } name ? $"{s.StationName} ({name})" : s.StationName)</option>
+                            }
+                        </select>
+                        @if (sessions.Count == 0)
+                        {
+                            <div class="small text-muted mt-1">No sessions are running right now.</div>
+                        }
+                    }
+                    else if (attachMode == AttachMode.Customer)
+                    {
+                        <div class="mt-2">
+                            <CustomerPicker SelectedId="customer?.Id" OnPicked="OnCustomerPicked" />
+                        </div>
+                    }
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="order-note">Note (optional)</label>
+                    <input id="order-note" class="form-control" maxlength="300" @bind="note" @bind:event="oninput" />
+                </div>
+
+                <div class="d-flex flex-column flex-sm-row gap-2">
+                    <button type="button" class="btn btn-primary btn-lg" disabled="@(cart.IsEmpty || busy)" @onclick="ChargeNowAsync">Charge now</button>
+                    <button type="button" class="btn btn-outline-primary btn-lg" disabled="@(cart.IsEmpty || busy || !CanAddToTab)" @onclick="AddToTabAsync">Add to tab</button>
+                    <button type="button" class="btn btn-outline-secondary btn-lg" disabled="@busy" @onclick="ClearCart">Clear</button>
+                </div>
+            </div>
+        </div>
+
+        <OpenTabsPanel @ref="tabsPanel" OnChanged="ReloadHistoryAsync" />
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h2 class="h5 card-title">Recent receipts</h2>
+                @if (history is null)
+                {
+                    <p class="mb-0">Loading...</p>
+                }
+                else if (history.Count == 0)
+                {
+                    <p class="text-muted mb-0">No receipts yet.</p>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var receipt in history)
+                        {
+                            <li class="list-group-item px-0 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div>
+                                    <div class="fw-semibold">#@receipt.RootPaymentId @receipt.Label</div>
+                                    <div class="small text-muted">@receipt.AtUtc.ToLocalTime().ToString("g") - @receipt.Methods</div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="fw-bold">@receipt.Total.ToString("C")</span>
+                                    <PrintReceiptButton PaymentId="receipt.RootPaymentId" Label="Reprint" CssClass="btn btn-sm btn-outline-secondary" />
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (pendingOrder is { } order)
+{
+    <PaymentDialog Title="@($"Charge order #{order.Id}")" Items="pendingItems" Due="order.Total"
+                   OnConfirm="tenders => ConfirmChargeAsync(order, tenders)" OnClosed="ChargeClosedAsync" />
+}
+
+@code {
+    private enum AttachMode { WalkIn, Session, Customer }
+
+    private static readonly string[] TilePalette =
+        ["btn-primary", "btn-success", "btn-info", "btn-warning", "btn-danger", "btn-secondary", "btn-dark"];
+
+    private readonly Cart cart = new();
+    private List<Product>? products;
+    private List<string> categories = [];
+    private string? selectedCategory;
+    private IReadOnlyList<AttachableSession> sessions = [];
+    private IReadOnlyList<ReceiptSummary>? history;
+    private OpenTabsPanel? tabsPanel;
+    private AttachMode attachMode = AttachMode.WalkIn;
+    private int? sessionId;
+    private CustomerPick? customer;
+    private string? note;
+    private bool busy;
+    private string? errorMessage;
+    private string? notice;
+    private Order? pendingOrder;
+    private IReadOnlyList<OutstandingItem> pendingItems = [];
+
+    private IEnumerable<Product> VisibleProducts =>
+        products!.Where(p => selectedCategory is null || string.Equals(p.Category, selectedCategory, StringComparison.CurrentCultureIgnoreCase));
+
+    private int? EffectiveSessionId => attachMode == AttachMode.Session ? sessionId : null;
+
+    private int? EffectiveCustomerId => attachMode == AttachMode.Customer ? customer?.Id : null;
+
+    private bool CanAddToTab => EffectiveSessionId is not null || EffectiveCustomerId is not null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            products = await ProductSvc.ListActiveAsync();
+            categories = products.Select(p => p.Category).Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .OrderBy(c => c, StringComparer.CurrentCultureIgnoreCase).ToList();
+            sessions = await TabsSvc.ListAttachableSessionsAsync();
+            history = await HistorySvc.RecentAsync(20);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load the POS page.");
+            products ??= [];
+            history ??= [];
+            errorMessage = "Could not load the POS. Refresh the page and try again.";
+        }
+    }
+
+    private static string TileClass(string category)
+    {
+        var hash = 0;
+        foreach (var c in category.Trim().ToLowerInvariant())
+        {
+            hash = (hash * 31 + c) % 9973;
+        }
+
+        return TilePalette[hash % TilePalette.Length];
+    }
+
+    private void AddToCart(Product product) => cart.Add(product.Id, product.Name, product.Price);
+
+    private void ClearCart()
+    {
+        cart.Clear();
+        note = null;
+    }
+
+    private void OnCustomerPicked(CustomerPick? pick) => customer = pick;
+
+    private string? AttachLabel()
+    {
+        if (EffectiveSessionId is { } id && sessions.FirstOrDefault(s => s.SessionId == id) is { } s)
+        {
+            return s.StationName;
+        }
+
+        return EffectiveCustomerId is not null ? customer?.Name : null;
+    }
+
+    private async Task ReloadHistoryAsync()
+    {
+        try
+        {
+            history = await HistorySvc.RecentAsync(20);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load recent receipts.");
+            errorMessage = "Could not load recent receipts.";
+        }
+    }
+
+    private async Task RefreshAllAsync()
+    {
+        try
+        {
+            products = await ProductSvc.ListActiveAsync();
+            categories = products.Select(p => p.Category).Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .OrderBy(c => c, StringComparer.CurrentCultureIgnoreCase).ToList();
+            sessions = await TabsSvc.ListAttachableSessionsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not refresh the POS.");
+            errorMessage = "Could not refresh. Try again.";
+        }
+
+        await ReloadHistoryAsync();
+        if (tabsPanel is not null)
+        {
+            await tabsPanel.RefreshAsync();
+        }
+    }
+
+    private async Task<ServiceResult<Order>?> CreateOrderAsync()
+    {
+        var result = await OrderSvc.CreateAsync(cart.ToDraft(EffectiveCustomerId, EffectiveSessionId, note));
+        if (!result.Success)
+        {
+            errorMessage = result.Error;
+            return null;
+        }
+
+        return result;
+    }
+
+    private async Task ChargeNowAsync()
+    {
+        if (busy || cart.IsEmpty)
+        {
+            return;
+        }
+
+        busy = true;
+        errorMessage = null;
+        notice = null;
+        try
+        {
+            if (await CreateOrderAsync() is not { Value: { } order })
+            {
+                return;
+            }
+
+            if (order.Status == OrderStatus.Paid)
+            {
+                notice = $"Order #{order.Id} has no charge and was marked paid.";
+                FinishSale();
+                await RefreshAllAsync();
+                return;
+            }
+
+            pendingItems = [new OutstandingItem(AllocationTargetType.Order, order.Id, $"Order #{order.Id}", order.Total, 0m, order.Total)];
+            pendingOrder = order;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Charge now failed.");
+            errorMessage = "Something went wrong. Check the open tabs before trying again.";
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task AddToTabAsync()
+    {
+        if (busy || cart.IsEmpty || !CanAddToTab)
+        {
+            return;
+        }
+
+        busy = true;
+        errorMessage = null;
+        notice = null;
+        try
+        {
+            var label = AttachLabel();
+            if (await CreateOrderAsync() is not { Value: { } order })
+            {
+                return;
+            }
+
+            notice = $"Order #{order.Id} added to the tab for {label ?? "the selected tab"}.";
+            FinishSale();
+            await RefreshAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Add to tab failed.");
+            errorMessage = "Something went wrong. Check the open tabs before trying again.";
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void FinishSale()
+    {
+        cart.Clear();
+        note = null;
+    }
+
+    private async Task<PaymentDialogResult> ConfirmChargeAsync(Order order, IReadOnlyList<TenderLine> tenders)
+    {
+        var target = new SettleTarget(AllocationTargetType.Order, order.Id);
+        var result = await SettlementSvc.SettleAsync(new SettleRequest([target], tenders, order.Total));
+        return new PaymentDialogResult(result.Success, result.Error, result.Value);
+    }
+
+    private async Task ChargeClosedAsync(bool recorded)
+    {
+        var order = pendingOrder;
+        pendingOrder = null;
+        if (order is null)
+        {
+            return;
+        }
+
+        if (recorded)
+        {
+            FinishSale();
+        }
+        else
+        {
+            // Cancelled before any payment: void the just-created order so no unpaid orphan remains.
+            try
+            {
+                var voided = await OrderSvc.VoidAsync(order.Id);
+                if (!voided.Success)
+                {
+                    errorMessage = voided.Error;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Could not void cancelled order {OrderId}.", order.Id);
+                errorMessage = $"Order #{order.Id} could not be cancelled. Void it from Open tabs.";
+            }
+        }
+
+        await RefreshAllAsync();
+    }
+}

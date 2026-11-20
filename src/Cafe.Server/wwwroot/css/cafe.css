@@ -111,20 +111,20 @@ small, .small { font-size: var(--fs-footnote); }
 /* Gray tinted secondary (also outline-primary/secondary/success/light/dark/info/warning, link) */
 .btn-secondary, .btn-light, .btn-dark, .btn-info, .btn-warning,
 .btn-outline-primary, .btn-outline-secondary, .btn-outline-success, .btn-outline-info, .btn-outline-warning, .btn-outline-light, .btn-outline-dark {
-    --bs-btn-color: var(--label); --bs-btn-bg: var(--bg-3); --bs-btn-border-color: transparent;
-    --bs-btn-hover-color: var(--label); --bs-btn-hover-bg: var(--bg-4); --bs-btn-hover-border-color: transparent;
-    --bs-btn-active-color: var(--label); --bs-btn-active-bg: var(--bg-4); --bs-btn-active-border-color: transparent;
-    --bs-btn-disabled-color: var(--label); --bs-btn-disabled-bg: var(--bg-3); --bs-btn-disabled-border-color: transparent;
-    background-color: var(--bg-3);
+    --bs-btn-color: var(--label); --bs-btn-bg: var(--fill); --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--label); --bs-btn-hover-bg: var(--fill-strong); --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--label); --bs-btn-active-bg: var(--fill-strong); --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-color: var(--label); --bs-btn-disabled-bg: var(--fill); --bs-btn-disabled-border-color: transparent;
+    background-color: var(--fill);
     color: var(--label);
 }
 .btn-secondary:hover, .btn-light:hover, .btn-dark:hover, .btn-info:hover, .btn-warning:hover,
 .btn-outline-primary:hover, .btn-outline-secondary:hover, .btn-outline-success:hover, .btn-outline-info:hover,
-.btn-outline-warning:hover, .btn-outline-light:hover, .btn-outline-dark:hover { background-color: var(--bg-4); color: var(--label); }
+.btn-outline-warning:hover, .btn-outline-light:hover, .btn-outline-dark:hover { background-color: var(--fill-strong); color: var(--label); }
 .btn-outline-primary { color: var(--accent); --bs-btn-color: var(--accent); --bs-btn-hover-color: var(--accent-hover); --bs-btn-active-color: var(--accent-hover); }
 .btn-outline-primary:hover { color: var(--accent-hover); }
 .btn-check:checked + .btn, .btn.active, .btn:first-child:active, :not(.btn-check) + .btn:active {
-    background-color: var(--bg-4);
+    background-color: var(--fill-strong);
     color: var(--label);
 }
 .btn-check:checked + .btn-outline-primary, .btn-outline-primary.active { background-color: var(--accent); color: #fff; }
@@ -182,7 +182,7 @@ small, .small { font-size: var(--fs-footnote); }
 .form-label { font-size: var(--fs-subhead); color: var(--label-2); margin-bottom: .35rem; }
 .form-control, .form-select {
     min-height: var(--control-h);
-    background-color: var(--bg-3);
+    background-color: var(--fill);
     color: var(--label);
     border: 1px solid transparent;
     border-radius: var(--radius-control);

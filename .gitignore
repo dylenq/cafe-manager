@@ -8,6 +8,13 @@ cafe.db-wal
 cafe-test-*.db*
 smoke.db*
 TestResults/
+logs/
+backups/
+# The Backups source folder must not be swallowed by backups/ on case-insensitive file systems; dev backup copies stay ignored.
+!/src/Cafe.Server/Backups/
+/src/Cafe.Server/Backups/*.db
+/src/Cafe.Server/Backups/*.tmp
+dist/
 
 # Claude agent worktrees
 .claude/worktrees/

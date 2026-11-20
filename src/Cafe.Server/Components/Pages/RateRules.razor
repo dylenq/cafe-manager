@@ -9,12 +9,15 @@
 @inject ILogger<RateRules> Logger
 
 <PageTitle>Rate rules - Cafe Manager</PageTitle>
+<SectionContent SectionName="page-title">Rate rules</SectionContent>
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="h3 mb-0">Rate rules</h1>
+<div class="page-header">
+    <h1 class="large-title">Rate rules</h1>
     @if (!showForm)
     {
-        <button type="button" class="btn btn-primary" @onclick="StartAdd">Add rate rule</button>
+        <div class="page-header-actions">
+            <button type="button" class="btn btn-primary" @onclick="StartAdd"><Icon Name="plus" Size="18" />Add rate rule</button>
+        </div>
     }
 </div>
 
@@ -28,110 +31,110 @@
 
 @if (showForm)
 {
-    <div class="card mb-4">
-        <div class="card-body">
-            <h2 class="h5 card-title">@(editingId is null ? "Add rate rule" : "Edit rate rule")</h2>
-            <EditForm Model="input" OnValidSubmit="SaveAsync">
-                <DataAnnotationsValidator />
-                <div class="row g-3">
-                    <div class="col-12 col-md-6">
-                        <label class="form-label" for="rule-name">Name</label>
-                        <InputText id="rule-name" class="form-control" @bind-Value="input.Name" />
-                        <ValidationMessage For="() => input.Name" class="text-danger" />
-                        @FieldError(nameof(RateRuleInput.Name))
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label" for="rule-type">Station type</label>
-                        <InputSelect id="rule-type" class="form-select" @bind-Value="input.StationTypeId">
-                            <option value="">All types</option>
-                            @foreach (var type in types)
-                            {
-                                <option value="@type.Id">@type.Name</option>
-                            }
-                        </InputSelect>
-                        @FieldError(nameof(RateRuleInput.StationTypeId))
-                    </div>
-                    <div class="col-12">
-                        <span class="form-label d-block">Days</span>
-                        @foreach (var (flag, label) in Days)
-                        {
-                            var current = flag;
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="day-@label"
-                                       checked="@input.DaysOfWeek.HasFlag(current)"
-                                       @onchange="e => ToggleDay(current, e.Value is true)" />
-                                <label class="form-check-label" for="day-@label">@label</label>
-                            </div>
-                        }
-                        @FieldError(nameof(RateRuleInput.DaysOfWeek))
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <label class="form-label" for="rule-start">Start time</label>
-                        <InputDate TValue="TimeOnly" Type="InputDateType.Time" id="rule-start" class="form-control" @bind-Value="input.StartTime" />
-                        @FieldError(nameof(RateRuleInput.StartTime))
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <label class="form-label" for="rule-end">End time</label>
-                        <InputDate TValue="TimeOnly" Type="InputDateType.Time" id="rule-end" class="form-control" @bind-Value="input.EndTime" />
-                        @FieldError(nameof(RateRuleInput.EndTime))
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <label class="form-label" for="rule-kind">Kind</label>
-                        <InputSelect id="rule-kind" class="form-select" @bind-Value="input.Kind">
-                            <option value="@RateRuleKind.FixedHourlyRate">Fixed hourly rate</option>
-                            <option value="@RateRuleKind.Multiplier">Multiplier</option>
-                        </InputSelect>
-                        @FieldError(nameof(RateRuleInput.Kind))
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <label class="form-label" for="rule-value">@(input.Kind == RateRuleKind.Multiplier ? "Multiplier (e.g. 1.5)" : "Hourly rate")</label>
-                        <InputNumber id="rule-value" class="form-control" @bind-Value="input.Value" />
-                        <ValidationMessage For="() => input.Value" class="text-danger" />
-                        @FieldError(nameof(RateRuleInput.Value))
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <label class="form-label" for="rule-priority">Priority</label>
-                        <InputNumber id="rule-priority" class="form-control" @bind-Value="input.Priority" />
-                        <ValidationMessage For="() => input.Priority" class="text-danger" />
-                        @FieldError(nameof(RateRuleInput.Priority))
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <label class="form-label" for="rule-audience">Applies to</label>
-                        <InputSelect id="rule-audience" class="form-select" @bind-Value="input.AppliesTo">
-                            <option value="@RateRuleAudience.Everyone">Everyone</option>
-                            <option value="@RateRuleAudience.MembersOnly">Members only</option>
-                            <option value="@RateRuleAudience.GuestsOnly">Guests only</option>
-                        </InputSelect>
-                        @FieldError(nameof(RateRuleInput.AppliesTo))
-                    </div>
-                    <div class="col-6 col-md-3 d-flex align-items-end">
-                        <div class="form-check">
-                            <InputCheckbox id="rule-enabled" class="form-check-input" @bind-Value="input.IsEnabled" />
-                            <label class="form-check-label" for="rule-enabled">Enabled</label>
-                        </div>
-                    </div>
+    <EditForm Model="input" OnValidSubmit="SaveAsync" class="mb-4">
+        <DataAnnotationsValidator />
+        <h2 class="title-2 mb-3">@(editingId is null ? "Add rate rule" : "Edit rate rule")</h2>
+
+        <div class="group-caption">Rule</div>
+        <div class="group">
+            <FormRow Label="Name" For="rule-name">
+                <InputText id="rule-name" class="form-control" @bind-Value="input.Name" />
+                <ValidationMessage For="() => input.Name" class="text-danger" />
+                @FieldError(nameof(RateRuleInput.Name))
+            </FormRow>
+            <FormRow Label="Station type" For="rule-type">
+                <InputSelect id="rule-type" class="form-select" @bind-Value="input.StationTypeId">
+                    <option value="">All types</option>
+                    @foreach (var type in types)
+                    {
+                        <option value="@type.Id">@type.Name</option>
+                    }
+                </InputSelect>
+                @FieldError(nameof(RateRuleInput.StationTypeId))
+            </FormRow>
+            <FormRow Label="Applies to" For="rule-audience">
+                <InputSelect id="rule-audience" class="form-select" @bind-Value="input.AppliesTo">
+                    <option value="@RateRuleAudience.Everyone">Everyone</option>
+                    <option value="@RateRuleAudience.MembersOnly">Members only</option>
+                    <option value="@RateRuleAudience.GuestsOnly">Guests only</option>
+                </InputSelect>
+                @FieldError(nameof(RateRuleInput.AppliesTo))
+            </FormRow>
+            <FormRow Label="Priority" For="rule-priority">
+                <InputNumber id="rule-priority" class="form-control" @bind-Value="input.Priority" />
+                <ValidationMessage For="() => input.Priority" class="text-danger" />
+                @FieldError(nameof(RateRuleInput.Priority))
+            </FormRow>
+            <FormRow Label="Enabled" For="rule-enabled" Switch="true">
+                <div class="form-check form-switch">
+                    <InputCheckbox id="rule-enabled" class="form-check-input" role="switch" @bind-Value="input.IsEnabled" />
                 </div>
-                <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
-                    <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">Cancel</button>
-                </div>
-            </EditForm>
+            </FormRow>
         </div>
-    </div>
+
+        <div class="group-caption">Schedule</div>
+        <div class="group">
+            <div class="group-row is-stacked">
+                <span class="row-label">Days</span>
+                <div class="d-flex flex-wrap column-gap-3">
+                    @foreach (var (flag, label) in Days)
+                    {
+                        var current = flag;
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="day-@label"
+                                   checked="@input.DaysOfWeek.HasFlag(current)"
+                                   @onchange="e => ToggleDay(current, e.Value is true)" />
+                            <label class="form-check-label" for="day-@label">@label</label>
+                        </div>
+                    }
+                </div>
+                @FieldError(nameof(RateRuleInput.DaysOfWeek))
+            </div>
+            <FormRow Label="Start time" For="rule-start">
+                <InputDate TValue="TimeOnly" Type="InputDateType.Time" id="rule-start" class="form-control" @bind-Value="input.StartTime" />
+                @FieldError(nameof(RateRuleInput.StartTime))
+            </FormRow>
+            <FormRow Label="End time" For="rule-end">
+                <InputDate TValue="TimeOnly" Type="InputDateType.Time" id="rule-end" class="form-control" @bind-Value="input.EndTime" />
+                @FieldError(nameof(RateRuleInput.EndTime))
+            </FormRow>
+        </div>
+
+        <div class="group-caption">Rate</div>
+        <div class="group">
+            <FormRow Label="Kind" For="rule-kind">
+                <InputSelect id="rule-kind" class="form-select" @bind-Value="input.Kind">
+                    <option value="@RateRuleKind.FixedHourlyRate">Fixed hourly rate</option>
+                    <option value="@RateRuleKind.Multiplier">Multiplier</option>
+                </InputSelect>
+                @FieldError(nameof(RateRuleInput.Kind))
+            </FormRow>
+            <FormRow Label="@(input.Kind == RateRuleKind.Multiplier ? "Multiplier (e.g. 1.5)" : "Hourly rate")" For="rule-value">
+                <InputNumber id="rule-value" class="form-control" @bind-Value="input.Value" />
+                <ValidationMessage For="() => input.Value" class="text-danger" />
+                @FieldError(nameof(RateRuleInput.Value))
+            </FormRow>
+        </div>
+
+        <div class="d-flex flex-column flex-sm-row gap-2">
+            <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
+            <button type="button" class="btn btn-secondary" @onclick="CancelForm">Cancel</button>
+        </div>
+    </EditForm>
 }
 
 @if (rules is null)
 {
-    <p>Loading...</p>
+    <p class="footnote">Loading...</p>
 }
 else if (rules.Count == 0)
 {
-    <p class="text-muted">No rate rules yet. Base station-type rates apply.</p>
+    <p class="empty-state">No rate rules yet. Base station-type rates apply.</p>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-striped align-middle">
+    <div class="table-card">
+        <table class="table align-middle">
             <thead>
                 <tr>
                     <th>Name</th>
@@ -140,7 +143,7 @@ else
                     <th>Window</th>
                     <th>Rate</th>
                     <th>Applies to</th>
-                    <th class="text-end">Priority</th>
+                    <th class="num">Priority</th>
                     <th>Enabled</th>
                     <th></th>
                 </tr>
@@ -159,23 +162,23 @@ else
                                 <span class="badge text-bg-secondary">overnight</span>
                             }
                         </td>
-                        <td>@ValueText(rule)</td>
+                        <td class="tabular">@ValueText(rule)</td>
                         <td>@AudienceText(rule.AppliesTo)</td>
-                        <td class="text-end">@rule.Priority</td>
+                        <td class="num">@rule.Priority</td>
                         <td>
-                            <button type="button" class="btn btn-sm @(rule.IsEnabled ? "btn-success" : "btn-outline-secondary")"
+                            <button type="button" class="btn btn-sm @(rule.IsEnabled ? "btn-tinted" : "btn-secondary")"
                                     @onclick="() => ToggleEnabledAsync(rule)">@(rule.IsEnabled ? "On" : "Off")</button>
                         </td>
                         <td class="text-end">
-                            <div class="d-flex flex-column flex-sm-row gap-2 justify-content-end">
+                            <div class="d-flex flex-wrap gap-2 justify-content-end">
                                 @if (confirmingDeleteId == rule.Id)
                                 {
-                                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(rule.Id)">Confirm delete</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => confirmingDeleteId = null">Cancel</button>
+                                    <button type="button" class="btn btn-sm btn-danger is-prominent" @onclick="() => DeleteAsync(rule.Id)">Confirm delete</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" @onclick="() => confirmingDeleteId = null">Cancel</button>
                                 }
                                 else
                                 {
-                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(rule)">Edit</button>
+                                    <button type="button" class="btn btn-sm btn-tinted" @onclick="() => StartEdit(rule)">Edit</button>
                                     <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => confirmingDeleteId = rule.Id">Delete</button>
                                 }
                             </div>

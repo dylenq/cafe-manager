@@ -1,0 +1,50 @@
+.form-row {
+    flex-wrap: wrap;
+    row-gap: .35rem;
+    align-items: center;
+}
+
+.form-row-label {
+    flex: 0 0 11rem;
+    max-width: 100%;
+    margin: 0;
+    font-size: var(--fs-body);
+    color: var(--label);
+}
+
+.form-row-label.is-switch {
+    flex: 1 1 auto;
+}
+
+.form-row-control {
+    flex: 1 1 14rem;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+}
+
+.form-row-control ::deep .form-control,
+.form-row-control ::deep .form-select {
+    width: 100%;
+}
+
+.form-row-control.is-switch {
+    flex: 0 0 auto;
+    align-items: flex-end;
+}
+
+.form-row-control.is-switch ::deep .form-check {
+    margin: 0;
+    padding: 0;
+    min-height: 0;
+}
+
+.form-row-control.is-switch ::deep .form-check-input {
+    float: none;
+    margin: 0;
+}
+
+@media (max-width: 575.98px) {
+    .form-row-label:not(.is-switch) { flex-basis: 100%; }
+}

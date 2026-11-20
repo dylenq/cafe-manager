@@ -15,37 +15,40 @@
 @inject ILogger<CustomerDetail> Logger
 
 <PageTitle>Customer - Cafe Manager</PageTitle>
+<SectionContent SectionName="page-title">Customer</SectionContent>
 
 @if (!loaded)
 {
-    <p>Loading...</p>
+    <p class="footnote">Loading...</p>
 }
 else if (detail is null)
 {
-    <p class="text-muted">@(errorMessage ?? CustomerService.Gone)</p>
-    <a href="customers">Back to customers</a>
+    <p class="empty-state">@(errorMessage ?? CustomerService.Gone)</p>
+    <div class="text-center"><a href="customers" class="btn btn-secondary">Back to customers</a></div>
 }
 else
 {
     var customer = detail.Customer;
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <h1 class="h3 mb-0">
+    <div class="page-header mb-2">
+        <h1 class="large-title">
             @customer.Name
             @if (customer.IsMember)
             {
-                <span class="badge text-bg-info ms-1">Member</span>
+                <span class="badge text-bg-info ms-1 align-middle">Member</span>
             }
             @if (!customer.IsActive)
             {
-                <span class="badge text-bg-secondary ms-1">Inactive</span>
+                <span class="badge text-bg-secondary ms-1 align-middle">Inactive</span>
             }
         </h1>
-        <a href="customers" class="btn btn-outline-secondary">Back to customers</a>
+        <div class="page-header-actions">
+            <a href="customers" class="btn btn-secondary">Back to customers</a>
+        </div>
     </div>
-    <p class="text-muted">
+    <p class="subhead mb-4">
         @if (!string.IsNullOrEmpty(customer.Phone))
         {
-            <span>@PhoneDisplay.Format(customer.Phone)</span>
+            <span class="tabular">@PhoneDisplay.Format(customer.Phone)</span>
         }
         @if (!string.IsNullOrEmpty(customer.Notes))
         {
@@ -69,108 +72,100 @@ else
     }
 
     <section class="mb-4">
-        <h2 class="h5">Balance</h2>
+        <h2 class="group-caption">Balance</h2>
         @if (detail.Balance.Buckets.Count == 0)
         {
-            <p class="text-muted">No minutes on balance.</p>
+            <p class="empty-state group">No minutes on balance.</p>
         }
         else
         {
-            <table class="table table-sm w-auto">
-                <thead><tr><th>Bucket</th><th class="text-end">Minutes</th></tr></thead>
-                <tbody>
-                    @foreach (var bucket in detail.Balance.Buckets)
-                    {
-                        <tr>
-                            <td>@(bucket.StationTypeId is null ? "Any type" : bucket.StationTypeName ?? "Unknown type")</td>
-                            <td class="text-end">@bucket.Minutes</td>
-                        </tr>
-                    }
-                </tbody>
-                <tfoot><tr><th>Total</th><th class="text-end">@detail.Balance.TotalMinutes</th></tr></tfoot>
-            </table>
+            <div class="balance-tiles">
+                @foreach (var bucket in detail.Balance.Buckets)
+                {
+                    <div class="balance-tile">
+                        <div class="balance-tile-label">@(bucket.StationTypeId is null ? "Any type" : bucket.StationTypeName ?? "Unknown type")</div>
+                        <div class="balance-tile-value">@bucket.Minutes<span class="balance-tile-unit"> min</span></div>
+                    </div>
+                }
+                <div class="balance-tile is-total">
+                    <div class="balance-tile-label">Total</div>
+                    <div class="balance-tile-value">@detail.Balance.TotalMinutes<span class="balance-tile-unit"> min</span></div>
+                </div>
+            </div>
         }
     </section>
 
     <div class="row g-3 mb-4">
         <div class="col-12 col-lg-6">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h2 class="h5 card-title">Sell package</h2>
-                    @if (!customer.IsActive)
-                    {
-                        <p class="text-muted">Reactivate this customer before selling a package.</p>
-                    }
-                    else if (packages.Count == 0)
-                    {
-                        <p class="text-muted">No active packages. Add one on the Packages page.</p>
-                    }
-                    else
-                    {
-                        <div class="mb-2">
-                            <label class="form-label" for="sell-package">Package</label>
-                            <select id="sell-package" class="form-select" @bind="sellPackageId">
-                                <option value="0">Choose a package...</option>
-                                @foreach (var p in packages)
-                                {
-                                    <option value="@p.Id">@p.Name - @p.Minutes min - @p.Price.ToString("C", CultureInfo.CurrentCulture)@(p.StationTypeId is null ? "" : " - " + TypeName(p.StationTypeId))</option>
-                                }
-                            </select>
-                        </div>
-                        <button type="button" class="btn btn-primary" disabled="@(busy || sellPackageId == 0 || !ShowsCurrentCustomer)" @onclick="BeginSell">Sell package</button>
-                    }
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-lg-6">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h2 class="h5 card-title">Manual adjustment</h2>
-                    <div class="mb-2">
-                        <label class="form-label" for="adj-bucket">Bucket</label>
-                        <select id="adj-bucket" class="form-select" @bind="adjustBucket">
-                            <option value="0">Any type</option>
-                            @foreach (var t in types)
+            <h2 class="group-caption">Sell package</h2>
+            @if (!customer.IsActive)
+            {
+                <p class="footnote px-3">Reactivate this customer before selling a package.</p>
+            }
+            else if (packages.Count == 0)
+            {
+                <p class="footnote px-3">No active packages. Add one on the Packages page.</p>
+            }
+            else
+            {
+                <div class="group">
+                    <FormRow Label="Package" For="sell-package">
+                        <select id="sell-package" class="form-select" @bind="sellPackageId">
+                            <option value="0">Choose a package...</option>
+                            @foreach (var p in packages)
                             {
-                                <option value="@t.Id">@t.Name</option>
+                                <option value="@p.Id">@p.Name - @p.Minutes min - @p.Price.ToString("C", CultureInfo.CurrentCulture)@(p.StationTypeId is null ? "" : " - " + TypeName(p.StationTypeId))</option>
                             }
                         </select>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label" for="adj-minutes">Minutes (+ or -)</label>
-                        <input id="adj-minutes" type="number" class="form-control" @bind="adjustMinutes" />
-                        @FieldError("MinutesDelta")
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label" for="adj-note">Note (required)</label>
-                        <input id="adj-note" type="text" class="form-control" maxlength="300" @bind="adjustNote" />
-                        @FieldError("Note")
-                    </div>
-                    <button type="button" class="btn btn-outline-primary" disabled="@(busy || !ShowsCurrentCustomer)" @onclick="AdjustAsync">Adjust balance</button>
+                    </FormRow>
                 </div>
+                <button type="button" class="btn btn-primary" disabled="@(busy || sellPackageId == 0 || !ShowsCurrentCustomer)" @onclick="BeginSell">Sell package</button>
+            }
+        </div>
+        <div class="col-12 col-lg-6">
+            <h2 class="group-caption">Manual adjustment</h2>
+            <div class="group">
+                <FormRow Label="Bucket" For="adj-bucket">
+                    <select id="adj-bucket" class="form-select" @bind="adjustBucket">
+                        <option value="0">Any type</option>
+                        @foreach (var t in types)
+                        {
+                            <option value="@t.Id">@t.Name</option>
+                        }
+                    </select>
+                </FormRow>
+                <FormRow Label="Minutes (+ or -)" For="adj-minutes">
+                    <input id="adj-minutes" type="number" class="form-control" @bind="adjustMinutes" />
+                    @FieldError("MinutesDelta")
+                </FormRow>
+                <FormRow Label="Note (required)" For="adj-note">
+                    <input id="adj-note" type="text" class="form-control" maxlength="300" @bind="adjustNote" />
+                    @FieldError("Note")
+                </FormRow>
             </div>
+            <button type="button" class="btn btn-secondary" disabled="@(busy || !ShowsCurrentCustomer)" @onclick="AdjustAsync">Adjust balance</button>
         </div>
     </div>
 
     <section class="mb-4">
-        <h2 class="h5">Package purchases</h2>
+        <h2 class="group-caption">Package purchases</h2>
         @if (detail.Sales.Count == 0)
         {
-            <p class="text-muted">No packages bought yet.</p>
+            <p class="empty-state group">No packages bought yet.</p>
         }
         else
         {
-            <div class="table-responsive">
-                <table class="table table-sm">
-                    <thead><tr><th>When</th><th>Package</th><th class="text-end">Minutes</th><th class="text-end">Price</th><th>Payment</th></tr></thead>
+            <div class="table-card">
+                <table class="table">
+                    <thead><tr><th>When</th><th>Package</th><th class="num">Minutes</th><th class="num">Price</th><th>Payment</th></tr></thead>
                     <tbody>
                         @foreach (var sale in detail.Sales)
                         {
                             <tr>
                                 <td>@sale.AtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)</td>
                                 <td>@sale.PackageName</td>
-                                <td class="text-end">@sale.Minutes</td>
-                                <td class="text-end">@sale.Price.ToString("C", CultureInfo.CurrentCulture)</td>
+                                <td class="num">@sale.Minutes</td>
+                                <td class="num">@sale.Price.ToString("C", CultureInfo.CurrentCulture)</td>
                                 <td>@(sale.Method?.ToString() ?? "-")</td>
                             </tr>
                         }
@@ -181,16 +176,16 @@ else
     </section>
 
     <section class="mb-4 customer-receipts">
-        <h2 class="h5">Receipts</h2>
+        <h2 class="group-caption">Receipts</h2>
         @if (receipts.Count == 0)
         {
-            <p class="text-muted">No receipts yet.</p>
+            <p class="empty-state group">No receipts yet.</p>
         }
         else
         {
-            <div class="table-responsive">
-                <table class="table table-sm align-middle">
-                    <thead><tr><th>When</th><th>For</th><th>Payment</th><th class="text-end">Amount</th><th></th></tr></thead>
+            <div class="table-card">
+                <table class="table align-middle">
+                    <thead><tr><th>When</th><th>For</th><th>Payment</th><th class="num">Amount</th><th></th></tr></thead>
                     <tbody>
                         @foreach (var receipt in receipts)
                         {
@@ -198,8 +193,8 @@ else
                                 <td>@receipt.AtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)</td>
                                 <td>@receipt.Label</td>
                                 <td>@receipt.Methods</td>
-                                <td class="text-end">@receipt.Total.ToString("C", CultureInfo.CurrentCulture)</td>
-                                <td><PrintReceiptButton PaymentId="receipt.RootPaymentId" Label="Reprint" CssClass="btn btn-sm btn-outline-secondary" /></td>
+                                <td class="num">@receipt.Total.ToString("C", CultureInfo.CurrentCulture)</td>
+                                <td class="text-end"><PrintReceiptButton PaymentId="receipt.RootPaymentId" Label="Reprint" CssClass="btn btn-sm btn-secondary" /></td>
                             </tr>
                         }
                     </tbody>
@@ -209,16 +204,16 @@ else
     </section>
 
     <section class="mb-4">
-        <h2 class="h5">Ledger history</h2>
+        <h2 class="group-caption">Ledger history</h2>
         @if (detail.Ledger.Count == 0)
         {
-            <p class="text-muted">No ledger entries yet.</p>
+            <p class="empty-state group">No ledger entries yet.</p>
         }
         else
         {
-            <div class="table-responsive">
-                <table class="table table-sm">
-                    <thead><tr><th>When</th><th>Reason</th><th>Bucket</th><th class="text-end">Minutes</th><th>Note</th><th>Session</th></tr></thead>
+            <div class="table-card">
+                <table class="table">
+                    <thead><tr><th>When</th><th>Reason</th><th>Bucket</th><th class="num">Minutes</th><th>Note</th><th>Session</th></tr></thead>
                     <tbody>
                         @foreach (var row in detail.Ledger)
                         {
@@ -226,7 +221,7 @@ else
                                 <td>@row.AtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)</td>
                                 <td>@row.ReasonText</td>
                                 <td>@(row.StationTypeId is null ? "Any type" : TypeName(row.StationTypeId))</td>
-                                <td class="text-end">@(row.MinutesDelta > 0 ? "+" : "")@row.MinutesDelta</td>
+                                <td class="num">@(row.MinutesDelta > 0 ? "+" : "")@row.MinutesDelta</td>
                                 <td>@row.Note</td>
                                 <td>@(row.SessionId is { } sid ? "#" + sid : "")</td>
                             </tr>
@@ -238,16 +233,16 @@ else
     </section>
 
     <section class="mb-4">
-        <h2 class="h5">Recent sessions</h2>
+        <h2 class="group-caption">Recent sessions</h2>
         @if (detail.Sessions.Count == 0)
         {
-            <p class="text-muted">No sessions yet.</p>
+            <p class="empty-state group">No sessions yet.</p>
         }
         else
         {
-            <div class="table-responsive">
-                <table class="table table-sm">
-                    <thead><tr><th>Started</th><th>Station</th><th>Mode</th><th class="text-end">Charged</th><th>Ended</th></tr></thead>
+            <div class="table-card">
+                <table class="table">
+                    <thead><tr><th>Started</th><th>Station</th><th>Mode</th><th class="num">Charged</th><th>Ended</th></tr></thead>
                     <tbody>
                         @foreach (var s in detail.Sessions)
                         {
@@ -255,7 +250,7 @@ else
                                 <td>@s.StartedAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)</td>
                                 <td>@s.StationName</td>
                                 <td>@s.Mode</td>
-                                <td class="text-end">@s.ChargedAmount.ToString("C", CultureInfo.CurrentCulture)</td>
+                                <td class="num">@s.ChargedAmount.ToString("C", CultureInfo.CurrentCulture)</td>
                                 <td>@(s.EndedAtUtc is null ? "Running" : s.EndReason?.ToString() ?? "Ended")</td>
                             </tr>
                         }

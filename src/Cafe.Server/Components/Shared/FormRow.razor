@@ -1,0 +1,14 @@
+@* One label/control row inside an inset grouped section (.group > .group-row). Admin forms use it so every row lays out the same way. *@
+<div class="group-row form-row">
+    <label class="row-label form-row-label@(Switch ? " is-switch" : "")" for="@For">@Label</label>
+    <div class="form-row-control@(Switch ? " is-switch" : "")">
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public string For { get; set; } = "";
+    [Parameter] public bool Switch { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

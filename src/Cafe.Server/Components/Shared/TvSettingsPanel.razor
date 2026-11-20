@@ -2,32 +2,36 @@
 @inject TvSettingsService TvSettings
 @inject ILogger<TvSettingsPanel> Logger
 
-<div class="card mt-4 tv-settings-panel">
-    <div class="card-body">
-        <h2 class="h5 card-title">Samsung TVs</h2>
+<section class="mb-5 tv-settings-panel">
+    <h2 class="title-2 mb-3">Samsung TVs</h2>
 
-        <div class="form-check form-switch mb-2">
-            <input class="form-check-input tv-poweroff-toggle" type="checkbox" role="switch" id="tv-poweroff-toggle" @bind="_powerOffOnStop" />
-            <label class="form-check-label" for="tv-poweroff-toggle">Power off the TV when a session is stopped</label>
+    <div class="group mb-3">
+        <div class="group-row">
+            <label class="row-label" for="tv-poweroff-toggle">Power off the TV when a session is stopped</label>
+            <div class="form-check form-switch m-0 p-0">
+                <input class="form-check-input tv-poweroff-toggle m-0 float-none" type="checkbox" role="switch" id="tv-poweroff-toggle" @bind="_powerOffOnStop" />
+            </div>
         </div>
-        <button type="button" class="btn btn-primary btn-sm" disabled="@_saving" @onclick="SaveAsync">Save</button>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+        <button type="button" class="btn btn-tinted" disabled="@_saving" @onclick="SaveAsync">Save</button>
         @if (_message is not null)
         {
-            <span class="ms-2 small @(_ok ? "text-success" : "text-danger") tv-settings-message" role="status">@_message</span>
+            <span class="small @(_ok ? "text-success" : "text-danger") tv-settings-message" role="status">@_message</span>
         }
-
-        <h3 class="h6 mt-4">Enable these on each TV</h3>
-        <ul class="small mb-2">
-            <li>Power On with Mobile (Settings, General, Network, Expert Settings)</li>
-            <li>IP Remote (Settings, General, Network, Expert Settings)</li>
-            <li>Network standby, so the TV answers Wake-on-LAN while it is off</li>
-        </ul>
-        <p class="small text-muted mb-0">
-            The TV must be on the same network with a fixed IP address. Enter that address and the TV's MAC address on the
-            Stations page, then use Pair TV. A model without network standby may show Unreachable while it is off.
-        </p>
     </div>
-</div>
+
+    <h3 class="group-caption">Enable these on each TV</h3>
+    <div class="group mb-2">
+        <div class="group-row">Power On with Mobile (Settings, General, Network, Expert Settings)</div>
+        <div class="group-row">IP Remote (Settings, General, Network, Expert Settings)</div>
+        <div class="group-row">Network standby, so the TV answers Wake-on-LAN while it is off</div>
+    </div>
+    <div class="group-footer">
+        The TV must be on the same network with a fixed IP address. Enter that address and the TV's MAC address on the
+        Stations page, then use Pair TV. A model without network standby may show Unreachable while it is off.
+    </div>
+</section>
 
 @code {
     private bool _powerOffOnStop = true;

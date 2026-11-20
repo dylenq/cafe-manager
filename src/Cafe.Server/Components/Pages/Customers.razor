@@ -8,12 +8,15 @@
 @inject ILogger<Customers> Logger
 
 <PageTitle>Customers - Cafe Manager</PageTitle>
+<SectionContent SectionName="page-title">Customers</SectionContent>
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="h3 mb-0">Customers</h1>
+<div class="page-header">
+    <h1 class="large-title">Customers</h1>
     @if (!showForm)
     {
-        <button type="button" class="btn btn-primary" @onclick="StartAdd">Add customer</button>
+        <div class="page-header-actions">
+            <button type="button" class="btn btn-primary" @onclick="StartAdd"><Icon Name="plus" Size="18" />Add customer</button>
+        </div>
     }
 </div>
 
@@ -27,58 +30,56 @@
 
 @if (showForm)
 {
-    <div class="card mb-4">
-        <div class="card-body">
-            <h2 class="h5 card-title">@(editingId is null ? "Add customer" : "Edit customer")</h2>
-            <EditForm Model="input" OnValidSubmit="SaveAsync">
-                <DataAnnotationsValidator />
-                <div class="row g-3">
-                    <div class="col-12 col-md-4">
-                        <label class="form-label" for="cust-name">Name</label>
-                        <InputText id="cust-name" class="form-control" @bind-Value="input.Name" />
-                        <ValidationMessage For="() => input.Name" class="text-danger" />
-                        @FieldError(nameof(CustomerInput.Name))
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label" for="cust-phone">Phone</label>
-                        <InputText id="cust-phone" class="form-control" @bind-Value="input.Phone" />
-                        <ValidationMessage For="() => input.Phone" class="text-danger" />
-                        @FieldError(nameof(CustomerInput.Phone))
-                    </div>
-                    <div class="col-12 col-md-4 d-flex align-items-end">
-                        <div class="form-check">
-                            <InputCheckbox id="cust-member" class="form-check-input" @bind-Value="input.IsMember" />
-                            <label class="form-check-label" for="cust-member">Member</label>
-                        </div>
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label" for="cust-notes">Notes</label>
-                        <InputTextArea id="cust-notes" class="form-control" rows="2" @bind-Value="input.Notes" />
-                        <ValidationMessage For="() => input.Notes" class="text-danger" />
-                        @FieldError(nameof(CustomerInput.Notes))
-                    </div>
+    <EditForm Model="input" OnValidSubmit="SaveAsync" class="mb-4">
+        <DataAnnotationsValidator />
+        <h2 class="title-2 mb-3">@(editingId is null ? "Add customer" : "Edit customer")</h2>
+
+        <div class="group-caption">Details</div>
+        <div class="group">
+            <FormRow Label="Name" For="cust-name">
+                <InputText id="cust-name" class="form-control" @bind-Value="input.Name" />
+                <ValidationMessage For="() => input.Name" class="text-danger" />
+                @FieldError(nameof(CustomerInput.Name))
+            </FormRow>
+            <FormRow Label="Phone" For="cust-phone">
+                <InputText id="cust-phone" class="form-control" @bind-Value="input.Phone" />
+                <ValidationMessage For="() => input.Phone" class="text-danger" />
+                @FieldError(nameof(CustomerInput.Phone))
+            </FormRow>
+            <FormRow Label="Member" For="cust-member" Switch="true">
+                <div class="form-check form-switch">
+                    <InputCheckbox id="cust-member" class="form-check-input" role="switch" @bind-Value="input.IsMember" />
                 </div>
-                <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
-                    <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">Cancel</button>
-                </div>
-            </EditForm>
+            </FormRow>
+            <FormRow Label="Notes" For="cust-notes">
+                <InputTextArea id="cust-notes" class="form-control" rows="2" @bind-Value="input.Notes" />
+                <ValidationMessage For="() => input.Notes" class="text-danger" />
+                @FieldError(nameof(CustomerInput.Notes))
+            </FormRow>
         </div>
-    </div>
+
+        <div class="d-flex flex-column flex-sm-row gap-2">
+            <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
+            <button type="button" class="btn btn-secondary" @onclick="CancelForm">Cancel</button>
+        </div>
+    </EditForm>
 }
 
 <div class="row g-2 align-items-end mb-3">
     <div class="col-12 col-md-6">
         <label class="form-label" for="cust-search">Search</label>
-        <input id="cust-search" class="form-control" placeholder="Name or phone digits" aria-label="Search customers"
-               @bind="term" @bind:event="oninput" @onkeydown="OnSearchKey" />
+        <div class="search-field">
+            <Icon Name="magnifier" Size="18" />
+            <input id="cust-search" class="form-control" placeholder="Name or phone digits" aria-label="Search customers"
+                   @bind="term" @bind:event="oninput" @onkeydown="OnSearchKey" />
+        </div>
     </div>
     <div class="col-auto">
-        <button type="button" class="btn btn-outline-primary" @onclick="SearchAsync">Search</button>
+        <button type="button" class="btn btn-secondary" @onclick="SearchAsync">Search</button>
     </div>
     <div class="col-auto">
-        <div class="form-check mb-2">
-            <input id="cust-inactive" class="form-check-input" type="checkbox" checked="@showInactive"
+        <div class="form-check form-switch mb-2">
+            <input id="cust-inactive" class="form-check-input" type="checkbox" role="switch" checked="@showInactive"
                    @onchange="OnShowInactiveChanged" />
             <label class="form-check-label" for="cust-inactive">Show inactive</label>
         </div>
@@ -87,17 +88,17 @@
 
 @if (customers is null)
 {
-    <p>Loading...</p>
+    <p class="footnote">Loading...</p>
 }
 else if (customers.Count == 0)
 {
-    <p class="text-muted">No customers found.</p>
+    <p class="empty-state">No customers found.</p>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-striped align-middle">
-            <caption>Showing up to 50</caption>
+    <div class="table-card">
+        <table class="table align-middle">
+            <caption class="footnote px-3 py-2" style="caption-side: bottom">Showing up to 50</caption>
             <thead>
                 <tr>
                     <th>Name</th>
@@ -118,7 +119,7 @@ else
                                 <span class="badge text-bg-info ms-1">Member</span>
                             }
                         </td>
-                        <td>@PhoneDisplay.Format(customer.Phone)</td>
+                        <td class="tabular">@PhoneDisplay.Format(customer.Phone)</td>
                         <td>@NotesSnippet(customer.Notes)</td>
                         <td>
                             @if (customer.IsActive)
@@ -131,17 +132,17 @@ else
                             }
                         </td>
                         <td class="text-end">
-                            <div class="d-flex flex-column flex-sm-row gap-2 justify-content-end">
+                            <div class="d-flex flex-wrap gap-2 justify-content-end">
                                 @if (confirmingToggleId == customer.Id)
                                 {
-                                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => ToggleActiveAsync(customer)">
+                                    <button type="button" class="btn btn-sm btn-danger is-prominent" @onclick="() => ToggleActiveAsync(customer)">
                                         Confirm @(customer.IsActive ? "deactivate" : "reactivate")
                                     </button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => confirmingToggleId = null">Cancel</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" @onclick="() => confirmingToggleId = null">Cancel</button>
                                 }
                                 else
                                 {
-                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(customer)">Edit</button>
+                                    <button type="button" class="btn btn-sm btn-tinted" @onclick="() => StartEdit(customer)">Edit</button>
                                     <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => confirmingToggleId = customer.Id">
                                         @(customer.IsActive ? "Deactivate" : "Reactivate")
                                     </button>

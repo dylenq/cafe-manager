@@ -14,78 +14,84 @@
 @inject ILogger<AgentsPanel> Logger
 
 @* The shared key is shown only to the logged-in admin: the page and this panel inherit [Authorize]. It is masked by default and never logged. *@
-<div class="card mb-4" id="pc-agents">
-    <div class="card-body">
-        <h2 class="h5 card-title">PC agents</h2>
+<section class="mb-5" id="pc-agents">
+    <h2 class="title-2 mb-3">PC agents</h2>
 
-        @if (!string.IsNullOrEmpty(_error))
-        {
-            <div class="alert alert-danger alert-dismissible" role="alert">
-                @_error
-                <button type="button" class="btn-close" aria-label="Close" @onclick="() => _error = null"></button>
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger alert-dismissible" role="alert">
+            @_error
+            <button type="button" class="btn-close" aria-label="Close" @onclick="() => _error = null"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_notice))
+    {
+        <div class="alert alert-success" role="status">@_notice</div>
+    }
+
+    <h3 class="group-caption">Shared key</h3>
+    <div class="group mb-2">
+        <div class="group-row is-stacked">
+            <div class="input-group">
+                <input id="agent-key" class="form-control font-monospace" readonly type="@(_showKey ? "text" : "password")" value="@_key" aria-label="Shared agent key" />
+                <button type="button" class="btn btn-secondary" @onclick="() => _showKey = !_showKey">@(_showKey ? "Hide" : "Show")</button>
+                <button type="button" class="btn btn-secondary" @onclick="CopyAsync">Copy</button>
+                <button type="button" class="btn btn-outline-danger" @onclick="() => _confirmRegenerate = true" disabled="@_confirmRegenerate">Regenerate</button>
             </div>
-        }
-
-        @if (!string.IsNullOrEmpty(_notice))
-        {
-            <div class="alert alert-success py-2" role="status">@_notice</div>
-        }
-
-        <h3 class="h6">Shared key</h3>
-        <div class="input-group mb-1">
-            <input id="agent-key" class="form-control font-monospace" readonly type="@(_showKey ? "text" : "password")" value="@_key" aria-label="Shared agent key" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="() => _showKey = !_showKey">@(_showKey ? "Hide" : "Show")</button>
-            <button type="button" class="btn btn-outline-secondary" @onclick="CopyAsync">Copy</button>
-            <button type="button" class="btn btn-outline-danger" @onclick="() => _confirmRegenerate = true" disabled="@_confirmRegenerate">Regenerate</button>
         </div>
-        <div class="form-text mb-2">
-            Put this key in <code>agentsettings.json</code> on every PC, with the server address <code>@ConnectUrl</code>.
-        </div>
-        @if (!string.IsNullOrEmpty(_copyMessage))
-        {
-            <div class="text-danger small mb-2" role="status">@_copyMessage</div>
-        }
+    </div>
+    <div class="group-footer mb-3">
+        Put this key in <code>agentsettings.json</code> on every PC, with the server address <code>@ConnectUrl</code>.
+    </div>
+    @if (!string.IsNullOrEmpty(_copyMessage))
+    {
+        <div class="text-danger small mb-2" role="status">@_copyMessage</div>
+    }
 
-        @if (_confirmRegenerate)
-        {
-            <div class="alert alert-warning" role="alert">
+    @if (_confirmRegenerate)
+    {
+        <div class="alert alert-warning" role="alert">
+            <div>
                 <p class="mb-2">All connected agents will disconnect and need the new key in agentsettings.json.</p>
-                <button type="button" class="btn btn-danger btn-sm me-2" @onclick="RegenerateAsync" disabled="@_busy">Regenerate key</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => _confirmRegenerate = false">Cancel</button>
+                <button type="button" class="btn btn-danger is-prominent btn-sm me-2" @onclick="RegenerateAsync" disabled="@_busy">Regenerate key</button>
+                <button type="button" class="btn btn-secondary btn-sm" @onclick="() => _confirmRegenerate = false">Cancel</button>
             </div>
-        }
+        </div>
+    }
 
-        <h3 class="h6 mt-4">Connected agents</h3>
-        @if (_connected.Count == 0)
-        {
-            <p class="text-muted mb-0">No agents are connected.</p>
-        }
-        else
-        {
-            <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                    <thead>
-                        <tr><th>Machine ID</th><th>Station</th><th>Version</th><th>Connected since</th></tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var agent in _connected)
-                        {
-                            <tr @key="agent.Connection.MachineId">
-                                <td>@agent.Connection.MachineId</td>
-                                <td>@(agent.StationName ?? "Unregistered")</td>
-                                <td>@agent.Connection.Version</td>
-                                <td>@FormatLocal(agent.Connection.ConnectedAtUtc)</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
+    <h3 class="group-caption mt-4">Connected agents</h3>
+    @if (_connected.Count == 0)
+    {
+        <p class="empty-state group">No agents are connected.</p>
+    }
+    else
+    {
+        <div class="table-card">
+            <table class="table align-middle">
+                <thead>
+                    <tr><th>Machine ID</th><th>Station</th><th>Version</th><th>Connected since</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var agent in _connected)
+                    {
+                        <tr @key="agent.Connection.MachineId">
+                            <td>@agent.Connection.MachineId</td>
+                            <td>@(agent.StationName ?? "Unregistered")</td>
+                            <td>@agent.Connection.Version</td>
+                            <td class="tabular">@FormatLocal(agent.Connection.ConnectedAtUtc)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 
-        @if (_conflicts.Count > 0)
-        {
-            <div class="alert alert-warning mt-4" role="alert" id="agent-conflicts">
-                <h3 class="h6">Machine ID conflicts</h3>
+    @if (_conflicts.Count > 0)
+    {
+        <div class="alert alert-warning mt-4" role="alert" id="agent-conflicts">
+            <div>
+                <h3 class="headline mb-1">Machine ID conflicts</h3>
                 <p class="mb-2">
                     Another PC tried to connect with a Machine ID that is already in use. The first connection was kept and
                     the newcomer was refused. This usually means a cloned Windows image: give each PC its own
@@ -104,75 +110,72 @@
                     }
                 </ul>
             </div>
-        }
-
-        <h3 class="h6 mt-4">Unregistered agents</h3>
-        @if (_unregistered.Count == 0)
-        {
-            <p class="text-muted mb-0">No unregistered agents. A PC whose Machine ID matches no station appears here.</p>
-        }
-        else
-        {
-            @foreach (var agent in _unregistered)
-            {
-                var row = RowFor(agent.MachineId);
-                <div class="border rounded p-2 mb-2" @key="agent.MachineId">
-                    <div class="fw-semibold mb-2">@agent.MachineId <span class="text-muted small fw-normal">@agent.Version</span></div>
-                    <div class="row g-2 align-items-end">
-                        <div class="col-12 col-lg-6">
-                            <div class="row g-2">
-                                <div class="col-12 col-sm-5">
-                                    <label class="form-label small mb-0" for="@($"type-{agent.MachineId}")">Station type</label>
-                                    <select id="@($"type-{agent.MachineId}")" class="form-select form-select-sm" @bind="row.TypeId">
-                                        <option value="0">Choose...</option>
-                                        @foreach (var type in _types)
-                                        {
-                                            <option value="@type.Id">@type.Name</option>
-                                        }
-                                    </select>
-                                </div>
-                                <div class="col-12 col-sm-7">
-                                    <label class="form-label small mb-0" for="@($"name-{agent.MachineId}")">Station name</label>
-                                    <div class="input-group input-group-sm">
-                                        <input id="@($"name-{agent.MachineId}")" class="form-control" @bind="row.Name" maxlength="100" />
-                                        <button type="button" class="btn btn-primary" @onclick="() => CreateAsync(agent.MachineId)" disabled="@_busy">Create station</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-12 col-lg-6">
-                            <label class="form-label small mb-0" for="@($"assign-{agent.MachineId}")">Or assign to an existing PC station</label>
-                            <div class="input-group input-group-sm">
-                                <select id="@($"assign-{agent.MachineId}")" class="form-select" @bind="row.StationId">
-                                    <option value="0">Choose...</option>
-                                    @foreach (var station in _pcStations)
-                                    {
-                                        <option value="@station.Id">@station.Name</option>
-                                    }
-                                </select>
-                                <button type="button" class="btn btn-outline-primary" @onclick="() => AssignAsync(agent.MachineId)" disabled="@_busy">Assign</button>
-                            </div>
-                        </div>
-                    </div>
-                    @if (!string.IsNullOrEmpty(row.Error))
-                    {
-                        <div class="text-danger small mt-1" role="alert">@row.Error</div>
-                    }
-                </div>
-            }
-        }
-
-        <h3 class="h6 mt-4">Cafe name on lock screens</h3>
-        <div class="input-group">
-            <input id="cafe-name" class="form-control" @bind="_cafeName" maxlength="@AgentSettingsService.CafeNameMaxLength" aria-label="Cafe name" />
-            <button type="button" class="btn btn-primary" @onclick="SaveCafeNameAsync" disabled="@_busy">Save</button>
         </div>
-        @if (!string.IsNullOrEmpty(_cafeNameError))
+    }
+
+    <h3 class="group-caption mt-4">Unregistered agents</h3>
+    @if (_unregistered.Count == 0)
+    {
+        <p class="empty-state group">No unregistered agents. A PC whose Machine ID matches no station appears here.</p>
+    }
+    else
+    {
+        @foreach (var agent in _unregistered)
         {
-            <div class="text-danger small mt-1" role="alert">@_cafeNameError</div>
+            var row = RowFor(agent.MachineId);
+            <div class="mb-3" @key="agent.MachineId">
+                <div class="group-caption is-sentence"><strong class="text-body">@agent.MachineId</strong> <span>@agent.Version</span></div>
+                <div class="group mb-0">
+                    <FormRow Label="Station type" For="@($"type-{agent.MachineId}")">
+                        <select id="@($"type-{agent.MachineId}")" class="form-select" @bind="row.TypeId">
+                            <option value="0">Choose...</option>
+                            @foreach (var type in _types)
+                            {
+                                <option value="@type.Id">@type.Name</option>
+                            }
+                        </select>
+                    </FormRow>
+                    <FormRow Label="Station name" For="@($"name-{agent.MachineId}")">
+                        <div class="input-group">
+                            <input id="@($"name-{agent.MachineId}")" class="form-control" @bind="row.Name" maxlength="100" />
+                            <button type="button" class="btn btn-tinted" @onclick="() => CreateAsync(agent.MachineId)" disabled="@_busy">Create station</button>
+                        </div>
+                    </FormRow>
+                    <FormRow Label="Or assign to an existing PC station" For="@($"assign-{agent.MachineId}")">
+                        <div class="input-group">
+                            <select id="@($"assign-{agent.MachineId}")" class="form-select" @bind="row.StationId">
+                                <option value="0">Choose...</option>
+                                @foreach (var station in _pcStations)
+                                {
+                                    <option value="@station.Id">@station.Name</option>
+                                }
+                            </select>
+                            <button type="button" class="btn btn-secondary" @onclick="() => AssignAsync(agent.MachineId)" disabled="@_busy">Assign</button>
+                        </div>
+                    </FormRow>
+                </div>
+                @if (!string.IsNullOrEmpty(row.Error))
+                {
+                    <div class="text-danger small mt-1 px-3" role="alert">@row.Error</div>
+                }
+            </div>
         }
+    }
+
+    <h3 class="group-caption mt-4">Cafe name on lock screens</h3>
+    <div class="group mb-2">
+        <div class="group-row is-stacked">
+            <div class="input-group">
+                <input id="cafe-name" class="form-control" @bind="_cafeName" maxlength="@AgentSettingsService.CafeNameMaxLength" aria-label="Cafe name" />
+                <button type="button" class="btn btn-tinted" @onclick="SaveCafeNameAsync" disabled="@_busy">Save</button>
+            </div>
+        </div>
     </div>
-</div>
+    @if (!string.IsNullOrEmpty(_cafeNameError))
+    {
+        <div class="text-danger small mt-1 px-3" role="alert">@_cafeNameError</div>
+    }
+</section>
 
 @code {
     private sealed class RowState

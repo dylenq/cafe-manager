@@ -54,7 +54,7 @@
 - [ ] **CUST-02**: Staff can search customers by name or phone
 - [ ] **CUST-03**: Staff can define time packages (minutes, price, optionally limited to a station type)
 - [ ] **CUST-04**: Staff can sell a package to a customer, which adds minutes to their balance and records the payment
-- [ ] **CUST-05**: Staff can start a session that draws time from a customer's minute balance
+- [x] **CUST-05**: Staff can start a session that draws time from a customer's minute balance
 - [ ] **CUST-06**: Sessions can be linked to a customer so member pricing applies
 
 ### POS & Payments
@@ -129,7 +129,7 @@
 | CUST-02 | Phase 5 | Pending |
 | CUST-03 | Phase 5 | Pending |
 | CUST-04 | Phase 5 | Pending |
-| CUST-05 | Phase 5 | Pending |
+| CUST-05 | Phase 5 | Complete |
 | CUST-06 | Phase 5 | Pending |
 | PRIC-03 | Phase 5 | Pending |
 | POS-01 | Phase 6 | Pending |

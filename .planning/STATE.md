@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 5
 current_phase_name: Customers & Packages
 status: executing
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-11-20T06:55:30.063Z"
+stopped_at: Completed 05-04-PLAN.md
+last_updated: "2026-11-20T07:06:11.229Z"
 last_activity: 2026-11-20
 last_activity_desc: Phase 5 execution started
-state_head: 0c310f8b1fcb16dd38e42e15fb87f86bba5d0de5
+state_head: e689a901657fbcd5f2d5259ec2ad42af0ed34887
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 30
-  completed_plans: 18
+  total_plans: 32
+  completed_plans: 21
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 5 (Customers & Packages) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-11-20 — Phase 5 execution started
 
@@ -70,6 +70,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 4 P02 | 25min | 2 tasks | 17 files |
 | Phase 4 P03 | 25min | 3 tasks | 9 files |
 | Phase 5 P05-01 | 35min | 2 tasks | 35 files |
+| Phase 5 P04 | 25min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,7 @@ Recent decisions affecting current work:
 - [Phase 4]: TV actions run through TvActionQueue (latest wins per station) and TvControlService (audit, cache, notice); AgentCommandKind TvPowerOn=5, TvPowerOff=6
 - [Phase 4]: 04-03: Home Notice gains optional Warning flag for TV failure notices
 - [Phase 5]: Balance ledger is append-only; debit type bucket first, refund last-drawn first; expiry never refunds
+- [Phase 5]: 05-04: refund capped at session net-drawn minutes; extend-from-balance under BalanceLock with paid fallback via ExtendAsync
 
 ### Pending Todos
 
@@ -116,6 +118,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-20T06:55:30.045Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-11-20T07:06:11.210Z
+Stopped at: Completed 05-04-PLAN.md
 Resume file: None

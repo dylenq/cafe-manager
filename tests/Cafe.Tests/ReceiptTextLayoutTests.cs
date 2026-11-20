@@ -55,7 +55,7 @@ public class ReceiptTextLayoutTests
     public void Text_outside_cp437_is_measured_after_replacement()
     {
         // Each emoji prints as one '?', so the row is still exactly the column width.
-        var lines = new ReceiptTextLayout(32).Row("\U0001F600\U0001F600 Cafe ễ", "10,000");
+        var lines = new ReceiptTextLayout(32).Row("\U0001F600\U0001F600 Cafe 漢", "10,000");
 
         var line = Assert.Single(lines);
         Assert.Equal(32, line.Length);

@@ -11,8 +11,8 @@ public enum EscPosAlign
 }
 
 /// <summary>
-/// Our own ESC/POS byte encoder (no third-party package). Text is encoded in code page 437; anything outside it
-/// prints as '?', and control characters never reach the printer as commands (only <see cref="LineFeed"/> emits 0x0A).
+/// Our own ESC/POS byte encoder (no third-party package). Text is encoded in code page 437; characters outside it
+/// lose their diacritics first (Vietnamese prints as plain letters), and whatever is still unmappable prints as '?', and control characters never reach the printer as commands (only <see cref="LineFeed"/> emits 0x0A).
 /// </summary>
 public sealed class EscPosEncoder
 {
@@ -81,8 +81,9 @@ public sealed class EscPosEncoder
 
     private static string Normalise(string text)
     {
+        // Compose first so a decomposed "e" + acute is one character that CP437 can print as-is.
         var sb = new StringBuilder(text.Length);
-        foreach (var rune in text.EnumerateRunes())
+        foreach (var rune in text.Normalize(NormalizationForm.FormC).EnumerateRunes())
         {
             if (rune.Value > 0xFFFF)
             {
@@ -95,10 +96,36 @@ public sealed class EscPosEncoder
             }
             else
             {
-                sb.Append(rune.ToString());
+                sb.Append(Fold(rune.ToString()));
             }
         }
 
         return sb.ToString();
     }
+
+    /// <summary>
+    /// Keeps a character CP437 can print (é, ñ, ü ...). Otherwise folds diacritics away so Vietnamese stays readable
+    /// ("ạ" prints as "a", "đ" as "d"); anything still unmappable stays as is and prints as '?'.
+    /// </summary>
+    private static string Fold(string character)
+    {
+        if (CanEncode(character))
+        {
+            return character;
+        }
+
+        var folded = new StringBuilder(character.Length);
+        foreach (var c in character.Replace('đ', 'd').Replace('Đ', 'D').Normalize(NormalizationForm.FormD))
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+            {
+                folded.Append(c);
+            }
+        }
+
+        var result = folded.ToString();
+        return result.Length > 0 && CanEncode(result) ? result : character;
+    }
+
+    private static bool CanEncode(string text) => Cp437.GetString(Cp437.GetBytes(text)) == text;
 }

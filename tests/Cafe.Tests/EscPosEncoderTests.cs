@@ -48,8 +48,21 @@ public class EscPosEncoderTests
     public void Text_is_encoded_in_code_page_437_with_question_mark_replacement()
     {
         Assert.Equal(new byte[] { 0x43, 0x61, 0x66, 0x82 }, new EscPosEncoder().Text("Café").ToArray());
-        Assert.Equal(new byte[] { 0x3F }, new EscPosEncoder().Text("ễ").ToArray());
         Assert.Equal(new byte[] { 0x3F }, new EscPosEncoder().Text("\U0001F600").ToArray());
+        Assert.Equal(new byte[] { 0x3F }, new EscPosEncoder().Text("漢").ToArray());
+    }
+
+    [Fact]
+    public void WR05_vietnamese_text_prints_as_readable_letters_instead_of_question_marks()
+    {
+        // CP437 prints à, ê and á itself; only ữ and đ need folding.
+        Assert.Equal("Cà phê sua dá", EscPosEncoder.ToPrintable("Cà phê sữa đá"));
+        Assert.Equal(13, new EscPosEncoder().Text("Cà phê sữa đá").ToArray().Length);
+        // Characters CP437 cannot print fold to the base letter; the ones it can print (à, ê, á) stay as they are.
+        Assert.Equal("e a u o a D d", EscPosEncoder.ToPrintable("ễ ạ ư ơ ả Đ đ"));
+        // A decomposed (NFD) string composes first: no extra '?' per combining mark.
+        Assert.Equal("Cà phê sua dá", EscPosEncoder.ToPrintable("Cà phê sữa đá".Normalize(NormalizationForm.FormD)));
+        Assert.DoesNotContain('?', EscPosEncoder.ToPrintable("Phở bò tái, bánh mì, Đà Nẵng".Normalize(NormalizationForm.FormD)));
     }
 
     [Fact]
@@ -73,7 +86,7 @@ public class EscPosEncoderTests
     public void ToPrintable_matches_what_prints()
     {
         Assert.Equal("Café", EscPosEncoder.ToPrintable("Café"));
-        Assert.Equal("?", EscPosEncoder.ToPrintable("ễ"));
+        Assert.Equal("e", EscPosEncoder.ToPrintable("ễ"));
         Assert.Equal("?", EscPosEncoder.ToPrintable("\U0001F600"));
         Assert.Equal("A B", EscPosEncoder.ToPrintable("A B"));
     }

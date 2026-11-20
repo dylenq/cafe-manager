@@ -6,17 +6,18 @@
 @inject ILogger<Products> Logger
 
 <PageTitle>Products - Cafe Manager</PageTitle>
+<SectionContent SectionName="page-title">Products</SectionContent>
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="h3 mb-0">Products</h1>
-    <div class="d-flex flex-wrap align-items-center gap-3">
+<div class="page-header">
+    <h1 class="large-title">Products</h1>
+    <div class="page-header-actions gap-3">
         <div class="form-check form-switch mb-0">
-            <input class="form-check-input" type="checkbox" id="show-inactive" checked="@showInactive" @onchange="ToggleInactiveAsync" />
+            <input class="form-check-input" type="checkbox" role="switch" id="show-inactive" checked="@showInactive" @onchange="ToggleInactiveAsync" />
             <label class="form-check-label" for="show-inactive">Show inactive</label>
         </div>
         @if (!showForm)
         {
-            <button type="button" class="btn btn-primary" @onclick="StartAdd">Add product</button>
+            <button type="button" class="btn btn-primary" @onclick="StartAdd"><Icon Name="plus" Size="18" />Add product</button>
         }
     </div>
 </div>
@@ -31,76 +32,70 @@
 
 @if (showForm)
 {
-    <div class="card mb-4">
-        <div class="card-body">
-            <h2 class="h5 card-title">@(editingId is null ? "Add product" : "Edit product")</h2>
-            <EditForm Model="input" OnValidSubmit="SaveAsync">
-                <DataAnnotationsValidator />
-                <div class="row g-3">
-                    <div class="col-12 col-md-5">
-                        <label class="form-label" for="product-name">Name</label>
-                        <InputText id="product-name" class="form-control" @bind-Value="input.Name" />
-                        <ValidationMessage For="() => input.Name" class="text-danger" />
-                        @FieldError("Name")
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label" for="product-category">Category</label>
-                        <InputText id="product-category" class="form-control" list="product-categories" @bind-Value="input.Category" />
-                        <datalist id="product-categories">
-                            @foreach (var category in categories)
-                            {
-                                <option value="@category"></option>
-                            }
-                        </datalist>
-                        <ValidationMessage For="() => input.Category" class="text-danger" />
-                        @FieldError("Category")
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <label class="form-label" for="product-price">Price</label>
-                        <InputNumber id="product-price" class="form-control" @bind-Value="input.Price" />
-                        <ValidationMessage For="() => input.Price" class="text-danger" />
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <label class="form-label" for="product-sort">Sort order</label>
-                        <InputNumber id="product-sort" class="form-control" @bind-Value="input.SortOrder" />
-                        <ValidationMessage For="() => input.SortOrder" class="text-danger" />
-                    </div>
-                    <div class="col-12 col-md-3 d-flex align-items-end">
-                        <div class="form-check">
-                            <InputCheckbox id="product-active" class="form-check-input" @bind-Value="input.IsActive" />
-                            <label class="form-check-label" for="product-active">Active</label>
-                        </div>
-                    </div>
+    <EditForm Model="input" OnValidSubmit="SaveAsync" class="mb-4">
+        <DataAnnotationsValidator />
+        <h2 class="title-2 mb-3">@(editingId is null ? "Add product" : "Edit product")</h2>
+
+        <div class="group-caption">Details</div>
+        <div class="group">
+            <FormRow Label="Name" For="product-name">
+                <InputText id="product-name" class="form-control" @bind-Value="input.Name" />
+                <ValidationMessage For="() => input.Name" class="text-danger" />
+                @FieldError("Name")
+            </FormRow>
+            <FormRow Label="Category" For="product-category">
+                <InputText id="product-category" class="form-control" list="product-categories" @bind-Value="input.Category" />
+                <datalist id="product-categories">
+                    @foreach (var category in categories)
+                    {
+                        <option value="@category"></option>
+                    }
+                </datalist>
+                <ValidationMessage For="() => input.Category" class="text-danger" />
+                @FieldError("Category")
+            </FormRow>
+            <FormRow Label="Price" For="product-price">
+                <InputNumber id="product-price" class="form-control" @bind-Value="input.Price" />
+                <ValidationMessage For="() => input.Price" class="text-danger" />
+            </FormRow>
+            <FormRow Label="Sort order" For="product-sort">
+                <InputNumber id="product-sort" class="form-control" @bind-Value="input.SortOrder" />
+                <ValidationMessage For="() => input.SortOrder" class="text-danger" />
+            </FormRow>
+            <FormRow Label="Active" For="product-active" Switch="true">
+                <div class="form-check form-switch">
+                    <InputCheckbox id="product-active" class="form-check-input" role="switch" @bind-Value="input.IsActive" />
                 </div>
-                <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
-                    <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">Cancel</button>
-                </div>
-            </EditForm>
+            </FormRow>
         </div>
-    </div>
+
+        <div class="d-flex flex-column flex-sm-row gap-2">
+            <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
+            <button type="button" class="btn btn-secondary" @onclick="CancelForm">Cancel</button>
+        </div>
+    </EditForm>
 }
 
 @if (products is null)
 {
-    <p>Loading...</p>
+    <p class="footnote">Loading...</p>
 }
 else if (products.Count == 0)
 {
-    <p class="text-muted">No products yet. Add one to start selling.</p>
+    <p class="empty-state">No products yet. Add one to start selling.</p>
 }
 else
 {
     @foreach (var group in products.GroupBy(p => p.Category, StringComparer.CurrentCultureIgnoreCase))
     {
-        <h2 class="h5 mt-3">@group.Key</h2>
-        <div class="table-responsive">
-            <table class="table table-striped align-middle">
+        <h2 class="group-caption mt-4">@group.Key</h2>
+        <div class="table-card">
+            <table class="table align-middle">
                 <thead>
                     <tr>
                         <th>Name</th>
-                        <th class="text-end">Price</th>
-                        <th class="text-end">Sort order</th>
+                        <th class="num">Price</th>
+                        <th class="num">Sort order</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -115,20 +110,20 @@ else
                                     <span class="badge text-bg-secondary ms-1">Inactive</span>
                                 }
                             </td>
-                            <td class="text-end">@product.Price.ToString("C")</td>
-                            <td class="text-end">@product.SortOrder</td>
+                            <td class="num">@product.Price.ToString("C")</td>
+                            <td class="num">@product.SortOrder</td>
                             <td class="text-end">
-                                <div class="d-flex flex-column flex-sm-row gap-2 justify-content-end">
+                                <div class="d-flex flex-wrap gap-2 justify-content-end">
                                     @if (confirmingDeleteId == product.Id)
                                     {
                                         <span class="align-self-center">Delete?</span>
-                                        <button type="button" class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(product.Id)">Yes</button>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => confirmingDeleteId = null">No</button>
+                                        <button type="button" class="btn btn-sm btn-danger is-prominent" @onclick="() => DeleteAsync(product.Id)">Yes</button>
+                                        <button type="button" class="btn btn-sm btn-secondary" @onclick="() => confirmingDeleteId = null">No</button>
                                     }
                                     else
                                     {
-                                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(product)">Edit</button>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleActiveAsync(product)">
+                                        <button type="button" class="btn btn-sm btn-tinted" @onclick="() => StartEdit(product)">Edit</button>
+                                        <button type="button" class="btn btn-sm btn-secondary" @onclick="() => ToggleActiveAsync(product)">
                                             @(product.IsActive ? "Deactivate" : "Activate")
                                         </button>
                                         <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => confirmingDeleteId = product.Id">Delete</button>

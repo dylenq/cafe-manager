@@ -5,13 +5,13 @@
 
 <div class="tv-pair-control d-flex flex-column gap-1 mb-2" data-station-id="@StationId">
     <div class="d-flex flex-wrap align-items-center gap-2 justify-content-end">
-        <span class="badge @(Paired ? "text-bg-success" : "text-bg-secondary") tv-paired-badge">@(Paired ? "Paired" : "Not paired")</span>
-        <button type="button" class="btn btn-sm btn-outline-primary tv-pair-button" disabled="@_busy" @onclick="PairAsync">@(Paired ? "Re-pair TV" : "Pair TV")</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary tv-test-button" disabled="@_busy" @onclick="TestAsync">Test</button>
+        <span class="capsule @(Paired ? "capsule-green" : "capsule-gray") tv-paired-badge"><span class="dot"></span>@(Paired ? "Paired" : "Not paired")</span>
+        <button type="button" class="btn btn-sm btn-tinted tv-pair-button" disabled="@_busy" @onclick="PairAsync">@(Paired ? "Re-pair TV" : "Pair TV")</button>
+        <button type="button" class="btn btn-sm btn-secondary tv-test-button" disabled="@_busy" @onclick="TestAsync">Test</button>
     </div>
     @if (_busy && _pairing)
     {
-        <div class="small text-muted tv-pair-wait">
+        <div class="footnote tv-pair-wait">
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
             Accept the prompt on the TV...
         </div>

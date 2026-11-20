@@ -7,12 +7,15 @@
 @inject ILogger<Stations> Logger
 
 <PageTitle>Stations - Cafe Manager</PageTitle>
+<SectionContent SectionName="page-title">Stations</SectionContent>
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="h3 mb-0">Stations</h1>
+<div class="page-header">
+    <h1 class="large-title">Stations</h1>
     @if (!showForm)
     {
-        <button type="button" class="btn btn-primary" @onclick="StartAdd">Add station</button>
+        <div class="page-header-actions">
+            <button type="button" class="btn btn-primary" @onclick="StartAdd"><Icon Name="plus" Size="18" />Add station</button>
+        </div>
     }
 </div>
 
@@ -33,90 +36,84 @@
 
 @if (showForm)
 {
-    <div class="card mb-4">
-        <div class="card-body">
-            <h2 class="h5 card-title">@(editingId is null ? "Add station" : "Edit station")</h2>
-            <EditForm Model="input" OnValidSubmit="SaveAsync">
-                <DataAnnotationsValidator />
-                <div class="row g-3">
-                    <div class="col-12 col-md-6">
-                        <label class="form-label" for="station-name">Name</label>
-                        <InputText id="station-name" class="form-control" @bind-Value="input.Name" />
-                        <ValidationMessage For="() => input.Name" class="text-danger" />
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label" for="station-type">Station type</label>
-                        <InputSelect id="station-type" class="form-select" @bind-Value="input.StationTypeId">
-                            <option value="0">Choose a type...</option>
-                            @foreach (var type in types ?? [])
-                            {
-                                <option value="@type.Id">@type.Name</option>
-                            }
-                        </InputSelect>
-                        <ValidationMessage For="() => input.StationTypeId" class="text-danger" />
-                    </div>
-                    <div class="col-6 col-md-4">
-                        <label class="form-label" for="station-kind">Kind</label>
-                        <InputSelect id="station-kind" class="form-select" @bind-Value="input.Kind" @bind-Value:after="OnKindChanged">
-                            <option value="@StationKind.PC">PC</option>
-                            <option value="@StationKind.Console">Console</option>
-                        </InputSelect>
-                    </div>
-                    <div class="col-6 col-md-4">
-                        <label class="form-label" for="station-sort">Sort order</label>
-                        <InputNumber id="station-sort" class="form-control" @bind-Value="input.SortOrder" />
-                        <ValidationMessage For="() => input.SortOrder" class="text-danger" />
-                    </div>
-                    <div class="col-12 col-md-4 d-flex align-items-end">
-                        <div class="form-check">
-                            <InputCheckbox id="station-enabled" class="form-check-input" @bind-Value="input.IsEnabled" />
-                            <label class="form-check-label" for="station-enabled">Enabled</label>
-                        </div>
-                    </div>
+    <EditForm Model="input" OnValidSubmit="SaveAsync" class="mb-4">
+        <DataAnnotationsValidator />
+        <h2 class="title-2 mb-3">@(editingId is null ? "Add station" : "Edit station")</h2>
 
-                    @if (input.Kind == StationKind.PC)
+        <div class="group-caption">Details</div>
+        <div class="group">
+            <FormRow Label="Name" For="station-name">
+                <InputText id="station-name" class="form-control" @bind-Value="input.Name" />
+                <ValidationMessage For="() => input.Name" class="text-danger" />
+            </FormRow>
+            <FormRow Label="Station type" For="station-type">
+                <InputSelect id="station-type" class="form-select" @bind-Value="input.StationTypeId">
+                    <option value="0">Choose a type...</option>
+                    @foreach (var type in types ?? [])
                     {
-                        <div class="col-12 col-md-6">
-                            <label class="form-label" for="station-machine">Agent machine ID</label>
-                            <InputText id="station-machine" class="form-control" @bind-Value="input.AgentMachineId" />
-                            <ValidationMessage For="() => input.AgentMachineId" class="text-danger" />
-                        </div>
+                        <option value="@type.Id">@type.Name</option>
                     }
-                    else
-                    {
-                        <div class="col-12 col-md-6">
-                            <label class="form-label" for="station-ip">TV IP address</label>
-                            <InputText id="station-ip" class="form-control" @bind-Value="input.TvIpAddress" placeholder="192.168.1.50" />
-                            <ValidationMessage For="() => input.TvIpAddress" class="text-danger" />
-                        </div>
-                        <div class="col-12 col-md-6">
-                            <label class="form-label" for="station-mac">TV MAC address</label>
-                            <InputText id="station-mac" class="form-control" @bind-Value="input.TvMacAddress" placeholder="AA:BB:CC:DD:EE:FF" />
-                            <ValidationMessage For="() => input.TvMacAddress" class="text-danger" />
-                        </div>
-                    }
+                </InputSelect>
+                <ValidationMessage For="() => input.StationTypeId" class="text-danger" />
+            </FormRow>
+            <FormRow Label="Kind" For="station-kind">
+                <InputSelect id="station-kind" class="form-select" @bind-Value="input.Kind" @bind-Value:after="OnKindChanged">
+                    <option value="@StationKind.PC">PC</option>
+                    <option value="@StationKind.Console">Console</option>
+                </InputSelect>
+            </FormRow>
+            <FormRow Label="Sort order" For="station-sort">
+                <InputNumber id="station-sort" class="form-control" @bind-Value="input.SortOrder" />
+                <ValidationMessage For="() => input.SortOrder" class="text-danger" />
+            </FormRow>
+            <FormRow Label="Enabled" For="station-enabled" Switch="true">
+                <div class="form-check form-switch">
+                    <InputCheckbox id="station-enabled" class="form-check-input" role="switch" @bind-Value="input.IsEnabled" />
                 </div>
-                <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
-                    <button type="submit" class="btn btn-primary" disabled="@(saving || types is not { Count: > 0 })">Save</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">Cancel</button>
-                </div>
-            </EditForm>
+            </FormRow>
         </div>
-    </div>
+
+        <div class="group-caption">Connection</div>
+        <div class="group">
+            @if (input.Kind == StationKind.PC)
+            {
+                <FormRow Label="Agent machine ID" For="station-machine">
+                    <InputText id="station-machine" class="form-control" @bind-Value="input.AgentMachineId" />
+                    <ValidationMessage For="() => input.AgentMachineId" class="text-danger" />
+                </FormRow>
+            }
+            else
+            {
+                <FormRow Label="TV IP address" For="station-ip">
+                    <InputText id="station-ip" class="form-control" @bind-Value="input.TvIpAddress" placeholder="192.168.1.50" />
+                    <ValidationMessage For="() => input.TvIpAddress" class="text-danger" />
+                </FormRow>
+                <FormRow Label="TV MAC address" For="station-mac">
+                    <InputText id="station-mac" class="form-control" @bind-Value="input.TvMacAddress" placeholder="AA:BB:CC:DD:EE:FF" />
+                    <ValidationMessage For="() => input.TvMacAddress" class="text-danger" />
+                </FormRow>
+            }
+        </div>
+
+        <div class="d-flex flex-column flex-sm-row gap-2">
+            <button type="submit" class="btn btn-primary" disabled="@(saving || types is not { Count: > 0 })">Save</button>
+            <button type="button" class="btn btn-secondary" @onclick="CancelForm">Cancel</button>
+        </div>
+    </EditForm>
 }
 
 @if (stations is null)
 {
-    <p>Loading...</p>
+    <p class="footnote">Loading...</p>
 }
 else if (stations.Count == 0)
 {
-    <p class="text-muted">No stations yet. Add one to get started.</p>
+    <p class="empty-state">No stations yet. Add one to get started.</p>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-striped align-middle">
+    <div class="table-card">
+        <table class="table align-middle">
             <thead>
                 <tr>
                     <th>Name</th>
@@ -124,7 +121,7 @@ else
                     <th>Kind</th>
                     <th>Endpoint</th>
                     <th>Enabled</th>
-                    <th class="text-end">Sort order</th>
+                    <th class="num">Sort order</th>
                     <th></th>
                 </tr>
             </thead>
@@ -137,21 +134,21 @@ else
                         <td>@station.Kind</td>
                         <td>@(station.Kind == StationKind.PC ? station.AgentMachineId : station.TvIpAddress)</td>
                         <td>@(station.IsEnabled ? "Yes" : "No")</td>
-                        <td class="text-end">@station.SortOrder</td>
+                        <td class="num">@station.SortOrder</td>
                         <td class="text-end">
                             @if (station.Kind == StationKind.Console && !string.IsNullOrWhiteSpace(station.TvIpAddress))
                             {
                                 <TvPairControl StationId="station.Id" StationName="@station.Name" Paired="@(!string.IsNullOrWhiteSpace(station.TvToken))" OnPaired="LoadAsync" />
                             }
-                            <div class="d-flex flex-column flex-sm-row gap-2 justify-content-end">
+                            <div class="d-flex flex-wrap gap-2 justify-content-end">
                                 @if (confirmingDeleteId == station.Id)
                                 {
-                                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(station.Id)">Confirm delete</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => confirmingDeleteId = null">Cancel</button>
+                                    <button type="button" class="btn btn-sm btn-danger is-prominent" @onclick="() => DeleteAsync(station.Id)">Confirm delete</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" @onclick="() => confirmingDeleteId = null">Cancel</button>
                                 }
                                 else
                                 {
-                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(station)">Edit</button>
+                                    <button type="button" class="btn btn-sm btn-tinted" @onclick="() => StartEdit(station)">Edit</button>
                                     <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => confirmingDeleteId = station.Id">Delete</button>
                                 }
                             </div>

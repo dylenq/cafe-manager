@@ -4,34 +4,38 @@
 @inject BackupService Backups
 @inject PricingConfigService Pricing
 
-<div class="card mb-4" id="backups">
-    <div class="card-body">
-        <h2 class="h5 card-title">Backups</h2>
+<section class="mb-5" id="backups">
+    <h2 class="title-2 mb-3">Backups</h2>
 
-        @if (!string.IsNullOrEmpty(_error))
-        {
-            <div class="alert alert-danger" role="alert">@_error</div>
-        }
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger" role="alert">@_error</div>
+    }
 
-        @if (!string.IsNullOrEmpty(_notice))
-        {
-            <div class="alert alert-success py-2" role="status">@_notice</div>
-        }
+    @if (!string.IsNullOrEmpty(_notice))
+    {
+        <div class="alert alert-success" role="status">@_notice</div>
+    }
 
-        <dl class="row mb-3">
-            <dt class="col-sm-4">Last backup</dt>
-            <dd class="col-sm-8">@LastBackupText</dd>
-            <dt class="col-sm-4">Backup folder</dt>
-            <dd class="col-sm-8 font-monospace text-break">@Backups.Directory</dd>
-            <dt class="col-sm-4">Retention</dt>
-            <dd class="col-sm-8">Keeps the newest @Backups.Keep backups. A copy is made every night at @Backups.Hour:00.</dd>
-        </dl>
-
-        <button type="button" class="btn btn-outline-primary" @onclick="BackUpNowAsync" disabled="@_running">
-            @(_running ? "Backing up..." : "Back up now")
-        </button>
+    <div class="group mb-3">
+        <div class="group-row">
+            <span class="row-label">Last backup</span>
+            <span class="row-value">@LastBackupText</span>
+        </div>
+        <div class="group-row">
+            <span class="row-label">Backup folder</span>
+            <span class="row-value font-monospace text-break">@Backups.Directory</span>
+        </div>
+        <div class="group-row">
+            <span class="row-label">Retention</span>
+            <span class="row-value">Keeps the newest @Backups.Keep backups. A copy is made every night at @Backups.Hour:00.</span>
+        </div>
     </div>
-</div>
+
+    <button type="button" class="btn btn-secondary" @onclick="BackUpNowAsync" disabled="@_running">
+        @(_running ? "Backing up..." : "Back up now")
+    </button>
+</section>
 
 @code {
     private bool _running;

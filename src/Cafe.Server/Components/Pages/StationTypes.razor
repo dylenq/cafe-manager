@@ -5,12 +5,15 @@
 @inject ILogger<StationTypes> Logger
 
 <PageTitle>Station types - Cafe Manager</PageTitle>
+<SectionContent SectionName="page-title">Station types</SectionContent>
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="h3 mb-0">Station types</h1>
+<div class="page-header">
+    <h1 class="large-title">Station types</h1>
     @if (!showForm)
     {
-        <button type="button" class="btn btn-primary" @onclick="StartAdd">Add station type</button>
+        <div class="page-header-actions">
+            <button type="button" class="btn btn-primary" @onclick="StartAdd"><Icon Name="plus" Size="18" />Add station type</button>
+        </div>
     }
 </div>
 
@@ -24,60 +27,55 @@
 
 @if (showForm)
 {
-    <div class="card mb-4">
-        <div class="card-body">
-            <h2 class="h5 card-title">@(editingId is null ? "Add station type" : "Edit station type")</h2>
-            <EditForm Model="input" OnValidSubmit="SaveAsync">
-                <DataAnnotationsValidator />
-                <div class="row g-3">
-                    <div class="col-12 col-md-6">
-                        <label class="form-label" for="type-name">Name</label>
-                        <InputText id="type-name" class="form-control" @bind-Value="input.Name" />
-                        <ValidationMessage For="() => input.Name" class="text-danger" />
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <label class="form-label" for="type-rate">Base hourly rate</label>
-                        <InputNumber id="type-rate" class="form-control" @bind-Value="input.HourlyRate" />
-                        <ValidationMessage For="() => input.HourlyRate" class="text-danger" />
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <label class="form-label" for="type-member-rate">Member hourly rate (optional)</label>
-                        <InputNumber id="type-member-rate" class="form-control" @bind-Value="input.MemberHourlyRate" />
-                        <ValidationMessage For="() => input.MemberHourlyRate" class="text-danger" />
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <label class="form-label" for="type-sort">Sort order</label>
-                        <InputNumber id="type-sort" class="form-control" @bind-Value="input.SortOrder" />
-                        <ValidationMessage For="() => input.SortOrder" class="text-danger" />
-                    </div>
-                </div>
-                <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
-                    <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">Cancel</button>
-                </div>
-            </EditForm>
+    <EditForm Model="input" OnValidSubmit="SaveAsync" class="mb-4">
+        <DataAnnotationsValidator />
+        <h2 class="title-2 mb-3">@(editingId is null ? "Add station type" : "Edit station type")</h2>
+
+        <div class="group-caption">Details</div>
+        <div class="group">
+            <FormRow Label="Name" For="type-name">
+                <InputText id="type-name" class="form-control" @bind-Value="input.Name" />
+                <ValidationMessage For="() => input.Name" class="text-danger" />
+            </FormRow>
+            <FormRow Label="Base hourly rate" For="type-rate">
+                <InputNumber id="type-rate" class="form-control" @bind-Value="input.HourlyRate" />
+                <ValidationMessage For="() => input.HourlyRate" class="text-danger" />
+            </FormRow>
+            <FormRow Label="Member hourly rate (optional)" For="type-member-rate">
+                <InputNumber id="type-member-rate" class="form-control" @bind-Value="input.MemberHourlyRate" />
+                <ValidationMessage For="() => input.MemberHourlyRate" class="text-danger" />
+            </FormRow>
+            <FormRow Label="Sort order" For="type-sort">
+                <InputNumber id="type-sort" class="form-control" @bind-Value="input.SortOrder" />
+                <ValidationMessage For="() => input.SortOrder" class="text-danger" />
+            </FormRow>
         </div>
-    </div>
+
+        <div class="d-flex flex-column flex-sm-row gap-2">
+            <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
+            <button type="button" class="btn btn-secondary" @onclick="CancelForm">Cancel</button>
+        </div>
+    </EditForm>
 }
 
 @if (types is null)
 {
-    <p>Loading...</p>
+    <p class="footnote">Loading...</p>
 }
 else if (types.Count == 0)
 {
-    <p class="text-muted">No station types yet. Add one to get started.</p>
+    <p class="empty-state">No station types yet. Add one to get started.</p>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-striped align-middle">
+    <div class="table-card">
+        <table class="table align-middle">
             <thead>
                 <tr>
                     <th>Name</th>
-                    <th class="text-end">Hourly rate</th>
-                    <th class="text-end">Member rate</th>
-                    <th class="text-end">Sort order</th>
+                    <th class="num">Hourly rate</th>
+                    <th class="num">Member rate</th>
+                    <th class="num">Sort order</th>
                     <th></th>
                 </tr>
             </thead>
@@ -86,19 +84,19 @@ else
                 {
                     <tr>
                         <td>@type.Name</td>
-                        <td class="text-end">@type.HourlyRate.ToString("N2")</td>
-                        <td class="text-end">@(type.MemberHourlyRate is { } member ? member.ToString("N2") : "Same as base")</td>
-                        <td class="text-end">@type.SortOrder</td>
+                        <td class="num">@type.HourlyRate.ToString("N2")</td>
+                        <td class="num">@(type.MemberHourlyRate is { } member ? member.ToString("N2") : "Same as base")</td>
+                        <td class="num">@type.SortOrder</td>
                         <td class="text-end">
-                            <div class="d-flex flex-column flex-sm-row gap-2 justify-content-end">
+                            <div class="d-flex flex-wrap gap-2 justify-content-end">
                                 @if (confirmingDeleteId == type.Id)
                                 {
-                                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(type.Id)">Confirm delete</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => confirmingDeleteId = null">Cancel</button>
+                                    <button type="button" class="btn btn-sm btn-danger is-prominent" @onclick="() => DeleteAsync(type.Id)">Confirm delete</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" @onclick="() => confirmingDeleteId = null">Cancel</button>
                                 }
                                 else
                                 {
-                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(type)">Edit</button>
+                                    <button type="button" class="btn btn-sm btn-tinted" @onclick="() => StartEdit(type)">Edit</button>
                                     <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => confirmingDeleteId = type.Id">Delete</button>
                                 }
                             </div>

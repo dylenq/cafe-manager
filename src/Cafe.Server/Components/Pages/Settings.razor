@@ -6,8 +6,11 @@
 @inject ILogger<Settings> Logger
 
 <PageTitle>Settings - Cafe Manager</PageTitle>
+<SectionContent SectionName="page-title">Settings</SectionContent>
 
-<h1 class="h3 mb-3">Settings</h1>
+<div class="page-header">
+    <h1 class="large-title">Settings</h1>
+</div>
 
 @if (!string.IsNullOrEmpty(errorMessage))
 {
@@ -24,43 +27,37 @@
 
 @if (input is null)
 {
-    <p>Loading...</p>
+    <p class="footnote">Loading...</p>
 }
 else
 {
-    <div class="card mb-4">
-        <div class="card-body">
-            <h2 class="h5 card-title">Session expiry</h2>
-            <EditForm Model="input" OnValidSubmit="SaveAsync">
-                <DataAnnotationsValidator />
-                <div class="row g-3">
-                    <div class="col-12 col-md-4">
-                        <label class="form-label" for="setting-grace">Grace period (minutes)</label>
-                        <InputNumber id="setting-grace" class="form-control" @bind-Value="input.GracePeriodMinutes" />
-                        <div class="form-text">Extra time after a session runs out before the station is locked. 0 to 30.</div>
-                        <ValidationMessage For="() => input.GracePeriodMinutes" class="text-danger" />
-                        @FieldError(nameof(SessionSettingsInput.GracePeriodMinutes))
-                    </div>
-                    <div class="col-12 col-md-8">
-                        <label class="form-label" for="setting-warnings">Warning minutes</label>
-                        <InputText id="setting-warnings" class="form-control" @bind-Value="input.WarningMinutes" />
-                        <div class="form-text">Comma-separated minutes before expiry, for example 10,5,1. The largest value starts the warning window.</div>
-                        <ValidationMessage For="() => input.WarningMinutes" class="text-danger" />
-                        @FieldError(nameof(SessionSettingsInput.WarningMinutes))
-                    </div>
-                </div>
-                <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
-                    <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
-                </div>
-            </EditForm>
-        </div>
-    </div>
-
-    <ReceiptSettingsPanel />
+    <section class="mb-5">
+        <h2 class="title-2 mb-3">Session expiry</h2>
+        <EditForm Model="input" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <div class="group mb-2">
+                <FormRow Label="Grace period (minutes)" For="setting-grace">
+                    <InputNumber id="setting-grace" class="form-control" @bind-Value="input.GracePeriodMinutes" />
+                    <ValidationMessage For="() => input.GracePeriodMinutes" class="text-danger" />
+                    @FieldError(nameof(SessionSettingsInput.GracePeriodMinutes))
+                </FormRow>
+                <FormRow Label="Warning minutes" For="setting-warnings">
+                    <InputText id="setting-warnings" class="form-control" @bind-Value="input.WarningMinutes" />
+                    <ValidationMessage For="() => input.WarningMinutes" class="text-danger" />
+                    @FieldError(nameof(SessionSettingsInput.WarningMinutes))
+                </FormRow>
+            </div>
+            <div class="group-footer mb-1">Extra time after a session runs out before the station is locked. 0 to 30.</div>
+            <div class="group-footer mb-3">Comma-separated minutes before expiry, for example 10,5,1. The largest value starts the warning window.</div>
+            <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
+        </EditForm>
+    </section>
 
     <AgentsPanel />
 
     <TvSettingsPanel />
+
+    <ReceiptSettingsPanel />
 
     <BackupPanel />
 }

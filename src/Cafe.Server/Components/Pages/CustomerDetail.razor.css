@@ -1,0 +1,38 @@
+.balance-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+    gap: var(--space-3);
+}
+
+.balance-tile {
+    background: var(--bg-2);
+    border-radius: var(--radius-group);
+    padding: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+}
+
+.balance-tile.is-total {
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.balance-tile-label {
+    font-size: var(--fs-footnote);
+    color: var(--label-2);
+}
+
+.balance-tile-value {
+    font-family: var(--font-rounded);
+    font-size: 1.75rem;
+    line-height: 1.15;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.balance-tile-unit {
+    font-family: var(--font);
+    font-size: var(--fs-subhead);
+    font-weight: 400;
+    color: var(--label-2);
+}

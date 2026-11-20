@@ -10,12 +10,15 @@
 @inject ILogger<Packages> Logger
 
 <PageTitle>Packages - Cafe Manager</PageTitle>
+<SectionContent SectionName="page-title">Time packages</SectionContent>
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="h3 mb-0">Time packages</h1>
+<div class="page-header">
+    <h1 class="large-title">Time packages</h1>
     @if (!showForm)
     {
-        <button type="button" class="btn btn-primary" @onclick="StartAdd">Add package</button>
+        <div class="page-header-actions">
+            <button type="button" class="btn btn-primary" @onclick="StartAdd"><Icon Name="plus" Size="18" />Add package</button>
+        </div>
     }
 </div>
 
@@ -29,74 +32,68 @@
 
 @if (showForm)
 {
-    <div class="card mb-4">
-        <div class="card-body">
-            <h2 class="h5 card-title">@(editingId is null ? "Add package" : "Edit package")</h2>
-            <EditForm Model="input" OnValidSubmit="SaveAsync">
-                <DataAnnotationsValidator />
-                <div class="row g-3">
-                    <div class="col-12 col-md-4">
-                        <label class="form-label" for="pkg-name">Name</label>
-                        <InputText id="pkg-name" class="form-control" @bind-Value="input.Name" />
-                        <ValidationMessage For="() => input.Name" class="text-danger" />
-                        @FieldError(nameof(TimePackageInput.Name))
-                    </div>
-                    <div class="col-6 col-md-2">
-                        <label class="form-label" for="pkg-minutes">Minutes</label>
-                        <InputNumber id="pkg-minutes" class="form-control" @bind-Value="input.Minutes" />
-                        <ValidationMessage For="() => input.Minutes" class="text-danger" />
-                        @FieldError(nameof(TimePackageInput.Minutes))
-                    </div>
-                    <div class="col-6 col-md-2">
-                        <label class="form-label" for="pkg-price">Price</label>
-                        <InputNumber id="pkg-price" class="form-control" @bind-Value="input.Price" />
-                        <ValidationMessage For="() => input.Price" class="text-danger" />
-                        @FieldError(nameof(TimePackageInput.Price))
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label" for="pkg-type">Station type</label>
-                        <InputSelect id="pkg-type" class="form-select" @bind-Value="input.StationTypeId">
-                            <option value="">Any type</option>
-                            @foreach (var type in types)
-                            {
-                                <option value="@type.Id">@type.Name</option>
-                            }
-                        </InputSelect>
-                        @FieldError(nameof(TimePackageInput.StationTypeId))
-                    </div>
-                    <div class="col-12">
-                        <div class="form-check">
-                            <InputCheckbox id="pkg-active" class="form-check-input" @bind-Value="input.IsActive" />
-                            <label class="form-check-label" for="pkg-active">Active (on sale)</label>
-                        </div>
-                    </div>
+    <EditForm Model="input" OnValidSubmit="SaveAsync" class="mb-4">
+        <DataAnnotationsValidator />
+        <h2 class="title-2 mb-3">@(editingId is null ? "Add package" : "Edit package")</h2>
+
+        <div class="group-caption">Details</div>
+        <div class="group">
+            <FormRow Label="Name" For="pkg-name">
+                <InputText id="pkg-name" class="form-control" @bind-Value="input.Name" />
+                <ValidationMessage For="() => input.Name" class="text-danger" />
+                @FieldError(nameof(TimePackageInput.Name))
+            </FormRow>
+            <FormRow Label="Minutes" For="pkg-minutes">
+                <InputNumber id="pkg-minutes" class="form-control" @bind-Value="input.Minutes" />
+                <ValidationMessage For="() => input.Minutes" class="text-danger" />
+                @FieldError(nameof(TimePackageInput.Minutes))
+            </FormRow>
+            <FormRow Label="Price" For="pkg-price">
+                <InputNumber id="pkg-price" class="form-control" @bind-Value="input.Price" />
+                <ValidationMessage For="() => input.Price" class="text-danger" />
+                @FieldError(nameof(TimePackageInput.Price))
+            </FormRow>
+            <FormRow Label="Station type" For="pkg-type">
+                <InputSelect id="pkg-type" class="form-select" @bind-Value="input.StationTypeId">
+                    <option value="">Any type</option>
+                    @foreach (var type in types)
+                    {
+                        <option value="@type.Id">@type.Name</option>
+                    }
+                </InputSelect>
+                @FieldError(nameof(TimePackageInput.StationTypeId))
+            </FormRow>
+            <FormRow Label="Active (on sale)" For="pkg-active" Switch="true">
+                <div class="form-check form-switch">
+                    <InputCheckbox id="pkg-active" class="form-check-input" role="switch" @bind-Value="input.IsActive" />
                 </div>
-                <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
-                    <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">Cancel</button>
-                </div>
-            </EditForm>
+            </FormRow>
         </div>
-    </div>
+
+        <div class="d-flex flex-column flex-sm-row gap-2">
+            <button type="submit" class="btn btn-primary" disabled="@saving">Save</button>
+            <button type="button" class="btn btn-secondary" @onclick="CancelForm">Cancel</button>
+        </div>
+    </EditForm>
 }
 
 @if (packages is null)
 {
-    <p>Loading...</p>
+    <p class="footnote">Loading...</p>
 }
 else if (packages.Count == 0)
 {
-    <p class="text-muted">No packages yet.</p>
+    <p class="empty-state">No packages yet.</p>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-striped align-middle">
+    <div class="table-card">
+        <table class="table align-middle">
             <thead>
                 <tr>
                     <th>Name</th>
-                    <th class="text-end">Minutes</th>
-                    <th class="text-end">Price</th>
+                    <th class="num">Minutes</th>
+                    <th class="num">Price</th>
                     <th>Station type</th>
                     <th>Status</th>
                     <th></th>
@@ -107,8 +104,8 @@ else
                 {
                     <tr>
                         <td>@package.Name</td>
-                        <td class="text-end">@package.Minutes</td>
-                        <td class="text-end">@package.Price.ToString("C", CultureInfo.CurrentCulture)</td>
+                        <td class="num">@package.Minutes</td>
+                        <td class="num">@package.Price.ToString("C", CultureInfo.CurrentCulture)</td>
                         <td>@TypeName(package.StationTypeId)</td>
                         <td>
                             @if (package.IsActive)
@@ -121,16 +118,16 @@ else
                             }
                         </td>
                         <td class="text-end">
-                            <div class="d-flex flex-column flex-sm-row gap-2 justify-content-end">
+                            <div class="d-flex flex-wrap gap-2 justify-content-end">
                                 @if (confirmingDeleteId == package.Id)
                                 {
-                                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(package.Id)">Confirm delete</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => confirmingDeleteId = null">Cancel</button>
+                                    <button type="button" class="btn btn-sm btn-danger is-prominent" @onclick="() => DeleteAsync(package.Id)">Confirm delete</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" @onclick="() => confirmingDeleteId = null">Cancel</button>
                                 }
                                 else
                                 {
-                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(package)">Edit</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleActiveAsync(package)">
+                                    <button type="button" class="btn btn-sm btn-tinted" @onclick="() => StartEdit(package)">Edit</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" @onclick="() => ToggleActiveAsync(package)">
                                         @(package.IsActive ? "Deactivate" : "Reactivate")
                                     </button>
                                     <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => confirmingDeleteId = package.Id">Delete</button>

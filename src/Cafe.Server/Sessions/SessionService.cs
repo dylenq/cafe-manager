@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Cafe.Server.Sessions;
 
 /// <summary>What a stop would charge right now, bound to the session state it was computed for.</summary>
-public sealed record StopQuote(int SessionId, int Version, decimal Amount);
+public sealed record StopQuote(int SessionId, int Version, decimal Amount, int RefundMinutes = 0);
 
 /// <summary>All session mutations. Every mutation writes a SessionEvent in the same transaction and raises the notifier.</summary>
 public class SessionService(
@@ -23,6 +23,9 @@ public class SessionService(
 {
     public const int MinMinutes = 1;
     public const int MaxMinutes = 1440;
+
+    /// <summary>Failure messages for an extend or start that the balance cannot cover begin with this (the UI offers the paid extension).</summary>
+    public const string InsufficientBalancePrefix = "Not enough balance";
 
     private const string Busy = "That station already has a session. Refresh the dashboard.";
     private const string Stale = "This session was changed by someone else. Refresh and try again.";
@@ -326,22 +329,73 @@ public class SessionService(
                 pricing.TimeZone,
                 session.IsMemberPricing)).Total;
 
-            var wasGrace = session.Status == SessionStatus.Grace;
-            session.PurchasedMinutes = purchased + minutes;
             session.ChargedAmount += quote;
+            ApplyExtension(ctx, session, purchased, minutes, active,
+                string.Create(CultureInfo.InvariantCulture, $"Extended by {minutes} min, +{quote:0.00}"));
+            return ServiceResult<decimal>.Ok(quote);
+        }, cancellationToken);
+    }
 
-            if (session.Status == SessionStatus.Grace && SessionClock.RemainingSeconds(session.PurchasedMinutes.Value, active) > 0)
+    /// <summary>
+    /// The state change every extension shares (paid or from balance): more purchased minutes, Grace revival with a
+    /// new segment when time remains, the Extended event and signal. Charging is the caller's business.
+    /// </summary>
+    private static void ApplyExtension(MutationContext ctx, Session session, int purchased, int minutes, long active, string details)
+    {
+        var wasGrace = session.Status == SessionStatus.Grace;
+        session.PurchasedMinutes = purchased + minutes;
+
+        if (session.Status == SessionStatus.Grace && SessionClock.RemainingSeconds(session.PurchasedMinutes.Value, active) > 0)
+        {
+            session.Status = SessionStatus.Active;
+            session.GraceStartedAtUtc = null;
+            session.Segments.Add(new SessionSegment { StationId = session.StationId, StartUtc = ctx.Now });
+        }
+
+        AddEvent(session, SessionEventType.Extended, session.StationId, ctx.Now, Truncate(details));
+        ctx.Signals.Add(new SessionSignal(SessionSignalKind.Extended, session.StationId, session.Id,
+            Minutes: minutes, ExtendedFromGrace: wasGrace && session.Status == SessionStatus.Active));
+    }
+
+    /// <summary>
+    /// Adds minutes to a Balance session by debiting the customer's ledger (type bucket first, then any-type) in the
+    /// same SaveChanges as the session change. Returns the usable minutes left. ChargedAmount is untouched. When the
+    /// balance cannot cover it the failure starts with <see cref="InsufficientBalancePrefix"/> and nothing changes,
+    /// so staff can fall back to the paid <see cref="ExtendAsync"/>.
+    /// </summary>
+    public async Task<ServiceResult<int>> ExtendFromBalanceAsync(int sessionId, int minutes, CancellationToken cancellationToken = default)
+    {
+        if (minutes is < MinMinutes or > MaxMinutes)
+        {
+            return ServiceResult<int>.Fail($"Minutes must be between {MinMinutes} and {MaxMinutes}.");
+        }
+
+        // Settle expiry first so a session whose grace already elapsed (not ticked yet) cannot be revived.
+        if (await ResolveFirstAsync(sessionId, cancellationToken))
+        {
+            return ServiceResult<int>.Fail(GraceOver);
+        }
+
+        using var _ = await balanceLock.AcquireAsync(cancellationToken);
+        return await MutateAsync<int>(sessionId, async ctx =>
+        {
+            var session = ctx.Session;
+            if (session.Mode != SessionMode.Balance || session.CustomerId is not { } customerId || session.PurchasedMinutes is not { } purchased)
             {
-                session.Status = SessionStatus.Active;
-                session.GraceStartedAtUtc = null;
-                session.Segments.Add(new SessionSegment { StationId = session.StationId, StartUtc = ctx.Now });
+                return ServiceResult<int>.Fail("Only balance sessions can be extended from balance.");
             }
 
-            AddEvent(session, SessionEventType.Extended, session.StationId, ctx.Now,
-                string.Create(CultureInfo.InvariantCulture, $"Extended by {minutes} min, +{quote:0.00}"));
-            ctx.Signals.Add(new SessionSignal(SessionSignalKind.Extended, session.StationId, session.Id,
-                Minutes: minutes, ExtendedFromGrace: wasGrace && session.Status == SessionStatus.Active));
-            return ServiceResult<decimal>.Ok(quote);
+            var typeId = session.Station.StationTypeId;
+            var usable = await BalanceService.UsableMinutesAsync(ctx.Db, customerId, typeId, ctx.Cancellation);
+            if (minutes > usable)
+            {
+                return ServiceResult<int>.Fail($"{InsufficientBalancePrefix}: {usable} min available.");
+            }
+
+            var active = ActiveSeconds(session, ctx.Now);
+            await BalanceService.DebitAsync(ctx.Db, customerId, typeId, minutes, ctx.Now, null, session.Id, ctx.Cancellation);
+            ApplyExtension(ctx, session, purchased, minutes, active, $"Extended by {minutes} min from balance");
+            return ServiceResult<int>.Ok(usable - minutes);
         }, cancellationToken);
     }
 
@@ -385,6 +439,20 @@ public class SessionService(
             if (await ctx.Db.Sessions.AnyAsync(s => s.StationId == target.Id && s.Status != SessionStatus.Ended, ctx.Cancellation))
             {
                 return ServiceResult<Session>.Fail($"{target.Name} already has a session.");
+            }
+
+            if (session.Mode == SessionMode.Balance)
+            {
+                // Type-specific minutes drawn by this session must not be spent on another station type (T-05-10).
+                var drawn = await BalanceService.NetDrawnByBucketAsync(ctx.Db, session.Id, ctx.Cancellation);
+                if (drawn.FirstOrDefault(b => b.StationTypeId is { } id && id != target.StationTypeId) is { StationTypeId: { } fromTypeId })
+                {
+                    var names = await ctx.Db.StationTypes.AsNoTracking()
+                        .Where(t => t.Id == fromTypeId || t.Id == target.StationTypeId)
+                        .ToDictionaryAsync(t => t.Id, t => t.Name, ctx.Cancellation);
+                    return ServiceResult<Session>.Fail(
+                        $"This session uses {names.GetValueOrDefault(fromTypeId, "type-specific")} balance and cannot move to a {names.GetValueOrDefault(target.StationTypeId, "different")} station.");
+                }
             }
 
             var from = session.Station;
@@ -439,9 +507,8 @@ public class SessionService(
             if (session.Mode == SessionMode.Balance && session.PurchasedMinutes is { } bought)
             {
                 // Unused whole minutes go back to the buckets they came from (refunds only credit, so no lock is needed).
-                var usedMinutes = (int)Math.Ceiling(ActiveSeconds(session, ctx.Now) / 60.0);
-                var unused = Math.Max(0, bought - usedMinutes);
-                var refunded = await BalanceService.RefundUnusedAsync(ctx.Db, session, unused, ctx.Now, ctx.Cancellation);
+                var refundable = await RefundableMinutesAsync(ctx.Db, session, ctx.Now, bought, ctx.Cancellation);
+                var refunded = await BalanceService.RefundUnusedAsync(ctx.Db, session, refundable, ctx.Now, ctx.Cancellation);
                 stopDetails = Truncate($"{stopDetails}, refunded {refunded} min");
             }
 
@@ -475,7 +542,32 @@ public class SessionService(
         var amount = session.Mode != SessionMode.OpenEnded
             ? session.ChargedAmount
             : await charges.OpenEndedAsync(db, session.Segments, time.GetUtcNow(), cancellationToken: cancellationToken, isMember: session.IsMemberPricing);
-        return ServiceResult<StopQuote>.Ok(new StopQuote(session.Id, session.Version, amount));
+        var refund = 0;
+        if (session.Mode == SessionMode.Balance && session.PurchasedMinutes is { } bought)
+        {
+            refund = await RefundableMinutesAsync(db, session, time.GetUtcNow(), bought, cancellationToken);
+        }
+
+        return ServiceResult<StopQuote>.Ok(new StopQuote(session.Id, session.Version, amount, refund));
+    }
+
+    /// <summary>
+    /// Unused whole minutes of a Balance session (purchased minus ceil(active seconds / 60), never negative), capped at
+    /// what the session net-drew from balance so paid-extension minutes are never refunded. One computation shared by
+    /// StopAsync and the stop quote so the preview always matches the refund.
+    /// </summary>
+    private static async Task<int> RefundableMinutesAsync(
+        CafeDbContext db, Session session, DateTimeOffset now, int purchasedMinutes, CancellationToken ct)
+    {
+        var used = (int)Math.Ceiling(ActiveSeconds(session, now) / 60.0);
+        var unused = Math.Max(0, purchasedMinutes - used);
+        if (unused == 0)
+        {
+            return 0;
+        }
+
+        var drawn = (await BalanceService.NetDrawnByBucketAsync(db, session.Id, ct)).Sum(b => b.Minutes);
+        return Math.Min(unused, drawn);
     }
 
     private static ServiceResult<decimal> Forward(ServiceResult failed) =>

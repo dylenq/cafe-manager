@@ -200,6 +200,20 @@ public class BalanceService(IDbContextFactory<CafeDbContext> dbFactory, TimeProv
         return slices;
     }
 
+    /// <summary>Minutes this session net-drew from each bucket (debits minus refunds), buckets with a positive net only.</summary>
+    internal static async Task<List<BalanceBucket>> NetDrawnByBucketAsync(CafeDbContext db, int sessionId, CancellationToken ct)
+    {
+        var rows = await db.CustomerMinuteLedger.AsNoTracking()
+            .Where(l => l.SessionId == sessionId && (l.Reason == LedgerReason.SessionDebit || l.Reason == LedgerReason.SessionRefund))
+            .Select(l => new { l.StationTypeId, l.MinutesDelta })
+            .ToListAsync(ct);
+        return rows
+            .GroupBy(r => r.StationTypeId)
+            .Select(g => new BalanceBucket(g.Key, -g.Sum(r => r.MinutesDelta)))
+            .Where(b => b.Minutes > 0)
+            .ToList();
+    }
+
     /// <summary>
     /// Refunds up to <paramref name="unusedMinutes"/> of a session's net-drawn minutes back to the buckets they came
     /// from, last-drawn bucket first. Returns the minutes refunded.

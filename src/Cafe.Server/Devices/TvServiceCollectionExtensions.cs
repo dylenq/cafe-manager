@@ -10,6 +10,11 @@ public static class TvServiceCollectionExtensions
         services.AddSingleton<ITvTransport, SamsungTvTransport>();
         services.AddSingleton<ITvDriver, SamsungTizenDriver>();
         services.AddSingleton<TvPairingService>();
+        services.AddSingleton<TvStateCache>();
+        services.AddSingleton<TvSettingsService>();
+        services.AddSingleton<TvControlService>();
+        services.AddSingleton<TvActionQueue>();
+        services.AddSingleton<ISessionEventSink, TvSessionEventSink>();
         services.AddSingleton<IExpiryActionHandler, TvExpiryActionHandler>();
         return services;
     }

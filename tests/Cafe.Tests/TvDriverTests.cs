@@ -339,8 +339,13 @@ public class TvDriverTests
 
     public class HandlerTests : SessionTestBase
     {
-        private TvExpiryActionHandler Handler(ITvDriver driver) =>
-            new(driver, Factory.Services.GetRequiredService<IDbContextFactory<CafeDbContext>>(), NullLogger<TvExpiryActionHandler>.Instance);
+        private TvExpiryActionHandler Handler(ITvDriver driver)
+        {
+            var dbFactory = Factory.Services.GetRequiredService<IDbContextFactory<CafeDbContext>>();
+            var control = new TvControlService(driver, dbFactory, new TvStateCache(TimeProvider.System, Options.Create(new TvOptions())),
+                TimeProvider.System, NullLogger<TvControlService>.Instance);
+            return new(control, dbFactory, NullLogger<TvExpiryActionHandler>.Instance);
+        }
 
         private async Task<Station> ConsoleAsync()
         {

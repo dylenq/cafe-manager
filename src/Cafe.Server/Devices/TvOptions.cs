@@ -34,5 +34,8 @@ public sealed class TvOptions
 
     public bool RunMonitor { get; set; } = true;
 
+    /// <summary>A queued automatic TV action is cancelled after this long.</summary>
+    public int ActionTimeoutSeconds { get; set; } = 30;
+
     public bool PowerOffOnStop { get; set; } = true;
 }

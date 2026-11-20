@@ -11,7 +11,7 @@ namespace Cafe.Server.Devices;
 /// (bounded by <see cref="ExpiryEvaluator.MaxActionAttempts"/>). Never acts on a station that has already started a
 /// new session, so a retried expiry cannot cut a new customer off.
 /// </summary>
-public sealed class TvExpiryActionHandler(ITvDriver driver, IDbContextFactory<CafeDbContext> dbFactory, ILogger<TvExpiryActionHandler> logger) : IExpiryActionHandler
+public sealed class TvExpiryActionHandler(TvControlService control, IDbContextFactory<CafeDbContext> dbFactory, ILogger<TvExpiryActionHandler> logger) : IExpiryActionHandler
 {
     public async Task ExecuteAsync(Station station, CancellationToken cancellationToken)
     {
@@ -29,7 +29,7 @@ public sealed class TvExpiryActionHandler(ITvDriver driver, IDbContextFactory<Ca
             }
         }
 
-        var result = await driver.PowerOffAsync(station, cancellationToken);
+        var result = await control.ExecuteAsync(station, on: false, "Expiry", cancellationToken);
         if (result.Outcome is TvActionOutcome.Failed or TvActionOutcome.Unreachable)
         {
             throw new InvalidOperationException($"The TV of {station.Name} was not powered off: {result.Message}.");

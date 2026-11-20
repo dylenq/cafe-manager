@@ -1,6 +1,6 @@
 namespace Cafe.Server.Data;
 
-/// <summary>A manual command staff can send to a PC agent. Stored as an int, so never reorder.</summary>
+/// <summary>A command sent to a PC agent or a console TV (manual or automatic). Stored as an int, so never reorder.</summary>
 public enum AgentCommandKind
 {
     Lock = 0,
@@ -8,10 +8,12 @@ public enum AgentCommandKind
     Message = 2,
     Shutdown = 3,
     Restart = 4,
+    TvPowerOn = 5,
+    TvPowerOff = 6,
 }
 
 /// <summary>
-/// Audit row for a manual agent command. StationId is a plain int (no foreign key) so the trail survives
+/// Audit row for an agent or TV power command. StationId is a plain int (no foreign key) so the trail survives
 /// station deletion; the station name is snapshotted for the same reason.
 /// </summary>
 public class AgentCommandLog

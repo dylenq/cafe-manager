@@ -94,11 +94,6 @@ function Wait-ForEnter {
     }
 }
 
-function Quote-Arg {
-    param([string]$Value)
-    return '"' + ($Value -replace '"', '""') + '"'
-}
-
 # Quotes one value for a native program command line (CommandLineToArgvW rules): backslashes before a quote are
 # doubled and the quote is escaped, and trailing backslashes are doubled before the closing quote.
 function Quote-NativeArg {
@@ -106,6 +101,14 @@ function Quote-NativeArg {
     $escaped = [regex]::Replace($Value, '(\\*)"', '$1$1\"')
     $escaped = [regex]::Replace($escaped, '(\\+)$', '$1$1')
     return '"' + $escaped + '"'
+}
+
+# A trailing backslash on a folder parameter would be read as an escaped quote by native programs (robocopy), so drop
+# it (a bare drive root such as C:\ is left alone; the install-path check rejects those later anyway).
+function Remove-TrailingBackslash {
+    param([string]$Path)
+    if ($Path.Length -gt 3) { return $Path.TrimEnd('\') }
+    return $Path
 }
 
 function Test-IsAdministrator {
@@ -217,17 +220,19 @@ function Test-UserLoggedOn {
 }
 
 function Install-Agent {
+    $SourcePath = Remove-TrailingBackslash $SourcePath
+    $InstallPath = Remove-TrailingBackslash $InstallPath
     # 1. Elevation
     if (-not (Test-IsAdministrator)) {
         Write-Host 'Administrator rights are needed. A Windows (UAC) prompt will appear: choose Yes.'
-        $argList = '-NoProfile -ExecutionPolicy Bypass -File ' + (Quote-Arg $PSCommandPath)
+        $argList = '-NoProfile -ExecutionPolicy Bypass -File ' + (Quote-NativeArg $PSCommandPath)
         foreach ($key in $ScriptArguments.Keys) {
             $value = $ScriptArguments[$key]
             if ($value -is [System.Management.Automation.SwitchParameter]) {
                 if ($value.IsPresent) { $argList += ' -' + $key }
             }
             else {
-                $argList += ' -' + $key + ' ' + (Quote-Arg ([string]$value))
+                $argList += ' -' + $key + ' ' + (Quote-NativeArg ([string]$value))
             }
         }
         $child = Start-Process -FilePath 'powershell.exe' -ArgumentList $argList -Verb RunAs -Wait -PassThru

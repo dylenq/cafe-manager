@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 6
 current_phase_name: POS & Receipts
 status: executing
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-11-20T07:20:21.292Z"
+stopped_at: Completed 06-05-PLAN.md
+last_updated: "2026-11-20T12:06:19.050Z"
 last_activity: 2026-11-20
 last_activity_desc: Phase 6 execution started
-state_head: 42cdbb82a2682297f0948e3c9deda95387cb0395
+state_head: 16fd957260dd9843fb600d7a648ce248f5744a14
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 32
-  completed_plans: 23
+  completed_plans: 27
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 6 (POS & Receipts) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-11-20 — Phase 6 execution started
 
@@ -73,6 +73,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 5 P04 | 25min | 2 tasks | 3 files |
 | Phase 5 P05-05 | 35min | 3 tasks | 11 files |
 | Phase 6 P01 | 40min | 2 tasks | 40 files |
+| Phase 6 P05 | 40min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -101,6 +102,7 @@ Recent decisions affecting current work:
 - [Phase 5]: Balance ledger is append-only; debit type bucket first, refund last-drawn first; expiry never refunds
 - [Phase 5]: 05-04: refund capped at session net-drawn minutes; extend-from-balance under BalanceLock with paid fallback via ExtendAsync
 - [Phase 5]: 05-05: Extend-from-balance shortfall shows an explicit paid-extension choice, never a silent fallback
+- [Phase 6]: 06-05: stale-total guard on StationCard (re-quote before StopAndSettleAsync); CheckoutService contract unchanged
 
 ### Pending Todos
 
@@ -121,6 +123,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-20T07:20:21.273Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-11-20T12:06:19.028Z
+Stopped at: Completed 06-05-PLAN.md
 Resume file: None

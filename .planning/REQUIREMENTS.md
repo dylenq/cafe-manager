@@ -59,10 +59,10 @@
 
 ### POS & Payments
 
-- [ ] **POS-01**: Staff can manage products (name, category, price, active)
-- [ ] **POS-02**: Staff can ring up an order and attach it to a session, a customer or a walk-in
-- [ ] **POS-03**: Staff can record a payment (cash or card, amount) for session charges, orders and packages
-- [ ] **POS-04**: Staff can print a receipt on a network ESC/POS thermal printer, with a fallback to a Windows printer
+- [x] **POS-01**: Staff can manage products (name, category, price, active)
+- [x] **POS-02**: Staff can ring up an order and attach it to a session, a customer or a walk-in
+- [x] **POS-03**: Staff can record a payment (cash or card, amount) for session charges, orders and packages
+- [x] **POS-04**: Staff can print a receipt on a network ESC/POS thermal printer, with a fallback to a Windows printer
 
 ### Reports & Deployment
 
@@ -132,10 +132,10 @@
 | CUST-05 | Phase 5 | Complete |
 | CUST-06 | Phase 5 | Complete |
 | PRIC-03 | Phase 5 | Complete |
-| POS-01 | Phase 6 | Pending |
-| POS-02 | Phase 6 | Pending |
-| POS-03 | Phase 6 | Pending |
-| POS-04 | Phase 6 | Pending |
+| POS-01 | Phase 6 | Complete |
+| POS-02 | Phase 6 | Complete |
+| POS-03 | Phase 6 | Complete |
+| POS-04 | Phase 6 | Complete |
 | REPT-01 | Phase 7 | Pending |
 | REPT-02 | Phase 7 | Pending |
 | DEPL-01 | Phase 7 | Pending |

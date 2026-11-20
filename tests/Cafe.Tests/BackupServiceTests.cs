@@ -194,6 +194,28 @@ public sealed class BackupServiceTests : IDisposable
         Assert.True(options.RunScheduler);
     }
 
+    [Theory]
+    [InlineData("4am")]
+    [InlineData("abc")]
+    [InlineData("1.5")]
+    public void Non_numeric_hour_and_keep_fall_back_with_a_warning_instead_of_throwing(string bad)
+    {
+        var warnings = new List<string>();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Backup:Hour"] = bad,
+            ["Backup:Keep"] = bad,
+            ["Backup:RunScheduler"] = "maybe",
+        }).Build();
+
+        var options = BackupOptions.From(config, warnings.Add);
+
+        Assert.Equal(4, options.Hour);
+        Assert.Equal(14, options.Keep);
+        Assert.True(options.RunScheduler);
+        Assert.Equal(3, warnings.Count);
+    }
+
     [Fact]
     public async Task Scheduled_loop_runs_at_the_configured_hour()
     {

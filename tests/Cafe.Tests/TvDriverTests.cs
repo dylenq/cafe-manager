@@ -436,7 +436,7 @@ public class TvDriverTests
             var dbFactory = Factory.Services.GetRequiredService<IDbContextFactory<CafeDbContext>>();
             var control = new TvControlService(driver, dbFactory, _cache,
                 TimeProvider.System, NullLogger<TvControlService>.Instance);
-            return new(control, dbFactory, NullLogger<TvExpiryActionHandler>.Instance);
+            return new(control, dbFactory, Options.Create(new TvOptions()), NullLogger<TvExpiryActionHandler>.Instance);
         }
 
         private async Task<Station> ConsoleAsync()

@@ -41,4 +41,12 @@ public sealed class TvOptions
     public int ActionTimeoutSeconds { get; set; } = 30;
 
     public bool PowerOffOnStop { get; set; } = true;
+
+    /// <summary>
+    /// Hard time budget for the power-off at session expiry. Must stay below the expiry evaluator's per-handler timeout
+    /// (10 s), otherwise a slow TV is reported as a generic handler timeout. The driver's worst case is longer (about
+    /// 13 s with the default timings), so a TV that is still busy when this runs out counts as a failed attempt and is
+    /// retried: the retry reads Standby and ends as AlreadyOff, so the power key is never sent twice.
+    /// </summary>
+    public int ExpiryActionTimeoutSeconds { get; set; } = 8;
 }

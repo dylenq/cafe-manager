@@ -1,9 +1,12 @@
 using Cafe.Server.Data;
+using Cafe.Server.Devices;
 using Cafe.Server.Stations;
 using Cafe.Shared;
 using Cafe.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Cafe.Tests;
 
@@ -28,7 +31,7 @@ public class TvReviewFixTests : SessionTestBase
         return id;
     }
 
-    private async Task<Station> LoadAsync(int id)
+    private async Task<Station> LoadStationAsync(int id)
     {
         await using var db = await DbAsync();
         return await db.Stations.AsNoTracking().SingleAsync(s => s.Id == id);
@@ -36,7 +39,7 @@ public class TvReviewFixTests : SessionTestBase
 
     private async Task UpdateAsync(int id, Action<StationInput> change)
     {
-        var current = await LoadAsync(id);
+        var current = await LoadStationAsync(id);
         var input = new StationInput
         {
             Name = current.Name,
@@ -59,7 +62,7 @@ public class TvReviewFixTests : SessionTestBase
     {
         var id = await PairedConsoleAsync();
         await UpdateAsync(id, i => i.TvIpAddress = "10.0.0.6");
-        Assert.Null((await LoadAsync(id)).TvToken);
+        Assert.Null((await LoadStationAsync(id)).TvToken);
     }
 
     [Fact]
@@ -67,7 +70,63 @@ public class TvReviewFixTests : SessionTestBase
     {
         var id = await PairedConsoleAsync();
         await UpdateAsync(id, i => { i.Kind = StationKind.PC; i.AgentMachineId = "PC-1"; });
-        Assert.Null((await LoadAsync(id)).TvToken);
+        Assert.Null((await LoadStationAsync(id)).TvToken);
+    }
+
+    // ---- WR-05 ----
+
+    private sealed class HangingDriver : ITvDriver
+    {
+        public Task<TvPairResult> PairAsync(Station station, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<TvPowerState> GetStateAsync(Station station, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<TvActionResult> PowerOnAsync(Station station, CancellationToken ct) => throw new NotSupportedException();
+
+        public async Task<TvActionResult> PowerOffAsync(Station station, CancellationToken ct)
+        {
+            await Task.Delay(Timeout.Infinite, ct);
+            return new TvActionResult(TvActionOutcome.PoweredOff, TvPowerState.Standby, "unreachable code");
+        }
+    }
+
+    private TvExpiryActionHandler HangingHandler(IOptions<TvOptions> options)
+    {
+        var dbFactory = Factory.Services.GetRequiredService<IDbContextFactory<CafeDbContext>>();
+        var control = new TvControlService(new HangingDriver(), dbFactory, new TvStateCache(TimeProvider.System, options),
+            TimeProvider.System, NullLogger<TvControlService>.Instance);
+        return new TvExpiryActionHandler(control, dbFactory, options, NullLogger<TvExpiryActionHandler>.Instance);
+    }
+
+    [Fact]
+    public void The_default_expiry_budget_fits_inside_the_evaluator_handler_timeout()
+    {
+        Assert.True(new TvOptions().ExpiryActionTimeoutSeconds < 10);
+    }
+
+    [Fact]
+    public async Task A_busy_tv_at_expiry_fails_within_the_budget_as_a_retryable_error()
+    {
+        var id = await PairedConsoleAsync();
+        var handler = HangingHandler(Options.Create(new TvOptions { ExpiryActionTimeoutSeconds = 1 }));
+        var station = await LoadStationAsync(id);
+
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => handler.ExecuteAsync(station, default));
+
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(5), $"took {clock.Elapsed}");
+        Assert.Contains("retried", ex.Message);
+    }
+
+    [Fact]
+    public async Task Caller_cancellation_at_expiry_is_not_turned_into_a_failure()
+    {
+        var id = await PairedConsoleAsync();
+        var handler = HangingHandler(Options.Create(new TvOptions()));
+        var station = await LoadStationAsync(id);
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => handler.ExecuteAsync(station, cts.Token));
     }
 
     [Fact]
@@ -75,6 +134,6 @@ public class TvReviewFixTests : SessionTestBase
     {
         var id = await PairedConsoleAsync();
         await UpdateAsync(id, i => { i.Name = "PS5-renamed"; i.TvMacAddress = "AA:BB:CC:DD:EE:00"; });
-        Assert.Equal("SECRET", (await LoadAsync(id)).TvToken);
+        Assert.Equal("SECRET", (await LoadStationAsync(id)).TvToken);
     }
 }

@@ -32,7 +32,7 @@ Run `install-server.ps1` as shown above. It does the following:
 4. Opens the Windows Firewall for TCP port 5080 with the rule "Cafe Manager (TCP 5080)", for Private and Domain networks only.
 5. Starts the service, waits up to 40 seconds for it to answer, prints the addresses of the server on your network, and opens `http://localhost:5080` in the browser.
 
-Optional parameters: `-SourcePath` (folder holding `Cafe.Server.exe`, default is the `Server` folder next to the script), `-InstallPath`, `-NoBrowser`, `-NoPause`.
+Optional parameters: `-SourcePath` (folder holding `Cafe.Server.exe`, default is the `Server` folder next to the script), `-InstallPath` (must be a full path inside a folder named `CafeManager`, for example `D:\CafeManager\Server`), `-NoBrowser`, `-NoPause`.
 
 If the PC's network is classified as Public, other devices cannot reach the server and the script prints a warning. Fix it with Settings, Network & Internet, your network, Network profile type, Private. Then try the address from a phone again.
 

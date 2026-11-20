@@ -72,6 +72,38 @@ function Remove-TrailingBackslash {
     return $Path
 }
 
+# robocopy /MIR and Remove-Item -Recurse delete whatever is in the target folder, so refuse any -InstallPath that is
+# not clearly a CafeManager folder: it must be a full path with a drive letter, contain a folder named CafeManager
+# (for example C:\Program Files\CafeManager\Agent), and must not be a drive root or a Windows system folder.
+function Assert-SafeInstallPath {
+    param([string]$Path)
+    $example = 'C:\Program Files\CafeManager\Agent'
+    if ([string]::IsNullOrWhiteSpace($Path) -or $Path -notmatch '^[A-Za-z]:\\') {
+        throw "-InstallPath must be a full path that starts with a drive letter, for example $example. Got: '$Path'"
+    }
+    $full = [IO.Path]::GetFullPath($Path).TrimEnd('\')
+    $segments = @($full.Split('\') | Where-Object { $_ -ne '' })
+    if ($segments.Count -lt 2) {
+        throw "-InstallPath '$Path' is a drive root. Use a CafeManager folder, for example $example."
+    }
+    if ($segments -notcontains 'CafeManager') {
+        throw "-InstallPath '$Path' is not inside a folder named CafeManager. Use for example $example."
+    }
+    $protected = @($env:SystemRoot, $env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:ProgramData, ($env:SystemDrive + '\Users'), $env:USERPROFILE)
+    foreach ($item in $protected) {
+        if ([string]::IsNullOrWhiteSpace($item)) { continue }
+        if ($full -ieq $item.TrimEnd('\')) {
+            throw "-InstallPath '$Path' is a system folder. Use a CafeManager folder, for example $example."
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:SystemRoot)) {
+        $windowsPrefix = $env:SystemRoot.TrimEnd('\') + '\'
+        if ($full.StartsWith($windowsPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "-InstallPath '$Path' is inside the Windows folder. Use for example $example."
+        }
+    }
+}
+
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
@@ -187,6 +219,7 @@ function Remove-FolderWithRetry {
 
 function Uninstall-Agent {
     $InstallPath = Remove-TrailingBackslash $InstallPath
+    Assert-SafeInstallPath -Path $InstallPath
     if (-not (Test-IsAdministrator)) {
         Write-Host 'Administrator rights are needed. A Windows (UAC) prompt will appear: choose Yes.'
         $argList = '-NoProfile -ExecutionPolicy Bypass -File ' + (Quote-NativeArg $PSCommandPath)

@@ -111,6 +111,38 @@ function Remove-TrailingBackslash {
     return $Path
 }
 
+# robocopy /MIR and Remove-Item -Recurse delete whatever is in the target folder, so refuse any -InstallPath that is
+# not clearly a CafeManager folder: it must be a full path with a drive letter, contain a folder named CafeManager
+# (for example C:\Program Files\CafeManager\Agent), and must not be a drive root or a Windows system folder.
+function Assert-SafeInstallPath {
+    param([string]$Path)
+    $example = 'C:\Program Files\CafeManager\Agent'
+    if ([string]::IsNullOrWhiteSpace($Path) -or $Path -notmatch '^[A-Za-z]:\\') {
+        throw "-InstallPath must be a full path that starts with a drive letter, for example $example. Got: '$Path'"
+    }
+    $full = [IO.Path]::GetFullPath($Path).TrimEnd('\')
+    $segments = @($full.Split('\') | Where-Object { $_ -ne '' })
+    if ($segments.Count -lt 2) {
+        throw "-InstallPath '$Path' is a drive root. Use a CafeManager folder, for example $example."
+    }
+    if ($segments -notcontains 'CafeManager') {
+        throw "-InstallPath '$Path' is not inside a folder named CafeManager. Use for example $example."
+    }
+    $protected = @($env:SystemRoot, $env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:ProgramData, ($env:SystemDrive + '\Users'), $env:USERPROFILE)
+    foreach ($item in $protected) {
+        if ([string]::IsNullOrWhiteSpace($item)) { continue }
+        if ($full -ieq $item.TrimEnd('\')) {
+            throw "-InstallPath '$Path' is a system folder. Use a CafeManager folder, for example $example."
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:SystemRoot)) {
+        $windowsPrefix = $env:SystemRoot.TrimEnd('\') + '\'
+        if ($full.StartsWith($windowsPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "-InstallPath '$Path' is inside the Windows folder. Use for example $example."
+        }
+    }
+}
+
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
@@ -244,6 +276,7 @@ function Test-UserLoggedOn {
 function Install-Agent {
     $SourcePath = Remove-TrailingBackslash $SourcePath
     $InstallPath = Remove-TrailingBackslash $InstallPath
+    Assert-SafeInstallPath -Path $InstallPath
     # 1. Elevation
     if (-not (Test-IsAdministrator)) {
         Write-Host 'Administrator rights are needed. A Windows (UAC) prompt will appear: choose Yes.'
@@ -281,6 +314,13 @@ function Install-Agent {
     if (-not (Test-Path -LiteralPath (Join-Path $SourcePath 'Cafe.Agent.exe'))) {
         throw "Cafe.Agent.exe was not found in '$SourcePath'. Run this script from the extracted release folder, or pass -SourcePath."
     }
+
+    # Mirroring a folder into itself (or into one of its parents) would delete the source files.
+    $sourceFull = ([IO.Path]::GetFullPath((Resolve-Path -LiteralPath $SourcePath).ProviderPath)).TrimEnd('\') + '\'
+    $targetFull = ([IO.Path]::GetFullPath($InstallPath)).TrimEnd('\') + '\'
+    if ($sourceFull.StartsWith($targetFull, [StringComparison]::OrdinalIgnoreCase) -or $targetFull.StartsWith($sourceFull, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "The install path '$InstallPath' and the source folder '$SourcePath' must be different folders that do not contain each other."
+    }
     $frameworkNote = Join-Path $SourcePath 'FRAMEWORK-DEPENDENT.txt'
     if (Test-Path -LiteralPath $frameworkNote) {
         Write-Warning 'This agent build is framework-dependent: the .NET 10 Desktop Runtime must be installed on this PC.'
@@ -290,7 +330,7 @@ function Install-Agent {
     Stop-RunningAgent
     New-Item -ItemType Directory -Force -Path $InstallPath | Out-Null
     # Keep the settings and logs of an earlier install out of the mirror deletion.
-    & robocopy.exe $SourcePath $InstallPath /MIR /XF agentsettings.json /XD logs /NFL /NDL /NJH /NJS /NP | Out-Null
+    & robocopy.exe $SourcePath $InstallPath /MIR /R:3 /W:2 /XF agentsettings.json /XD logs /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) {
         throw "robocopy failed with exit code $LASTEXITCODE while copying the agent files."
     }

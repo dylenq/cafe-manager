@@ -275,6 +275,49 @@ public class TvDriverTests
         Assert.Equal(IPAddress.Parse("192.168.1.255"), WakeOnLan.SubnetBroadcast(IPAddress.Parse("192.168.1.50")));
     }
 
+    private static WakeOnLan.LocalInterface Nic(string address, string mask) => new(IPAddress.Parse(address), IPAddress.Parse(mask));
+
+    [Fact]
+    public void Broadcast_targets_use_the_real_subnet_mask()
+    {
+        var targets = WakeOnLan.BroadcastTargets(IPAddress.Parse("10.1.5.20"), [Nic("10.1.4.9", "255.255.254.0")]);
+        Assert.Equal([IPAddress.Parse("10.1.5.255")], targets);
+    }
+
+    [Fact]
+    public void Broadcast_targets_cover_only_the_interfaces_that_contain_the_tv()
+    {
+        var targets = WakeOnLan.BroadcastTargets(IPAddress.Parse("192.168.1.50"),
+            [Nic("10.0.0.2", "255.0.0.0"), Nic("192.168.1.10", "255.255.255.0"), Nic("192.168.1.11", "255.255.255.0"), Nic("172.16.0.5", "255.255.0.0")]);
+        Assert.Equal([IPAddress.Parse("192.168.1.255")], targets);
+
+        var two = WakeOnLan.BroadcastTargets(IPAddress.Parse("192.168.1.50"), [Nic("192.168.1.10", "255.255.255.0"), Nic("192.168.0.10", "255.255.254.0")]);
+        Assert.Equal(["192.168.1.255"], two.Select(a => a.ToString()).Distinct());
+    }
+
+    [Fact]
+    public void Broadcast_targets_fall_back_to_slash_24_and_the_limited_broadcast()
+    {
+        var none = WakeOnLan.BroadcastTargets(IPAddress.Parse("192.168.1.50"), []);
+        Assert.Equal(["192.168.1.255", "255.255.255.255"], none.Select(a => a.ToString()));
+
+        var unrelated = WakeOnLan.BroadcastTargets(IPAddress.Parse("192.168.1.50"), [Nic("10.0.0.2", "255.255.255.0")]);
+        Assert.Equal(["192.168.1.255", "255.255.255.255"], unrelated.Select(a => a.ToString()));
+    }
+
+    [Fact]
+    public async Task Wake_on_lan_goes_to_the_broadcast_of_the_matching_interface_only()
+    {
+        _net.Interfaces.Add(Nic("10.1.4.9", "255.255.254.0"));
+        _net.Interfaces.Add(Nic("172.16.0.5", "255.255.0.0"));
+        _net.Http = () => FakeTvTransport.State("standby");
+
+        await Driver(o => o.WolRounds = 1).PowerOnAsync(Tv(ip: "10.1.5.20", token: null), default);
+
+        Assert.Equal(2, _net.Datagrams.Count);
+        Assert.All(_net.Datagrams, d => Assert.Equal("10.1.5.255", d.Target.ToString()));
+    }
+
     [Fact]
     public async Task A_tv_that_is_on_is_left_alone()
     {

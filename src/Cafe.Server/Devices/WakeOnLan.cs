@@ -43,10 +43,46 @@ public static class WakeOnLan
         return true;
     }
 
+    /// <summary>The up IPv4 interfaces of this machine: address and subnet mask.</summary>
+    public readonly record struct LocalInterface(IPAddress Address, IPAddress Mask);
+
     /// <summary>
-    /// The /24 broadcast address (a.b.c.255). An assumption: the subnet mask is not stored. 255.255.255.255 is
-    /// always sent as well.
+    /// Where to send the magic packet: the directed broadcast address of every local IPv4 interface whose subnet
+    /// contains the TV. When none matches (or the interfaces cannot be listed) it falls back to the /24 guess plus
+    /// 255.255.255.255, which leaves through the OS default interface only.
     /// </summary>
+    public static IReadOnlyList<IPAddress> BroadcastTargets(IPAddress tv, IEnumerable<LocalInterface> interfaces)
+    {
+        var tvBytes = tv.GetAddressBytes();
+        var found = new List<IPAddress>();
+        foreach (var nic in interfaces)
+        {
+            var address = nic.Address.GetAddressBytes();
+            var mask = nic.Mask.GetAddressBytes();
+            if (address.Length != 4 || mask.Length != 4 || tvBytes.Length != 4)
+            {
+                continue;
+            }
+
+            var inSubnet = true;
+            var broadcast = new byte[4];
+            for (var i = 0; i < 4; i++)
+            {
+                inSubnet &= (address[i] & mask[i]) == (tvBytes[i] & mask[i]);
+                broadcast[i] = (byte)(address[i] | ~mask[i]);
+            }
+
+            var target = new IPAddress(broadcast);
+            if (inSubnet && !found.Contains(target))
+            {
+                found.Add(target);
+            }
+        }
+
+        return found.Count > 0 ? found : [SubnetBroadcast(tv), IPAddress.Broadcast];
+    }
+
+    /// <summary>The /24 broadcast address (a.b.c.255): the fallback guess when no local interface matches the TV.</summary>
     public static IPAddress SubnetBroadcast(IPAddress address)
     {
         var b = address.GetAddressBytes();

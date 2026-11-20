@@ -230,7 +230,7 @@ public sealed class SamsungTizenDriver(ITvTransport transport, IOptions<TvOption
 
     private async Task SendMagicPacketsAsync(byte[] packet, IPAddress tv, CancellationToken ct)
     {
-        IPAddress[] targets = [IPAddress.Broadcast, WakeOnLan.SubnetBroadcast(tv)];
+        var targets = WakeOnLan.BroadcastTargets(tv, transport.GetLocalInterfaces());
         var rounds = Math.Max(1, Options.WolRounds);
         for (var round = 0; round < rounds; round++)
         {

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text;
@@ -64,6 +65,35 @@ public sealed class SamsungTvTransport : ITvTransport
     {
         using var udp = new UdpClient(AddressFamily.InterNetwork) { EnableBroadcast = true };
         await udp.SendAsync(payload, new IPEndPoint(target, port), cancellationToken);
+    }
+
+    public IReadOnlyList<WakeOnLan.LocalInterface> GetLocalInterfaces()
+    {
+        var result = new List<WakeOnLan.LocalInterface>();
+        try
+        {
+            foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (nic.OperationalStatus != OperationalStatus.Up || nic.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                {
+                    continue;
+                }
+
+                foreach (var unicast in nic.GetIPProperties().UnicastAddresses)
+                {
+                    if (unicast.Address.AddressFamily == AddressFamily.InterNetwork && unicast.IPv4Mask is { } mask)
+                    {
+                        result.Add(new WakeOnLan.LocalInterface(unicast.Address, mask));
+                    }
+                }
+            }
+        }
+        catch (Exception ex) when (ex is NetworkInformationException or PlatformNotSupportedException or InvalidOperationException)
+        {
+            // Fall back to the /24 guess plus the limited broadcast.
+        }
+
+        return result;
     }
 
     private static async Task<string> ReadLimitedAsync(HttpContent content, CancellationToken ct)

@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 4
 current_phase_name: Samsung TV Control
-status: executing
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-11-20T06:40:51.165Z"
+status: verifying
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-11-20T06:49:54.436Z"
 last_activity: 2026-11-20
 last_activity_desc: Phase 4 execution started
-state_head: ade762647b0cdc335dec0dfa7f9e917b44073499
+state_head: 447feaeba2fc4bea650e0057c8a74328995ba833
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 22
-  completed_plans: 16
+  total_plans: 27
+  completed_plans: 17
   percent: 0
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 
 Phase: 4 (Samsung TV Control) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-11-20 — Phase 4 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -68,6 +68,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 3 P01 | 25min | 2 tasks | 40 files |
 | Phase 4 P04-01 | 35min | 2 tasks | 16 files |
 | Phase 4 P02 | 25min | 2 tasks | 17 files |
+| Phase 4 P03 | 25min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,7 @@ Recent decisions affecting current work:
 - [Phase 3]: Agent hub gated only by shared-key middleware; /hubs exempt from setup gate
 - [Phase 4]: TV no-token marker is '-'; certificate bypass only in SamsungTvTransport; state reads not serialised per TV
 - [Phase 4]: TV actions run through TvActionQueue (latest wins per station) and TvControlService (audit, cache, notice); AgentCommandKind TvPowerOn=5, TvPowerOff=6
+- [Phase 4]: 04-03: Home Notice gains optional Warning flag for TV failure notices
 
 ### Pending Todos
 
@@ -112,6 +114,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-20T06:40:51.149Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-11-20T06:49:54.419Z
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None

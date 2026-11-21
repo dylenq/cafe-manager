@@ -7,7 +7,7 @@ Only run the scripts from the bundle you built yourself or received directly fro
 ## What you need
 
 - A Windows 10 or 11 PC at the front desk to act as the server. It must stay on whenever the cafe is open. Give it a fixed address on your network: in your router, find the DHCP reservation (or "address reservation") page, pick this PC and reserve its current address. Without this the address can change after a reboot and every gaming PC would lose the server.
-- The release zip, `CafeManager-1.0.0-win-x64.zip`, copied to the server PC (a USB stick is fine).
+- The two release packages: `CafeManager-1.0.0-FrontDesk.zip` for the server PC and `CafeManager-1.0.0-GamingPC.zip` for every gaming PC (a USB stick is fine). Each has a short `README.txt` with the same steps in plain language. The full `CafeManager-1.0.0-win-x64.zip` contains both plus the agent simulator.
 - Administrator rights on the server PC and on every gaming PC.
 - The gaming PCs on the same local network (same router) as the server. No internet connection is needed to run the cafe.
 - Samsung smart TVs on the same network for console stations.
@@ -16,7 +16,7 @@ Preparing the zip:
 
 1. Right-click the zip, choose Properties, tick Unblock (if shown), press OK. Then extract it, for example to `C:\CafeManager-Setup`. If you already extracted it, open PowerShell in that folder and run `Get-ChildItem -Recurse . | Unblock-File`.
 2. The programs are unsigned, so Windows SmartScreen may show "Windows protected your PC". Choose More info, then Run anyway.
-3. Run each script from PowerShell (or a Command Prompt) opened in the extracted folder, using the form below. Each script asks for administrator rights itself and shows a Windows (UAC) prompt: choose Yes.
+3. The simplest way is to double-click `Install Cafe Manager Server.cmd` (front desk) or `Install on this Gaming PC.cmd` (gaming PC) in the extracted folder; the gaming PC one asks for its settings. To pass parameters instead, run each script from PowerShell (or a Command Prompt) opened in the extracted folder, using the form below. Each script asks for administrator rights itself and shows a Windows (UAC) prompt: choose Yes.
 
 ```
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install-server.ps1
@@ -78,7 +78,7 @@ The agent keeps the PC locked until a session is started and locks it again when
 1. Copy the extracted bundle (or at least `install-agent.ps1` and the `Agent` folder) to the gaming PC.
 2. On the server open Settings, find the PC agents card, and use the copy button next to the shared key. Do not share this key outside the cafe.
 3. Choose an emergency unlock code of at least 6 characters. Staff type it on the lock screen if the server is unreachable.
-4. On the gaming PC, in the extracted folder, run (replace the placeholders with your own values):
+4. Sign in as the player account and double-click `Install on this Gaming PC.cmd`. It asks for the player account (Enter keeps the signed-in one), the server address (a bare IP such as `192.168.1.10` becomes `http://192.168.1.10:5080`), the shared key and the emergency code (twice). Or run it with parameters (replace the placeholders with your own values):
 
    ```
    powershell -NoProfile -ExecutionPolicy Bypass -File .\install-agent.ps1 -ServerUrl http://192.168.1.10:5080 -SharedKey <shared-key-from-settings> -EmergencyCode <your-emergency-code> -MachineId PC-01 -GamingUser gamer

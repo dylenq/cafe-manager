@@ -55,6 +55,10 @@ $FirewallRuleName = 'Cafe Manager (TCP 5080)'
 $Port = 5080
 $DataPath = Join-Path $env:ProgramData 'CafeManager'
 
+# Files extracted from a zip downloaded from the internet carry a "blocked" mark; clear it on the release folder so
+# the service program can start without a SmartScreen prompt for every file.
+Get-ChildItem -LiteralPath $PSScriptRoot -Recurse -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
+
 function Wait-ForEnter {
     if (-not $NoPause) {
         [void](Read-Host 'Press Enter to close this window')

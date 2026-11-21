@@ -6,10 +6,16 @@ Contents
   Agent/                The agent program (runs on every gaming PC)
   docs/                 INSTALL.md and USER-GUIDE.md
   tools/AgentSim-*/     Agent simulator for testing without gaming PCs
+  Install Cafe Manager Server.cmd    Double-click on the front-desk PC
+  Install on this Gaming PC.cmd      Double-click on each gaming PC (asks 4 questions)
   install-server.ps1    Installs the server as a Windows service
   uninstall-server.ps1  Removes the server (keeps your data unless told otherwise)
   install-agent.ps1     Installs the agent on a gaming PC
   uninstall-agent.ps1   Removes the agent from a gaming PC
+
+The cafe does not need this zip: give them CafeManager-<version>-FrontDesk.zip and
+CafeManager-<version>-GamingPC.zip, which contain only what each kind of PC needs and a
+plain-language README.txt.
 
 Quick start
   1. Extract this zip (for example to C:\CafeManager-Setup).

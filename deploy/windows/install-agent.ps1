@@ -26,7 +26,9 @@
     (outbound connections are allowed by default).
 
 .PARAMETER ServerUrl
-    Address of the server, for example http://192.168.1.10:5080.
+    Address of the server, for example http://192.168.1.10:5080. A bare IP address or name is accepted and becomes
+    http://<address>:5080. When ServerUrl, SharedKey or EmergencyCode is left out, the script asks for it, so the
+    "Install on this Gaming PC.cmd" launcher can be double-clicked without any arguments.
 
 .PARAMETER SharedKey
     The agent shared key from the server's Settings page.
@@ -52,16 +54,9 @@
 #Requires -Version 5.1
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)]
-    [string]$ServerUrl,
-
-    [Parameter(Mandatory = $true)]
-    [ValidateNotNullOrEmpty()]
-    [string]$SharedKey,
-
-    [Parameter(Mandatory = $true)]
-    [ValidateLength(6, 200)]
-    [string]$EmergencyCode,
+    [string]$ServerUrl = '',
+    [string]$SharedKey = '',
+    [string]$EmergencyCode = '',
 
     [string]$MachineId = '',
     [string]$GamingUser = '',
@@ -86,6 +81,65 @@ $PolicyKeyPath = 'Software\Microsoft\Windows\CurrentVersion\Policies\System'
 if ([string]::IsNullOrWhiteSpace($GamingUser)) {
     $GamingUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name
     $ScriptArguments['GamingUser'] = $GamingUser
+}
+
+# Files extracted from a zip downloaded from the internet carry a "blocked" mark that makes Windows refuse or warn
+# about them; clear it on the release folder so the agent program itself can run.
+Get-ChildItem -LiteralPath $PSScriptRoot -Recurse -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
+
+# Turns "192.168.1.10" or "frontdesk" into "http://192.168.1.10:5080"; a full http(s) address is kept as typed.
+function ConvertTo-ServerUrl {
+    param([string]$Value)
+    $v = $Value.Trim().TrimEnd('/')
+    if ($v -eq '') { return '' }
+    if ($v -notmatch '^[A-Za-z][A-Za-z0-9+.-]*://') {
+        if ($v -notmatch ':\d+$') { $v = $v + ':5080' }
+        $v = 'http://' + $v
+    }
+    return $v
+}
+
+# Ask for anything that was not passed on the command line (double-click install). This runs before elevation and
+# the answers are handed to the elevated run as parameters.
+$NeedsPrompt = [string]::IsNullOrWhiteSpace($ServerUrl) -or [string]::IsNullOrWhiteSpace($SharedKey) -or [string]::IsNullOrWhiteSpace($EmergencyCode)
+if ($NoPause -and ($NeedsPrompt -or $EmergencyCode.Length -lt 6)) {
+    # Unattended run: never wait for typed answers.
+    Write-Host 'ERROR: -ServerUrl, -SharedKey and -EmergencyCode (at least 6 characters) are required with -NoPause.' -ForegroundColor Red
+    exit 1
+}
+if ($NeedsPrompt) {
+    Write-Host ''
+    Write-Host '== Cafe Manager - set up this gaming PC ==' -ForegroundColor Cyan
+    Write-Host 'You need two things from the front-desk app (Settings page): the server address and the shared key.'
+    Write-Host ''
+}
+if (-not $ScriptArguments.ContainsKey('GamingUser') -or $NeedsPrompt) {
+    if ($NeedsPrompt) {
+        $answer = Read-Host "Windows account the players use on this PC [press Enter for $GamingUser]"
+        if (-not [string]::IsNullOrWhiteSpace($answer)) { $GamingUser = $answer.Trim() }
+    }
+    $ScriptArguments['GamingUser'] = $GamingUser
+}
+while ([string]::IsNullOrWhiteSpace($ServerUrl)) {
+    $ServerUrl = ConvertTo-ServerUrl (Read-Host 'Server address (for example 192.168.1.10)')
+}
+$ServerUrl = ConvertTo-ServerUrl $ServerUrl
+$ScriptArguments['ServerUrl'] = $ServerUrl
+while ([string]::IsNullOrWhiteSpace($SharedKey)) {
+    $SharedKey = (Read-Host 'Shared key (front-desk app: Settings > PC agents)').Trim()
+    $ScriptArguments['SharedKey'] = $SharedKey
+}
+while ($EmergencyCode.Length -lt 6) {
+    $first = Read-Host 'Choose an emergency unlock code (at least 6 characters, keep it secret)'
+    if ($first.Length -lt 6) { Write-Host 'The code must be at least 6 characters.' -ForegroundColor Yellow; continue }
+    $second = Read-Host 'Type the emergency code again'
+    if ($first -cne $second) { Write-Host 'The two codes did not match. Try again.' -ForegroundColor Yellow; continue }
+    $EmergencyCode = $first
+    $ScriptArguments['EmergencyCode'] = $EmergencyCode
+}
+if ($EmergencyCode.Length -gt 200) {
+    Write-Host 'ERROR: the emergency code must be at most 200 characters.' -ForegroundColor Red
+    exit 1
 }
 
 function Wait-ForEnter {

@@ -44,8 +44,21 @@ $PolicyKeyPath = 'Software\Microsoft\Windows\CurrentVersion\Policies\System'
 $AgentDataPath = Join-Path $env:ProgramData 'CafeManager\agent'
 
 # Capture the invoking user BEFORE elevation and pass it through.
+# When run without arguments (double-click), suggest the account the agent task runs for, else the current user.
 if ([string]::IsNullOrWhiteSpace($GamingUser)) {
-    $GamingUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $suggested = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    try {
+        $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
+        if (-not [string]::IsNullOrWhiteSpace($existing.Principal.UserId)) { $suggested = $existing.Principal.UserId }
+    }
+    catch {
+        Write-Verbose 'The agent task could not be read; suggesting the current user.'
+    }
+    $GamingUser = $suggested
+    if (-not $NoPause) {
+        $answer = Read-Host "Windows account the players use on this PC [press Enter for $suggested]"
+        if (-not [string]::IsNullOrWhiteSpace($answer)) { $GamingUser = $answer.Trim() }
+    }
     $ScriptArguments['GamingUser'] = $GamingUser
 }
 

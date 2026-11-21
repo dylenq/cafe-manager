@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Builds the Cafe Manager release bundle: dist/CafeManager-<version>-win-x64.zip
+# Builds the Cafe Manager release: dist/CafeManager-<version>-win-x64.zip (everything, for the installer/developer)
+# plus the two packages handed to the cafe: dist/CafeManager-<version>-FrontDesk.zip and -GamingPC.zip.
 # Env: SKIP_TESTS=1 skips the test suite; CAFE_ALLOW_MISSING_DOCS=1 allows a bundle without docs/INSTALL.md and docs/USER-GUIDE.md.
 set -euo pipefail
 
@@ -23,6 +24,10 @@ if [ "${SKIP_TESTS:-0}" = "1" ]; then
   ZIP_SUFFIX="-untested"
 fi
 ZIP="dist/${BUNDLE}${ZIP_SUFFIX}.zip"
+FRONT="CafeManager-${VERSION}-FrontDesk"
+GAMING="CafeManager-${VERSION}-GamingPC"
+FRONT_ZIP="dist/${FRONT}${ZIP_SUFFIX}.zip"
+GAMING_ZIP="dist/${GAMING}${ZIP_SUFFIX}.zip"
 echo "== Cafe Manager release ${VERSION} =="
 
 # Fail fast on an unsupported host before the long publish steps run.
@@ -42,7 +47,7 @@ else
 fi
 
 echo "[b] Cleaning ${STAGE} and ${ZIP}"
-rm -rf "$STAGE" "$ZIP"
+rm -rf "$STAGE" "$ZIP" "$FRONT_ZIP" "$GAMING_ZIP"
 mkdir -p "$STAGE/$BUNDLE"
 
 echo "[c] Publishing the server (win-x64, self-contained)"
@@ -67,7 +72,7 @@ dotnet publish src/Cafe.AgentSim -c Release -r "$RID" --self-contained false --n
   -o "$STAGE/$BUNDLE/tools/AgentSim-$RID"
 
 echo "[f] Adding scripts, docs and README"
-cp deploy/windows/*.ps1 "$STAGE/$BUNDLE/"
+cp deploy/windows/*.ps1 deploy/windows/*.cmd "$STAGE/$BUNDLE/"
 mkdir -p "$STAGE/$BUNDLE/docs"
 if [ ! -f docs/INSTALL.md ] || [ ! -f docs/USER-GUIDE.md ]; then
   if [ "${CAFE_ALLOW_MISSING_DOCS:-0}" = "1" ]; then
@@ -81,6 +86,18 @@ if ls docs/*.md >/dev/null 2>&1; then
   cp docs/*.md "$STAGE/$BUNDLE/docs/"
 fi
 cp build/bundle-README.txt "$STAGE/$BUNDLE/README.txt"
+
+echo "[f2] Staging the client packages (front desk, gaming PC)"
+B="$STAGE/$BUNDLE"
+mkdir -p "$STAGE/$FRONT" "$STAGE/$GAMING"
+cp -R "$B/Server" "$B/docs" "$STAGE/$FRONT/"
+cp "$B/install-server.ps1" "$B/uninstall-server.ps1" \
+  "$B/Install Cafe Manager Server.cmd" "$B/Uninstall Cafe Manager Server.cmd" "$STAGE/$FRONT/"
+cp build/client/README-FrontDesk.txt "$STAGE/$FRONT/README.txt"
+cp -R "$B/Agent" "$STAGE/$GAMING/"
+cp "$B/install-agent.ps1" "$B/uninstall-agent.ps1" \
+  "$B/Install on this Gaming PC.cmd" "$B/Uninstall from this Gaming PC.cmd" "$STAGE/$GAMING/"
+cp build/client/README-GamingPC.txt "$STAGE/$GAMING/README.txt"
 
 echo "[g] Safety scan"
 BAD="$(find "$STAGE" \( -name '*.db' -o -name '*.db-wal' -o -name '*.db-shm' -o -name '*.sqlite' -o -name '*.sqlite3' -o -name '*.tmp' \) -print)"
@@ -102,22 +119,30 @@ while IFS= read -r d; do
   fi
 done < <(find "$STAGE" -type d -name logs -print)
 
-echo "[h] Zipping ${ZIP}"
+echo "[h] Zipping ${ZIP}, ${FRONT_ZIP} and ${GAMING_ZIP}"
 mkdir -p dist
-if command -v zip >/dev/null 2>&1; then
-  ZIP_ABS="$(pwd)/${ZIP}"
-  rm -f "$ZIP_ABS"
-  (cd "$STAGE" && zip -r -X -q "$ZIP_ABS" "$BUNDLE")
-elif command -v ditto >/dev/null 2>&1; then
-  ditto -c -k --keepParent "$STAGE/$BUNDLE" "$ZIP"
-else
-  echo "ERROR: neither zip nor ditto is available" >&2
-  exit 1
-fi
+make_zip() { # $1 folder name under $STAGE, $2 zip path relative to the repo root
+  if command -v zip >/dev/null 2>&1; then
+    local abs
+    abs="$(pwd)/$2"
+    rm -f "$abs"
+    (cd "$STAGE" && zip -r -X -q "$abs" "$1")
+  elif command -v ditto >/dev/null 2>&1; then
+    ditto -c -k --keepParent "$STAGE/$1" "$2"
+  else
+    echo "ERROR: neither zip nor ditto is available" >&2
+    exit 1
+  fi
+}
+make_zip "$BUNDLE" "$ZIP"
+make_zip "$FRONT" "$FRONT_ZIP"
+make_zip "$GAMING" "$GAMING_ZIP"
 
 echo "[i] Result"
 echo "Zip:    $ROOT/$ZIP"
 echo "Size:   $(du -h "$ZIP" | cut -f1)"
 echo "Agent:  $AGENT_MODE"
 unzip -l "$ZIP" | sed -n '1,40p'
-echo "SHA-256: $(shasum -a 256 "$ZIP" | cut -d' ' -f1)"
+for z in "$ZIP" "$FRONT_ZIP" "$GAMING_ZIP"; do
+  echo "$(du -h "$z" | cut -f1)  $(shasum -a 256 "$z" | cut -d' ' -f1)  $z"
+done

@@ -1,0 +1,55 @@
+1
+00:00:00,004 --> 00:00:00,903
+Cafe Manager.
+
+2
+00:00:00,903 --> 00:00:03,394
+The front desk for your gaming cafe.
+
+3
+00:00:04,647 --> 00:00:07,929
+Every PC and every console, live on one screen.
+
+4
+00:00:08,282 --> 00:00:12,057
+Start a session with one tap, and the PC unlocks instantly.
+
+5
+00:00:12,408 --> 00:00:16,418
+Members, prepaid hours and open-ended play are priced automatically.
+
+6
+00:00:20,713 --> 00:00:23,734
+Snacks and drinks go straight onto the customer's bill.
+
+7
+00:00:28,659 --> 00:00:30,095
+And when time runs out?
+
+8
+00:00:36,522 --> 00:00:41,567
+The customer is warned, gets a short grace period, and then the PC locks itself.
+
+9
+00:00:41,567 --> 00:00:43,396
+Consoles switch off their TV.
+
+10
+00:00:48,550 --> 00:00:52,012
+Stop, settle in cash or card, and print a receipt.
+
+11
+00:00:57,637 --> 00:01:01,239
+See your revenue by day, by product and by payment method.
+
+12
+00:01:02,003 --> 00:01:07,212
+It runs on your own server in the cafe, so it keeps working even when the internet is down.
+
+13
+00:01:07,565 --> 00:01:08,564
+Cafe Manager.
+
+14
+00:01:08,564 --> 00:01:11,791
+Simple, reliable, and built for your cafe.

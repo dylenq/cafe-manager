@@ -1,459 +1,459 @@
 1
-00:00:00,004 --> 00:00:01,452
+00:00:00,008 --> 00:00:01,583
 Welcome to Cafe Manager.
 
 2
-00:00:01,452 --> 00:00:15,086
+00:00:01,583 --> 00:00:16,419
 This video walks you through everything your front desk needs: starting and billing timed sessions, locking PCs and switching off console TVs when time runs out, members and prepaid time, food and drinks, receipts and reports.
 
 3
-00:00:15,437 --> 00:00:21,250
+00:00:16,769 --> 00:00:22,297
 Everything runs on one computer inside the cafe, so it keeps working even when the internet is down.
 
 4
-00:00:22,204 --> 00:00:23,784
+00:00:23,251 --> 00:00:24,344
 First, logging in.
 
 5
-00:00:24,536 --> 00:00:27,782
+00:00:25,097 --> 00:00:28,280
 Open the Cafe Manager address on the front desk computer.
 
 6
-00:00:27,782 --> 00:00:30,288
+00:00:28,280 --> 00:00:30,736
 Your owner will usually bookmark it for you.
 
 7
-00:00:30,639 --> 00:00:33,569
+00:00:31,088 --> 00:00:33,988
 Type the shared staff password and press Log in.
 
 8
-00:00:33,569 --> 00:00:39,613
+00:00:33,988 --> 00:00:39,970
 After five wrong tries in five minutes, that device is blocked for five minutes, so take your time.
 
 9
-00:00:39,966 --> 00:00:40,965
+00:00:40,322 --> 00:00:41,023
 The dashboard.
 
 10
-00:00:41,716 --> 00:00:43,621
+00:00:41,776 --> 00:00:43,763
 The dashboard is your home screen.
 
 11
-00:00:43,621 --> 00:00:50,737
+00:00:43,763 --> 00:00:51,183
 Every station in the cafe has its own card, and the cards update live, so every screen at the desk always shows the same thing.
 
 12
-00:00:51,089 --> 00:00:59,158
+00:00:51,534 --> 00:00:59,178
 The badge in the corner shows the status: Idle means free, In session, Paused, Expiring when time is nearly up, or Offline.
 
 13
-00:00:59,509 --> 00:01:04,666
+00:00:59,529 --> 00:01:05,086
 Console stations also show the TV status, with buttons to switch the TV on or off.
 
 14
-00:01:04,666 --> 00:01:09,006
+00:01:05,086 --> 00:01:09,763
 There is no real TV connected in this demo, so they show Unreachable.
 
 15
-00:01:09,358 --> 00:01:13,444
+00:01:10,113 --> 00:01:14,451
 In the bottom corner of this video you can see the screen of a gaming PC.
 
 16
-00:01:13,444 --> 00:01:16,298
+00:01:14,451 --> 00:01:17,481
 Right now it is locked, waiting for the front desk.
 
 17
-00:01:16,649 --> 00:01:23,652
+00:01:17,833 --> 00:01:24,569
 One more thing: press Enable sound once at the start of your shift, so you hear the alarm when a station runs out of time.
 
 18
-00:01:24,003 --> 00:01:25,260
+00:01:24,921 --> 00:01:25,827
 Starting a session.
 
 19
-00:01:26,011 --> 00:01:28,208
+00:01:26,580 --> 00:01:28,763
 A customer wants one hour on PC 3.
 
 20
-00:01:28,208 --> 00:01:35,574
+00:01:28,763 --> 00:01:36,083
 On the card, press one of the quick buttons: thirty, sixty, a hundred and twenty, or a hundred and eighty minutes.
 
 21
-00:01:35,926 --> 00:01:39,917
+00:01:36,434 --> 00:01:40,484
 The PC unlocks within a second, and the countdown starts on the card.
 
 22
-00:01:39,917 --> 00:01:42,347
+00:01:40,484 --> 00:01:42,949
 The charge is shown and updates as you go.
 
 23
-00:01:42,698 --> 00:01:46,403
+00:01:43,299 --> 00:01:46,338
 For any other length, type the minutes in the box and press Start.
 
 24
-00:01:46,755 --> 00:01:48,180
+00:01:46,691 --> 00:01:47,882
 Extending and pausing.
 
 25
-00:01:48,932 --> 00:01:50,186
+00:01:48,634 --> 00:01:49,836
 They want more time?
 
 26
-00:01:50,186 --> 00:01:55,702
+00:01:49,836 --> 00:01:55,124
 Press plus fifteen, plus thirty or plus sixty, or type your own number and press Extend.
 
 27
-00:01:55,702 --> 00:01:58,021
+00:01:55,124 --> 00:01:57,348
 The new time goes straight to the PC.
 
 28
-00:01:58,372 --> 00:02:00,992
+00:01:57,699 --> 00:01:59,941
 If a customer steps out, press Pause.
 
 29
-00:02:00,992 --> 00:02:05,381
+00:01:59,941 --> 00:02:03,697
 The clock stops, the PC locks, and paused time is not charged.
 
 30
-00:02:05,733 --> 00:02:07,461
+00:02:04,048 --> 00:02:05,385
 Press Resume when they are back.
 
 31
-00:02:07,813 --> 00:02:09,779
+00:02:05,737 --> 00:02:07,623
 Members and open-ended sessions.
 
 32
-00:02:10,532 --> 00:02:16,395
+00:02:08,375 --> 00:02:14,228
 To attach a customer, search by name or phone number in the customer box, and pick them from the list.
 
 33
-00:02:16,745 --> 00:02:20,376
+00:02:14,579 --> 00:02:18,039
 Alex is a member, so the member rate is applied automatically.
 
 34
-00:02:20,726 --> 00:02:24,077
+00:02:18,391 --> 00:02:21,809
 Press Start open ended when the customer will pay at the end.
 
 35
-00:02:24,077 --> 00:02:27,922
+00:02:21,809 --> 00:02:25,731
 The clock counts up instead of down, and it never runs out on its own.
 
 36
-00:02:28,275 --> 00:02:30,725
+00:02:26,081 --> 00:02:28,448
 Customers can also buy prepaid hours.
 
 37
-00:02:30,725 --> 00:02:33,174
+00:02:28,448 --> 00:02:30,815
 Jordan has five hours on his balance.
 
 38
-00:02:33,526 --> 00:02:37,013
+00:02:31,167 --> 00:02:34,532
 Pick Jordan, check the minutes, and press Start from balance.
 
 39
-00:02:37,013 --> 00:02:40,501
+00:02:34,532 --> 00:02:37,896
 The time is taken from the balance instead of being paid now.
 
 40
-00:02:40,853 --> 00:02:42,018
+00:02:38,249 --> 00:02:39,132
 Moving a session.
 
 41
-00:02:42,769 --> 00:02:45,821
+00:02:39,884 --> 00:02:43,077
 A PC has a problem, or friends want to sit together?
 
 42
-00:02:45,821 --> 00:02:48,873
+00:02:43,077 --> 00:02:46,271
 Choose a free station under Move to, and press Move.
 
 43
-00:02:48,873 --> 00:02:53,099
+00:02:46,271 --> 00:02:50,692
 The session carries on at the new station with the same time and charge.
 
 44
-00:02:53,450 --> 00:02:55,307
+00:02:51,045 --> 00:02:52,579
 Controlling a PC remotely.
 
 45
-00:02:56,763 --> 00:02:59,433
+00:02:54,030 --> 00:02:56,667
 Every PC card has a menu with three dots.
 
 46
-00:02:59,433 --> 00:03:04,968
+00:02:56,667 --> 00:03:02,133
 From here you can lock or unlock the PC, restart it, shut it down, or send a message.
 
 47
-00:03:05,319 --> 00:03:07,970
+00:03:02,486 --> 00:03:05,182
 Let's tell PC 3 that their noodles are ready.
 
 48
-00:03:12,160 --> 00:03:16,932
+00:03:09,344 --> 00:03:14,043
 The message pops up in the corner of the customer's screen, without interrupting their game.
 
 49
-00:03:17,284 --> 00:03:18,575
+00:03:14,395 --> 00:03:15,500
 When time runs out.
 
 50
-00:03:19,326 --> 00:03:23,470
+00:03:16,253 --> 00:03:20,441
 Now the most important part: what happens when paid time runs out.
 
 51
-00:03:23,470 --> 00:03:27,992
+00:03:20,441 --> 00:03:25,009
 Let's start a very short one minute session on PC 1, so we can watch it.
 
 52
-00:03:28,342 --> 00:03:32,672
+00:03:25,361 --> 00:03:29,864
 Before the end, the customer sees a countdown in the corner of their screen.
 
 53
-00:03:32,672 --> 00:03:36,262
+00:03:29,864 --> 00:03:33,598
 Warnings are shown at ten, five and one minutes before the end.
 
 54
-00:03:36,262 --> 00:03:39,852
+00:03:33,598 --> 00:03:37,331
 At the desk, the station appears in the alert strip at the top.
 
 55
-00:03:40,202 --> 00:03:43,323
+00:03:37,682 --> 00:03:40,424
 Press Acknowledge to tell the rest of the team you have seen it.
 
 56
-00:03:48,463 --> 00:03:52,257
+00:03:45,501 --> 00:03:49,450
 At zero, the card shows Time up and a short grace period begins.
 
 57
-00:03:52,257 --> 00:03:56,288
+00:03:49,450 --> 00:03:53,646
 The customer's countdown turns red, telling them to save their work.
 
 58
-00:03:56,288 --> 00:04:00,615
+00:03:53,646 --> 00:03:58,150
 If they want more time, just press Extend now and nothing is interrupted.
 
 59
-00:04:06,919 --> 00:04:10,116
+00:04:04,354 --> 00:04:07,313
 When the grace period ends, the PC locks itself.
 
 60
-00:04:10,116 --> 00:04:13,179
+00:04:07,313 --> 00:04:10,149
 For a console, the TV is switched off instead.
 
 61
-00:04:13,530 --> 00:04:19,536
+00:04:10,500 --> 00:04:16,932
 And this also works if the network goes down: the PC keeps counting on its own and still locks at zero.
 
 62
-00:04:19,536 --> 00:04:22,918
+00:04:16,932 --> 00:04:20,553
 The amount owed is waiting on the POS page as an open tab.
 
 63
-00:04:23,270 --> 00:04:24,991
+00:04:20,905 --> 00:04:22,270
 Stopping and taking payment.
 
 64
-00:04:25,743 --> 00:04:26,591
+00:04:23,022 --> 00:04:23,873
 PC 3 is done.
 
 65
-00:04:26,591 --> 00:04:27,308
+00:04:23,873 --> 00:04:24,594
 Press Stop.
 
 66
-00:04:27,308 --> 00:04:32,719
+00:04:24,594 --> 00:04:30,030
 The panel shows the final charge, including any food and drinks added to their tab.
 
 67
-00:04:33,070 --> 00:04:35,541
+00:04:30,382 --> 00:04:32,465
 Press Stop and settle to take payment now.
 
 68
-00:04:35,892 --> 00:04:37,400
+00:04:32,816 --> 00:04:34,252
 You can split a payment.
 
 69
-00:04:37,400 --> 00:04:43,745
+00:04:34,252 --> 00:04:40,296
 Here the customer pays five dollars in cash, so choose Cash, enter the amount, and press Add payment.
 
 70
-00:04:44,096 --> 00:04:47,624
+00:04:40,648 --> 00:04:43,878
 Then press Rest by card for the remainder, and Record payment.
 
 71
-00:04:48,218 --> 00:04:51,394
+00:04:44,820 --> 00:04:47,904
 The payment is saved and a receipt number is created.
 
 72
-00:04:51,394 --> 00:04:53,311
+00:04:47,904 --> 00:04:49,765
 You can print it, or press Done.
 
 73
-00:04:53,311 --> 00:04:54,929
+00:04:49,765 --> 00:04:51,336
 The PC locks straight away.
 
 74
-00:04:55,280 --> 00:04:58,979
+00:04:51,688 --> 00:04:55,381
 If someone will pay later, press Stop, then Stop, pay later.
 
 75
-00:04:58,979 --> 00:05:02,185
+00:04:55,381 --> 00:04:58,582
 The amount stays on an open tab until it is settled.
 
 76
-00:05:02,536 --> 00:05:03,641
+00:04:58,934 --> 00:04:59,798
 Food and drinks.
 
 77
-00:05:06,360 --> 00:05:08,874
+00:05:02,514 --> 00:05:05,023
 Open the POS page to sell food and drinks.
 
 78
-00:05:08,874 --> 00:05:13,842
+00:05:05,023 --> 00:05:09,982
 Tap a product to add it to the cart, and use plus and minus to change the quantity.
 
 79
-00:05:14,192 --> 00:05:16,839
+00:05:10,334 --> 00:05:12,643
 For a walk-in customer, press Charge now.
 
 80
-00:05:16,839 --> 00:05:21,810
+00:05:12,643 --> 00:05:16,979
 When paying cash, type what they hand you, and Cafe Manager shows the change.
 
 81
-00:05:24,415 --> 00:05:30,449
+00:05:20,566 --> 00:05:26,844
 To put items on someone's session instead, choose Active session, pick the station, and press Add to tab.
 
 82
-00:05:30,449 --> 00:05:33,552
+00:05:26,844 --> 00:05:30,073
 It will be added to their bill when the session stops.
 
 83
-00:05:33,902 --> 00:05:35,750
+00:05:30,423 --> 00:05:32,366
 Open tabs are listed on the right.
 
 84
-00:05:35,750 --> 00:05:40,316
+00:05:32,366 --> 00:05:37,165
 Press Settle to take payment for any of them, like the session that expired earlier.
 
 85
-00:05:40,667 --> 00:05:42,292
+00:05:37,517 --> 00:05:38,914
 Customers and packages.
 
 86
-00:05:45,009 --> 00:05:48,562
+00:05:41,644 --> 00:05:45,075
 On the Customers page you can search, add and edit customers.
 
 87
-00:05:48,562 --> 00:05:50,542
+00:05:45,075 --> 00:05:46,987
 Tick Member when you add a member.
 
 88
-00:05:50,892 --> 00:05:55,889
+00:05:47,339 --> 00:05:51,840
 Open a customer to see their balance, purchases, receipts and recent sessions.
 
 89
-00:05:56,241 --> 00:05:59,986
+00:05:52,192 --> 00:05:56,075
 To sell a package of hours, choose the package and press Sell package.
 
 90
-00:05:59,986 --> 00:06:04,426
+00:05:56,075 --> 00:06:00,679
 Take the payment, and the minutes are added to their balance as soon as it is paid.
 
 91
-00:06:04,777 --> 00:06:06,243
+00:06:01,031 --> 00:06:02,211
 Sessions and reports.
 
 92
-00:06:08,953 --> 00:06:14,474
+00:06:04,921 --> 00:06:10,473
 The Sessions page lists every session, with its start and end, why it ended, and what it cost.
 
 93
-00:06:14,474 --> 00:06:17,940
+00:06:10,473 --> 00:06:13,957
 Press Events to see exactly what happened during a session.
 
 94
-00:06:20,249 --> 00:06:28,244
+00:06:16,286 --> 00:06:23,558
 Reports show the money collected for any period: today, this week, this month, or a custom range, split into cash and card.
 
 95
-00:06:28,595 --> 00:06:35,353
+00:06:23,910 --> 00:06:30,689
 Scroll down for revenue by day and week, by station type, by product and category, and by payment method.
 
 96
-00:06:35,353 --> 00:06:39,278
+00:06:30,689 --> 00:06:34,627
 Every table can be exported to a spreadsheet with Export CSV.
 
 97
-00:06:39,631 --> 00:06:41,271
+00:06:34,980 --> 00:06:36,058
 Setup, for the owner.
 
 98
-00:06:42,023 --> 00:06:45,390
+00:06:36,811 --> 00:06:40,170
 The pages under Setup are normally used by the owner only.
 
 99
-00:06:47,700 --> 00:06:52,346
+00:06:42,488 --> 00:06:46,508
 Station types set the hourly price, with an optional cheaper member price.
 
 100
-00:06:54,667 --> 00:06:57,574
+00:06:48,820 --> 00:06:52,066
 Stations is where each PC and console is added.
 
 101
-00:06:57,574 --> 00:07:00,419
+00:06:52,066 --> 00:06:55,243
 A PC is linked to its agent by its machine ID.
 
 102
-00:07:00,419 --> 00:07:05,676
+00:06:55,243 --> 00:07:01,113
 A console needs the TV's network address, and is paired once with the Pair TV button.
 
 103
-00:07:07,981 --> 00:07:12,414
+00:07:03,433 --> 00:07:07,860
 Products are the food and drinks sold on the POS page, grouped by category.
 
 104
-00:07:14,733 --> 00:07:19,609
+00:07:10,167 --> 00:07:14,926
 Packages are prepaid bundles of hours, for one station type or for any station.
 
 105
-00:07:21,914 --> 00:07:28,632
+00:07:17,233 --> 00:07:23,708
 Rate rules change the price at certain times, for example a weekend evening price, or a cheaper rate in the morning.
 
 106
-00:07:30,947 --> 00:07:40,575
+00:07:26,019 --> 00:07:35,785
 Settings holds the grace period and warning times, the key used to connect gaming PCs, the TV power-off option, the receipt printer, and the nightly backups.
 
 107
-00:07:40,926 --> 00:07:42,363
+00:07:36,137 --> 00:07:37,256
 If something goes wrong.
 
 108
-00:07:45,081 --> 00:07:50,768
+00:07:39,967 --> 00:07:46,186
 If a PC card says Agent offline, check that the PC is switched on and connected to the network.
 
 109
-00:07:50,768 --> 00:07:52,444
+00:07:46,186 --> 00:07:48,018
 It will reconnect by itself.
 
 110
-00:07:52,444 --> 00:07:56,874
+00:07:48,018 --> 00:07:52,863
 If a TV shows Unreachable, check it is plugged in and on the cafe network.
 
 111
-00:07:57,224 --> 00:08:03,702
+00:07:53,214 --> 00:08:00,090
 And if a PC is ever stuck locked with the server down, staff can use the emergency unlock code on the lock screen.
 
 112
-00:08:03,702 --> 00:08:05,293
+00:08:00,090 --> 00:08:01,779
 Ask your owner for the code.
 
 113
-00:08:05,293 --> 00:08:08,191
+00:08:01,779 --> 00:08:04,855
 The full staff guide is included with the software.
 
 114
-00:08:08,543 --> 00:08:09,115
+00:08:05,208 --> 00:08:05,689
 That's it.
 
 115
-00:08:09,115 --> 00:08:12,202
+00:08:05,689 --> 00:08:08,291
 You are ready to run the front desk with Cafe Manager.

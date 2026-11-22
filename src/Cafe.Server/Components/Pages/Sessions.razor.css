@@ -6,3 +6,7 @@
 .event-trail li {
     padding: .15rem 0;
 }
+
+.station-filter {
+    min-width: 11rem;
+}

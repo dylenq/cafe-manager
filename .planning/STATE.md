@@ -124,6 +124,13 @@ Items acknowledged and deferred at milestone close, most recent first:
 |----------|------|--------|-------------|-----------|
 | *(none)* | | | | |
 
+## Post-v1 Changes
+
+| Date | Change | Branch |
+|------|--------|--------|
+| 2026-11-22 | Client guide and promo videos (`dist/video/`), narration in `docs/video/` | main |
+| 2026-11-23 | UI/UX redesign "Control Room": new tokens, bundled Inter, KPI filter tiles, stations grouped by type, progress bars, redesigned POS, customer, reports, settings and login pages; videos re-recorded | ui-redesign-v3 |
+
 ## Session Continuity
 
 Last session: 2026-11-20T16:56:52.187Z

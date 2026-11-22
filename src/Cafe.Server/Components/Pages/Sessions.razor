@@ -23,7 +23,7 @@
     </div>
     <div class="page-header-actions">
         <label class="subhead" for="station-filter">Station</label>
-        <select id="station-filter" class="form-select w-auto" value="@filterId" @onchange="OnFilterChanged">
+        <select id="station-filter" class="form-select w-auto station-filter" value="@filterId" @onchange="OnFilterChanged">
             <option value="">All stations</option>
             @foreach (var station in stations)
             {
@@ -121,7 +121,7 @@ else
                         <td>@(row.Mode == SessionMode.Balance ? "Balance" : row.Mode == SessionMode.Prepaid ? "Prepaid" : "Open-ended")</td>
                         <td class="tabular">@Local(row.StartedAtUtc)</td>
                         <td class="tabular">@(row.EndedAtUtc is { } end ? Local(end) : "")</td>
-                        <td>@EndReasonText(row)</td>
+                        <td><span class="capsule @EndReasonStyle(EndReasonText(row))"><span class="dot"></span>@EndReasonText(row)</span></td>
                         <td class="num">@Duration(row.ActiveSeconds)</td>
                         <td class="num">@row.ChargedAmount.ToString("C")</td>
                         <td class="num">
@@ -249,6 +249,15 @@ else
 
     private string Local(DateTimeOffset utc) =>
         TimeZoneInfo.ConvertTime(utc, Pricing.TimeZone).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+
+    private static string EndReasonStyle(string text) => text switch
+    {
+        "Active" or "Grace" => "capsule-green",
+        "Paused" => "capsule-blue",
+        "Expired" => "capsule-orange",
+        "Stopped" => "capsule-gray",
+        _ => "capsule-gray",
+    };
 
     private static string EndReasonText(SessionHistoryRow row) => row.Status switch
     {

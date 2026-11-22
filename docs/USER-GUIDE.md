@@ -5,7 +5,7 @@ This guide is for front-desk staff. It covers a normal day at the desk. Installa
 ## Logging in
 
 1. Open the Cafe Manager address on the front-desk screen (your owner will have bookmarked it, for example `http://192.168.1.10:5080`).
-2. Type the shared password in "Password" and press "Log in".
+2. Type the shared staff password in "Password" and press "Log in".
 3. If you type the password wrong several times in a row (5 times within 5 minutes), that device is blocked for 5 minutes. Wait, then try again.
 
 The menu at the top gives you: Dashboard, Stations, Station types, Sessions, Reports, POS, Products, Customers, Packages, Rate rules and Settings. Stations, Station types, Rate rules, Products, Packages and Settings are normally changed by the owner only.
@@ -14,10 +14,14 @@ There is no "forgot password" button. If nobody knows the admin password, ask th
 
 ## The dashboard
 
-The Dashboard shows one card per station, updated live. Each card shows:
+The Dashboard shows one card per station, updated live and grouped by station type.
+
+Along the top, five tiles count All stations, Free, In use, Needs attention (nearly out of time or out of time) and Offline. Press a tile to show only those stations; press "All stations" to see everything again.
+
+Each card shows:
 
 - The station name and a status badge: Idle (free), In session, Paused, Expiring (time is nearly up or up), or Offline.
-- For a running session: the time left (or time used for an open-ended session), the charge so far, and a "Member" badge if a member customer is attached.
+- For a running session: the time left (or time used for an open-ended session) with a bar showing how much of the paid time is used, the charge so far, and a "Member" badge if a member customer is attached.
 - "Agent offline" on a PC card means the PC's agent is not connected to the server (see Troubleshooting).
 - For a console: the TV indicator ("TV On", "TV Standby", "TV Unreachable", "TV Unknown" or "TV not checked") and the buttons "TV On" and "TV Off".
 - For a PC: a "PC" menu with Lock, Unlock PC (free), Restart, Shutdown and Send message.
@@ -40,7 +44,7 @@ All of these are on the station card while a session is running.
 
 1. Extend: press one of the quick buttons (15, 30 or 60 minutes), or type the minutes in the "min" box next to "Extend" and press "Extend" (prepaid sessions). With a customer's balance, use "Extend from balance". You can extend while the session is paused or in the grace period (see below).
 2. Pause and resume: press "Pause" to stop the clock (for example the customer steps out), "Resume" to continue. Paused time is not charged.
-3. Move: pick another free station under "Move to..." and press "Move". The session continues on the new station. A session paid from a balance for one type of station cannot be moved to a different type.
+3. Move: press "Move to another station" at the bottom of the card, pick a free station under "Move to..." and press "Move". The session continues on the new station. A session paid from a balance for one type of station cannot be moved to a different type.
 
 ## Stopping a session
 

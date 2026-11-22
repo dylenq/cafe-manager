@@ -11,7 +11,10 @@
 <SectionContent SectionName="page-title">Customers</SectionContent>
 
 <div class="page-header">
-    <h1 class="large-title">Customers</h1>
+    <div class="page-heading">
+        <h1 class="large-title">Customers</h1>
+        <p class="page-sub">Members, guests and their prepaid time.</p>
+    </div>
     @if (!showForm)
     {
         <div class="page-header-actions">
@@ -112,7 +115,8 @@ else
                 @foreach (var customer in customers)
                 {
                     <tr>
-                        <td>
+                        <td class="cust-cell">
+                            <span class="cust-mini@(customer.IsMember ? " is-member" : "")" aria-hidden="true">@string.Concat(customer.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpperInvariant(w[0])))</span>
                             <a href="customers/@customer.Id">@customer.Name</a>
                             @if (customer.IsMember)
                             {

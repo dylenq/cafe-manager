@@ -1,38 +1,98 @@
+.cust-hero {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: var(--space-5);
+    padding: 1.1rem 1.2rem;
+    border: 1px solid var(--hairline);
+    border-radius: 16px;
+    background:
+        radial-gradient(80% 140% at 0% 0%, rgba(124, 108, 255, .14), transparent 60%),
+        var(--bg-2);
+    box-shadow: var(--panel-shadow);
+}
+
+.cust-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    flex: none;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #2a2f3d, #1a1e28);
+    border: 1px solid var(--hairline-strong);
+    color: var(--label);
+    font-size: 1.125rem;
+    font-weight: 750;
+    letter-spacing: .02em;
+}
+
+.cust-avatar.is-member {
+    background: linear-gradient(135deg, #9a8cff 0%, #6a56f5 60%, #22d3ee 150%);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 10px 24px -10px rgba(124, 108, 255, .8);
+}
+
+.cust-hero-main {
+    flex: 1 1 14rem;
+    min-width: 0;
+}
+
+.cust-hero-main .large-title { margin: 0; }
+
+.cust-hero-sub {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem .75rem;
+    margin: .3rem 0 0;
+}
+
+.cust-notes { color: var(--label-3); }
+
 .balance-tiles {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
-    gap: var(--space-3);
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: .65rem;
 }
 
 .balance-tile {
-    background: var(--bg-2);
-    border-radius: var(--radius-group);
-    padding: var(--space-4);
+    background: linear-gradient(180deg, rgba(255, 255, 255, .02), transparent), var(--bg-2);
+    border: 1px solid var(--hairline);
+    border-radius: 14px;
+    padding: .9rem 1rem;
     display: flex;
     flex-direction: column;
-    gap: .25rem;
+    gap: .3rem;
+    box-shadow: var(--panel-shadow);
 }
 
 .balance-tile.is-total {
-    box-shadow: inset 0 0 0 1px var(--accent);
+    border-color: rgba(124, 108, 255, .45);
+    background: radial-gradient(120% 120% at 0% 0%, rgba(124, 108, 255, .16), transparent 60%), var(--bg-2);
 }
 
 .balance-tile-label {
     font-size: var(--fs-footnote);
+    font-weight: 600;
     color: var(--label-2);
 }
 
 .balance-tile-value {
     font-family: var(--font-rounded);
     font-size: 1.75rem;
-    line-height: 1.15;
-    font-weight: 600;
+    line-height: 1.1;
+    font-weight: 700;
+    letter-spacing: -.03em;
     font-variant-numeric: tabular-nums;
 }
 
 .balance-tile-unit {
     font-family: var(--font);
     font-size: var(--fs-subhead);
-    font-weight: 400;
+    font-weight: 500;
+    letter-spacing: 0;
     color: var(--label-2);
 }

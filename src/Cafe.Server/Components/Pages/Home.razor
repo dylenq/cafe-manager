@@ -13,7 +13,21 @@
 <PageTitle>Dashboard</PageTitle>
 <SectionContent SectionName="page-title">Dashboard</SectionContent>
 
-<h1 class="large-title page-title">Dashboard</h1>
+<div class="dash-header">
+    <div>
+        <h1 class="large-title page-title">Dashboard</h1>
+        <p class="subhead dash-sub">
+            @if (_cards is { Count: > 0 })
+            {
+                <span>@_cards.Count stations</span><span class="dash-live"><span class="dash-live-dot"></span>Live</span>
+            }
+            else
+            {
+                <span>Every station at a glance</span>
+            }
+        </p>
+    </div>
+</div>
 
 @if (_stale)
 {
@@ -42,14 +56,43 @@ else if (_cards.Count == 0)
 }
 else
 {
-    <div class="station-grid">
-        @foreach (var card in _cards)
+    <div class="kpi-row" role="group" aria-label="Filter stations by status">
+        @foreach (var f in Filters)
         {
-            <div class="station-grid-item" @key="card.StationId">
-                <StationCard Model="card" IdleStations="IdleStations" OnNotice="AddNotice" Acknowledged="_tracker.IsAcknowledged(card.StationId)" />
-            </div>
+            var count = _cards.Count(c => Matches(c, f.Key));
+            <button type="button" class="kpi kpi-@f.Key @(_filter == f.Key ? "is-active" : "")" aria-pressed="@(_filter == f.Key ? "true" : "false")"
+                    @onclick="() => _filter = f.Key">
+                <span class="kpi-icon"><Icon Name="@f.Icon" Size="16" /></span>
+                <span class="kpi-label">@f.Label</span>
+                <span class="kpi-value">@count</span>
+            </button>
         }
     </div>
+
+    var visible = _cards.Where(c => Matches(c, _filter)).ToList();
+    if (visible.Count == 0)
+    {
+        <div class="dash-empty">No stations match this filter. <button type="button" class="btn btn-link btn-sm" @onclick="ShowAll">Show all</button></div>
+    }
+    var groups = visible.GroupBy(c => c.TypeName).ToList();
+    foreach (var group in groups)
+    {
+        if (groups.Count > 1)
+        {
+            <div class="station-group-head">
+                <h2 class="station-group-title">@group.Key</h2>
+                <span class="station-group-count">@group.Count(c => c.Status == Cafe.Shared.StationStatus.Idle) free of @group.Count()</span>
+            </div>
+        }
+        <div class="station-grid">
+            @foreach (var card in group)
+            {
+                <div class="station-grid-item" @key="card.StationId">
+                    <StationCard Model="card" IdleStations="IdleStations" OnNotice="AddNotice" Acknowledged="_tracker.IsAcknowledged(card.StationId)" />
+                </div>
+            }
+        </div>
+    }
 }
 
 @code {
@@ -67,6 +110,30 @@ else
     private int _noticeId;
 
     private sealed record Notice(int Id, string Text, bool Warning = false);
+
+    private sealed record FilterDef(string Key, string Label, string Icon);
+
+    private static readonly FilterDef[] Filters =
+    [
+        new("all", "All stations", "grid"),
+        new("free", "Free", "play"),
+        new("busy", "In use", "bolt"),
+        new("attention", "Needs attention", "warning"),
+        new("offline", "Offline", "offline"),
+    ];
+
+    private string _filter = "all";
+
+    private void ShowAll() => _filter = "all";
+
+    private static bool Matches(StationCardModel card, string filter) => filter switch
+    {
+        "free" => card.Status == Cafe.Shared.StationStatus.Idle,
+        "busy" => card.Session is not null,
+        "attention" => card.Status == Cafe.Shared.StationStatus.Expiring,
+        "offline" => card.Status == Cafe.Shared.StationStatus.Offline,
+        _ => true,
+    };
 
     private IReadOnlyList<IdleStation> IdleStations =>
         _cards?.Where(c => c.Session is null).Select(c => new IdleStation(c.StationId, c.Name)).ToList() ?? [];

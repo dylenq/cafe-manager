@@ -1,0 +1,26 @@
+@using Cafe.Server.Pricing
+@implements IDisposable
+@inject TimeProvider Time
+@inject PricingConfigService PricingConfig
+
+<div class="live-clock" title="Cafe time">
+    <span class="live-dot" aria-hidden="true"></span>
+    <span class="live-time">@Now.ToString("t")</span>
+    <span class="live-date">@Now.ToString("ddd d MMM")</span>
+</div>
+
+@code {
+    private Timer? _timer;
+
+    private DateTime Now => TimeZoneInfo.ConvertTime(Time.GetUtcNow(), PricingConfig.TimeZone).DateTime;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && RendererInfo.IsInteractive)
+        {
+            _timer = new Timer(_ => _ = InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
+        }
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

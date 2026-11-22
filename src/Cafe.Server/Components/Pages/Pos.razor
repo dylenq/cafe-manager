@@ -17,7 +17,10 @@
 <SectionContent SectionName="page-title">POS</SectionContent>
 
 <div class="page-header">
-    <h1 class="large-title">POS</h1>
+    <div class="page-heading">
+        <h1 class="large-title">POS</h1>
+        <p class="page-sub">Sell food and drinks, and settle open tabs.</p>
+    </div>
     <div class="page-header-actions">
         <button type="button" class="btn btn-outline-secondary" @onclick="RefreshAllAsync">Refresh</button>
     </div>
@@ -65,9 +68,18 @@
             <div class="pos-grid">
                 @foreach (var product in VisibleProducts)
                 {
-                    <button type="button" class="pos-tile" @onclick="() => AddToCart(product)">
+                    var inCart = cart.Lines.FirstOrDefault(l => l.ProductId == product.Id)?.Quantity ?? 0;
+                    <button type="button" class="pos-tile pos-hue-@HueOf(product.Category)" @onclick="() => AddToCart(product)">
+                        <span class="pos-tile-mono" aria-hidden="true">@Monogram(product.Name)</span>
+                        @if (inCart > 0)
+                        {
+                            <span class="pos-tile-qty" aria-label="@inCart in cart">@inCart</span>
+                        }
                         <span class="pos-tile-name">@product.Name</span>
-                        <span class="pos-tile-price">@product.Price.ToString("C")</span>
+                        <span class="pos-tile-foot">
+                            <span class="pos-tile-price">@product.Price.ToString("C")</span>
+                            <span class="pos-tile-add" aria-hidden="true"><Icon Name="plus" Size="14" /></span>
+                        </span>
                     </button>
                 }
             </div>
@@ -75,6 +87,7 @@
     </div>
 
     <div class="col-12 col-lg-5">
+      <div class="pos-side">
         <h2 class="group-caption pos-caption">Cart</h2>
         <div class="group">
             @if (cart.IsEmpty)
@@ -183,6 +196,7 @@
                 }
             </div>
         }
+      </div>
     </div>
 </div>
 
@@ -193,6 +207,12 @@
 }
 
 @code {
+    private static string Monogram(string name) =>
+        string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpperInvariant(w[0])));
+
+    // One color per category (in display order) so a category's tiles share a hue.
+    private int HueOf(string? category) => Math.Max(0, categories.IndexOf(category ?? string.Empty)) % 6;
+
     private readonly Cart cart = new();
     private List<Product>? products;
     private List<string> categories = [];

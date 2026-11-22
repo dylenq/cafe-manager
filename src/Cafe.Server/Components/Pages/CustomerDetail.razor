@@ -29,32 +29,35 @@ else if (detail is null)
 else
 {
     var customer = detail.Customer;
-    <div class="page-header mb-2">
-        <h1 class="large-title">
-            @customer.Name
-            @if (customer.IsMember)
-            {
-                <span class="badge text-bg-info ms-1 align-middle">Member</span>
-            }
-            @if (!customer.IsActive)
-            {
-                <span class="badge text-bg-secondary ms-1 align-middle">Inactive</span>
-            }
-        </h1>
+    <div class="cust-hero">
+        <span class="cust-avatar@(customer.IsMember ? " is-member" : "")" aria-hidden="true">@Initials(customer.Name)</span>
+        <div class="cust-hero-main">
+            <h1 class="large-title">
+                @customer.Name
+                @if (customer.IsMember)
+                {
+                    <span class="badge text-bg-info ms-1 align-middle">Member</span>
+                }
+                @if (!customer.IsActive)
+                {
+                    <span class="badge text-bg-secondary ms-1 align-middle">Inactive</span>
+                }
+            </h1>
+            <p class="subhead cust-hero-sub">
+                @if (!string.IsNullOrEmpty(customer.Phone))
+                {
+                    <span class="tabular">@PhoneDisplay.Format(customer.Phone)</span>
+                }
+                @if (!string.IsNullOrEmpty(customer.Notes))
+                {
+                    <span class="cust-notes">@customer.Notes</span>
+                }
+            </p>
+        </div>
         <div class="page-header-actions">
             <a href="customers" class="btn btn-secondary">Back to customers</a>
         </div>
     </div>
-    <p class="subhead mb-4">
-        @if (!string.IsNullOrEmpty(customer.Phone))
-        {
-            <span class="tabular">@PhoneDisplay.Format(customer.Phone)</span>
-        }
-        @if (!string.IsNullOrEmpty(customer.Notes))
-        {
-            <span class="ms-2">@customer.Notes</span>
-        }
-    </p>
 
     @if (!string.IsNullOrEmpty(errorMessage))
     {
@@ -269,6 +272,9 @@ else
 }
 
 @code {
+    private static string Initials(string name) =>
+        string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpperInvariant(w[0])));
+
     private CustomerDetailModel? detail;
     private List<TimePackage> packages = [];
     private List<StationType> types = [];

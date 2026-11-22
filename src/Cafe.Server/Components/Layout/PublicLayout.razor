@@ -1,8 +1,30 @@
 @inherits LayoutComponentBase
 
 <div class="auth-shell">
-    <div class="auth-card">
-        <div class="auth-glyph" aria-hidden="true"><Icon Name="gamecontroller" Size="32" /></div>
-        @Body
-    </div>
+    <aside class="auth-art" aria-hidden="true">
+        <div class="auth-art-inner">
+            <div class="auth-brand">
+                <span class="auth-brand-glyph"><Icon Name="gamecontroller" Size="22" /></span>
+                <span>Cafe Manager</span>
+            </div>
+            <h2 class="auth-art-title">Every station.<br />One screen.</h2>
+            <ul class="auth-art-points">
+                <li><Icon Name="lock" Size="18" /><span>PCs lock and TVs switch off the moment paid time runs out.</span></li>
+                <li><Icon Name="cart" Size="18" /><span>Sessions, snacks and tabs settled in one place.</span></li>
+                <li><Icon Name="server" Size="18" /><span>Runs on your own server. Keeps working offline.</span></li>
+            </ul>
+            <div class="auth-art-grid">
+                @for (var i = 0; i < 12; i++)
+                {
+                    <span class="auth-art-cell s-@(i % 5)"></span>
+                }
+            </div>
+        </div>
+    </aside>
+    <main class="auth-main">
+        <div class="auth-card">
+            <div class="auth-glyph" aria-hidden="true"><Icon Name="gamecontroller" Size="28" /></div>
+            @Body
+        </div>
+    </main>
 </div>

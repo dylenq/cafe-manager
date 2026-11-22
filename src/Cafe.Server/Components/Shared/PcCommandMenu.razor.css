@@ -1,7 +1,7 @@
 .pc-command-menu { position: relative; }
 
 .pc-menu-trigger[disabled] { opacity: .4; cursor: not-allowed; }
-.pc-menu-trigger[aria-expanded="true"] { background: rgba(255, 255, 255, .12); }
+.pc-menu-trigger[aria-expanded="true"] { background: var(--fill-strong); color: var(--label); }
 
 .pc-menu-panel { width: 16rem; max-width: calc(100vw - 2rem); }
 

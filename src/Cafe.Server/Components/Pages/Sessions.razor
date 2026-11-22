@@ -17,7 +17,10 @@
 <SectionContent SectionName="page-title">Sessions</SectionContent>
 
 <div class="page-header">
-    <h1 class="large-title">Sessions</h1>
+    <div class="page-heading">
+        <h1 class="large-title">Sessions</h1>
+        <p class="page-sub">Every session, newest first, with what happened and what it cost.</p>
+    </div>
     <div class="page-header-actions">
         <label class="subhead" for="station-filter">Station</label>
         <select id="station-filter" class="form-select w-auto" value="@filterId" @onchange="OnFilterChanged">

@@ -17,7 +17,7 @@
             <h2 class="tile-name">@Model.Name</h2>
             <div class="tile-meta">
                 <span class="tile-type">@Model.TypeName</span>
-                <span class="capsule capsule-gray">@(Model.Kind == StationKind.PC ? "PC" : "Console")</span>
+                <span class="capsule capsule-gray kind-capsule"><Icon Name="@(Model.Kind == StationKind.PC ? "desktop" : "tv")" Size="12" />@(Model.Kind == StationKind.PC ? "PC" : "Console")</span>
                 @if (Model.AgentOffline && Model.Session is not null)
                 {
                     <span class="capsule capsule-orange agent-offline-badge" title="The PC agent is not connected"><span class="dot"></span>Agent offline</span>
@@ -57,6 +57,16 @@
             else
             {
                 <div class="countdown session-countdown@(level == AlertLevel.Warning ? " is-expiring" : "")">@Countdown(session, now)</div>
+            }
+            @if (Progress(session, now) is { } pct)
+            {
+                <div class="tile-progress" role="progressbar" aria-label="Time used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@pct">
+                    <span style="width:@(pct)%"></span>
+                </div>
+            }
+            else if (session.Mode == SessionMode.OpenEnded)
+            {
+                <div class="tile-clock-note">Elapsed</div>
             }
         </div>
         <div class="tile-foot">
@@ -134,7 +144,7 @@
             {
                 <div class="tile-flow extend-balance">
                     <div class="flow-label">Extend from balance</div>
-                    <div class="flow-controls">
+                    <div class="flow-controls quick-picks">
                         @foreach (var m in ExtendPicks)
                         {
                             <button type="button" class="btn btn-sm btn-outline-primary" disabled="@_busy"
@@ -165,7 +175,7 @@
             {
                 <div class="tile-flow">
                     <div class="flow-label">Extend</div>
-                    <div class="flow-controls">
+                    <div class="flow-controls quick-picks">
                         @foreach (var m in ExtendPicks)
                         {
                             <button type="button" class="btn btn-sm btn-outline-primary" disabled="@_busy"
@@ -181,6 +191,8 @@
                 </div>
             }
 
+            <details class="tile-more">
+                <summary>Move to another station</summary>
             <div class="tile-flow">
                 <div class="flow-label">Move</div>
                 <div class="flow-controls">
@@ -197,6 +209,7 @@
                             @onclick="() => MoveAsync(session.SessionId)">Move</button>
                 </div>
             </div>
+            </details>
         }
     }
     else
@@ -206,7 +219,7 @@
         </div>
         <div class="tile-flow">
             <div class="flow-label">Start prepaid</div>
-            <div class="flow-controls">
+            <div class="flow-controls quick-picks">
                 @foreach (var m in StartPicks)
                 {
                     <button type="button" class="btn btn-sm btn-outline-primary" disabled="@_busy"
@@ -381,6 +394,18 @@
             _ => "",
         }
         : "";
+
+    // Share of purchased time used, for timed sessions; null for open-ended ones.
+    private static int? Progress(SessionCardModel session, DateTimeOffset now)
+    {
+        if (session.PurchasedMinutes is not { } minutes || minutes <= 0)
+        {
+            return null;
+        }
+
+        var active = SessionClock.ActiveSeconds(session.ClosedActiveSeconds, session.OpenSegmentStartUtc, now);
+        return (int)Math.Clamp(Math.Round(active * 100.0 / (minutes * 60.0)), 0, 100);
+    }
 
     private static string Countdown(SessionCardModel session, DateTimeOffset now)
     {

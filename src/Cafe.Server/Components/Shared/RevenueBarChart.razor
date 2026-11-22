@@ -13,7 +13,17 @@ else
     var barWidth = Math.Max(2d, slot * 0.7);
     <svg class="revenue-chart" viewBox="0 0 @Width @(Height + 28)" role="img" aria-label="@Title" preserveAspectRatio="xMidYMid meet">
         <title>@Title</title>
-        <line x1="0" y1="@Height" x2="@Width" y2="@Height" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" />
+        <defs>
+            <linearGradient id="rev-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#a194ff" />
+                <stop offset="1" stop-color="#6a56f5" stop-opacity="0.55" />
+            </linearGradient>
+        </defs>
+        @for (var g = 1; g <= 3; g++)
+        {
+            <line class="chart-grid" x1="0" y1="@F(Height - (Height - 8) * g / 3d)" x2="@Width" y2="@F(Height - (Height - 8) * g / 3d)" />
+        }
+        <line x1="0" y1="@Height" x2="@Width" y2="@Height" stroke="currentColor" stroke-opacity="0.35" stroke-width="1" />
         @for (var i = 0; i < Bars.Count; i++)
         {
             var bar = Bars[i];
@@ -22,6 +32,10 @@ else
             <rect class="chart-bar" x="@F(x)" y="@F(Height - h)" width="@F(barWidth)" height="@F(h)">
                 <title>@bar.Label: @bar.Value.ToString("C")</title>
             </rect>
+            @if (Bars.Count <= 12 && bar.Value > 0)
+            {
+                <!text class="chart-value" x="@F(x + barWidth / 2)" y="@F(Height - h - 6)" text-anchor="middle">@bar.Value.ToString("C0")</!text>
+            }
             @if (i % step == 0)
             {
                 <!text class="chart-label" x="@F(x + barWidth / 2)" y="@(Height + 16)" text-anchor="middle" fill="currentColor">@bar.Label</!text>

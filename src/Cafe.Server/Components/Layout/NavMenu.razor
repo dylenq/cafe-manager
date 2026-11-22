@@ -1,6 +1,9 @@
 <div class="brand">
     <span class="brand-glyph" aria-hidden="true"><Icon Name="gamecontroller" Size="20" /></span>
-    <a class="brand-name" href="">Cafe Manager</a>
+    <span class="brand-text">
+        <a class="brand-name" href="">Cafe Manager</a>
+        <span class="brand-sub">Front desk</span>
+    </span>
 </div>
 
 <div class="nav-scrollable" onclick="if(event.target.closest('a')){document.getElementById('nav-toggle').checked=false;}">
@@ -8,51 +11,57 @@
         <div class="nav-section">
             <div class="nav-heading">Front Desk</div>
             <NavLink class="nav-item-link" href="" Match="NavLinkMatch.All">
-                <Icon Name="house" /><span>Dashboard</span>
+                <Icon Name="grid" Size="18" /><span>Dashboard</span>
             </NavLink>
             <NavLink class="nav-item-link" href="sessions">
-                <Icon Name="clock" /><span>Sessions</span>
+                <Icon Name="clock" Size="18" /><span>Sessions</span>
             </NavLink>
             <NavLink class="nav-item-link" href="pos">
-                <Icon Name="cart" /><span>POS</span>
+                <Icon Name="cart" Size="18" /><span>POS</span>
             </NavLink>
             <NavLink class="nav-item-link" href="reports">
-                <Icon Name="chart" /><span>Reports</span>
+                <Icon Name="chart" Size="18" /><span>Reports</span>
             </NavLink>
         </div>
 
         <div class="nav-section">
             <div class="nav-heading">Customers</div>
             <NavLink class="nav-item-link" href="customers">
-                <Icon Name="people" /><span>Customers</span>
+                <Icon Name="people" Size="18" /><span>Customers</span>
             </NavLink>
             <NavLink class="nav-item-link" href="packages">
-                <Icon Name="gift" /><span>Packages</span>
+                <Icon Name="gift" Size="18" /><span>Packages</span>
             </NavLink>
         </div>
 
         <div class="nav-section">
             <div class="nav-heading">Setup</div>
             <NavLink class="nav-item-link" href="stations">
-                <Icon Name="desktop" /><span>Stations</span>
+                <Icon Name="desktop" Size="18" /><span>Stations</span>
             </NavLink>
             <NavLink class="nav-item-link" href="station-types">
-                <Icon Name="gamecontroller" /><span>Station Types</span>
+                <Icon Name="gamecontroller" Size="18" /><span>Station Types</span>
             </NavLink>
             <NavLink class="nav-item-link" href="products">
-                <Icon Name="tag" /><span>Products</span>
+                <Icon Name="tag" Size="18" /><span>Products</span>
             </NavLink>
             <NavLink class="nav-item-link" href="rate-rules">
-                <Icon Name="slider" /><span>Rate Rules</span>
+                <Icon Name="slider" Size="18" /><span>Rate Rules</span>
             </NavLink>
             <NavLink class="nav-item-link" href="settings">
-                <Icon Name="gear" /><span>Settings</span>
+                <Icon Name="gear" Size="18" /><span>Settings</span>
             </NavLink>
         </div>
     </nav>
 
+    <div class="nav-status" title="Cafe Manager runs on this cafe's own server and keeps working without internet.">
+        <Icon Name="server" Size="16" />
+        <span>Local server</span>
+        <span class="nav-status-pill">Online</span>
+    </div>
+
     <form method="post" action="/logout" class="nav-logout">
         <AntiforgeryToken />
-        <button type="submit" class="nav-item-link"><Icon Name="logout" /><span>Log Out</span></button>
+        <button type="submit" class="nav-item-link"><Icon Name="logout" Size="18" /><span>Log Out</span></button>
     </form>
 </div>

@@ -1,0 +1,36 @@
+.live-clock {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    height: 32px;
+    padding: 0 .75rem;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-capsule);
+    background: rgba(148, 163, 184, .05);
+    font-size: var(--fs-footnote);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.live-dot {
+    width: .45rem;
+    height: .45rem;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 3px rgba(52, 211, 153, .18);
+}
+
+.live-time {
+    font-weight: 650;
+    color: var(--label);
+}
+
+.live-date {
+    color: var(--label-3);
+}
+
+@media (max-width: 640px) {
+    .live-date {
+        display: none;
+    }
+}

@@ -1,0 +1,34 @@
+.cust-cell {
+    white-space: nowrap;
+}
+
+.cust-cell a {
+    color: var(--label);
+    font-weight: 600;
+}
+
+.cust-cell a:hover {
+    color: var(--accent-text);
+}
+
+.cust-mini {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    margin-right: .6rem;
+    border-radius: 9px;
+    background: var(--bg-4);
+    border: 1px solid var(--hairline-strong);
+    color: var(--label-2);
+    font-size: .6875rem;
+    font-weight: 750;
+    vertical-align: middle;
+}
+
+.cust-mini.is-member {
+    background: linear-gradient(135deg, #8b7dff, #6a56f5);
+    border-color: transparent;
+    color: #fff;
+}

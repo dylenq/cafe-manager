@@ -69,7 +69,7 @@
                 @foreach (var product in VisibleProducts)
                 {
                     var inCart = cart.Lines.FirstOrDefault(l => l.ProductId == product.Id)?.Quantity ?? 0;
-                    <button type="button" class="pos-tile pos-hue-@HueOf(product.Category)" @onclick="() => AddToCart(product)">
+                    <button type="button" class="pos-tile" @onclick="() => AddToCart(product)">
                         <span class="pos-tile-mono" aria-hidden="true">@Monogram(product.Name)</span>
                         @if (inCart > 0)
                         {
@@ -209,9 +209,6 @@
 @code {
     private static string Monogram(string name) =>
         string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpperInvariant(w[0])));
-
-    // One color per category (in display order) so a category's tiles share a hue.
-    private int HueOf(string? category) => Math.Max(0, categories.IndexOf(category ?? string.Empty)) % 6;
 
     private readonly Cart cart = new();
     private List<Product>? products;

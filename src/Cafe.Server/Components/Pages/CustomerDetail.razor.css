@@ -7,10 +7,9 @@
     padding: 1.1rem 1.2rem;
     border: 1px solid var(--hairline);
     border-radius: 16px;
-    background:
-        radial-gradient(80% 140% at 0% 0%, rgba(124, 108, 255, .14), transparent 60%),
-        var(--bg-2);
+    background: var(--bg-2);
     box-shadow: var(--panel-shadow);
+    animation: rise var(--dur-3) var(--ease) both;
 }
 
 .cust-avatar {
@@ -21,19 +20,17 @@
     height: 3.5rem;
     flex: none;
     border-radius: 16px;
-    background: linear-gradient(135deg, #2a2f3d, #1a1e28);
-    border: 1px solid var(--hairline-strong);
+    background: var(--fill-strong);
     color: var(--label);
+    font-family: var(--font-display);
     font-size: 1.125rem;
-    font-weight: 750;
+    font-weight: 700;
     letter-spacing: .02em;
 }
 
 .cust-avatar.is-member {
-    background: linear-gradient(135deg, #9a8cff 0%, #6a56f5 60%, #22d3ee 150%);
-    border-color: transparent;
-    color: #fff;
-    box-shadow: 0 10px 24px -10px rgba(124, 108, 255, .8);
+    background: var(--accent);
+    color: var(--on-accent);
 }
 
 .cust-hero-main {
@@ -59,10 +56,10 @@
 }
 
 .balance-tile {
-    background: linear-gradient(180deg, rgba(255, 255, 255, .02), transparent), var(--bg-2);
+    background: var(--bg-2);
     border: 1px solid var(--hairline);
-    border-radius: 14px;
-    padding: .9rem 1rem;
+    border-radius: 16px;
+    padding: 1rem 1.1rem;
     display: flex;
     flex-direction: column;
     gap: .3rem;
@@ -70,8 +67,14 @@
 }
 
 .balance-tile.is-total {
-    border-color: rgba(124, 108, 255, .45);
-    background: radial-gradient(120% 120% at 0% 0%, rgba(124, 108, 255, .16), transparent 60%), var(--bg-2);
+    background: var(--label);
+    border-color: var(--label);
+    color: var(--bg-2);
+}
+
+.balance-tile.is-total .balance-tile-label,
+.balance-tile.is-total .balance-tile-unit {
+    color: color-mix(in srgb, var(--bg-2) 72%, transparent);
 }
 
 .balance-tile-label {
@@ -81,7 +84,7 @@
 }
 
 .balance-tile-value {
-    font-family: var(--font-rounded);
+    font-family: var(--font-display);
     font-size: 1.75rem;
     line-height: 1.1;
     font-weight: 700;

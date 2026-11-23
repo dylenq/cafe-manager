@@ -13,11 +13,10 @@
                 <li><Icon Name="cart" Size="18" /><span>Sessions, snacks and tabs settled in one place.</span></li>
                 <li><Icon Name="server" Size="18" /><span>Runs on your own server. Keeps working offline.</span></li>
             </ul>
-            <div class="auth-art-grid">
-                @for (var i = 0; i < 12; i++)
-                {
-                    <span class="auth-art-cell s-@(i % 5)"></span>
-                }
+            <div class="auth-art-tiles">
+                <div class="auth-tile s-busy"><span class="auth-tile-name">PC-01</span><span class="auth-tile-time">48:12</span></div>
+                <div class="auth-tile s-warn"><span class="auth-tile-name">PC-02</span><span class="auth-tile-time">04:51</span></div>
+                <div class="auth-tile s-free"><span class="auth-tile-name">PS5-1</span><span class="auth-tile-time">Free</span></div>
             </div>
         </div>
     </aside>

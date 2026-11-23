@@ -9,6 +9,7 @@
 
 .cust-cell a:hover {
     color: var(--accent-text);
+    text-decoration: none;
 }
 
 .cust-mini {
@@ -19,16 +20,14 @@
     height: 1.9rem;
     margin-right: .6rem;
     border-radius: 9px;
-    background: var(--bg-4);
-    border: 1px solid var(--hairline-strong);
+    background: var(--fill-strong);
     color: var(--label-2);
     font-size: .6875rem;
-    font-weight: 750;
+    font-weight: 700;
     vertical-align: middle;
 }
 
 .cust-mini.is-member {
-    background: linear-gradient(135deg, #8b7dff, #6a56f5);
-    border-color: transparent;
-    color: #fff;
+    background: var(--accent);
+    color: var(--on-accent);
 }

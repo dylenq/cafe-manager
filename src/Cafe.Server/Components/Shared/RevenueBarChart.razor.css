@@ -2,12 +2,15 @@
     width: 100%;
     height: auto;
     max-height: 260px;
-    color: var(--label-3);
+    color: var(--accent);
     overflow: visible;
 }
 
 .chart-bar {
     fill: url(#rev-grad);
+    transform-origin: bottom;
+    transform-box: fill-box;
+    animation: bar-grow .6s var(--ease) both;
     rx: 5px;
     ry: 5px;
     transition: opacity .15s ease;
@@ -17,8 +20,10 @@
     opacity: .8;
 }
 
+@keyframes bar-grow { from { transform: scaleY(0); } to { transform: none; } }
+
 .chart-grid {
-    stroke: rgba(148, 163, 184, .1);
+    stroke: var(--separator);
     stroke-width: 1;
     stroke-dasharray: 3 5;
 }

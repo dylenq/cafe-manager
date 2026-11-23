@@ -130,6 +130,7 @@ Items acknowledged and deferred at milestone close, most recent first:
 |------|--------|--------|
 | 2026-11-22 | Client guide and promo videos (`dist/video/`), narration in `docs/video/` | main |
 | 2026-11-23 | UI/UX redesign "Control Room": new tokens, bundled Inter, KPI filter tiles, stations grouped by type, progress bars, redesigned POS, customer, reports, settings and login pages; videos re-recorded | ui-redesign-v3 |
+| 2026-11-23 | Restyle to the global design style: light/dark follow the system, monochrome + cobalt accent, Bricolage Grotesque headings, glass layers, spring motion, mobile-first, WCAG AA verified; videos re-recorded in light mode | ui-redesign-v4 |
 
 ## Session Continuity
 

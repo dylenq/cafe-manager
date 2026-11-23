@@ -10,64 +10,63 @@
 
 .pos-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
-    gap: .65rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .75rem;
+}
+
+@media (min-width: 640px) {
+    .pos-grid { grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); }
 }
 
 .pos-tile {
-    --hue: var(--accent);
     position: relative;
-    min-height: 118px;
+    min-height: 124px;
     width: 100%;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: .35rem;
-    padding: .85rem .85rem .75rem;
-    background:
-        radial-gradient(140% 90% at 0% 0%, color-mix(in srgb, var(--hue) 12%, transparent), transparent 60%),
-        var(--bg-2);
+    padding: 1rem 1rem .85rem;
+    background: var(--bg-2);
     color: var(--label);
     border: 1px solid var(--hairline);
-    border-radius: 14px;
+    border-radius: 16px;
     box-shadow: var(--panel-shadow);
     text-align: left;
     white-space: normal;
     touch-action: manipulation;
     cursor: pointer;
-    transition: border-color .14s ease, transform .08s ease, background-color .14s ease;
+    animation: pop var(--dur-3) var(--ease) both;
+    transition: border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease), transform var(--dur-1) var(--ease);
 }
 
-.pos-hue-0 { --hue: #7c6cff; }
-.pos-hue-1 { --hue: #22d3ee; }
-.pos-hue-2 { --hue: #fbbf24; }
-.pos-hue-3 { --hue: #34d399; }
-.pos-hue-4 { --hue: #fb5f78; }
-.pos-hue-5 { --hue: #60a5fa; }
+@media (hover: hover) {
+    .pos-tile:hover { border-color: var(--hairline-strong); box-shadow: var(--raise-shadow); transform: translateY(-2px); }
+}
 
-.pos-tile:hover { border-color: color-mix(in srgb, var(--hue) 45%, transparent); }
-.pos-tile:active { transform: scale(.98); }
+.pos-tile:active { transform: scale(.97); }
 .pos-tile:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 .pos-tile-mono {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    margin-bottom: .2rem;
-    border-radius: 9px;
-    background: color-mix(in srgb, var(--hue) 20%, transparent);
-    color: color-mix(in srgb, var(--hue) 70%, white);
-    font-size: .75rem;
-    font-weight: 750;
-    letter-spacing: .02em;
+    width: 2.1rem;
+    height: 2.1rem;
+    margin-bottom: .25rem;
+    border-radius: 10px;
+    background: var(--fill);
+    color: var(--label-2);
+    font-family: var(--font-display);
+    font-size: .8125rem;
+    font-weight: 700;
+    letter-spacing: .01em;
 }
 
 .pos-tile-qty {
     position: absolute;
-    top: .6rem;
-    right: .6rem;
+    top: .7rem;
+    right: .7rem;
     min-width: 1.5rem;
     height: 1.5rem;
     padding: 0 .4rem;
@@ -75,18 +74,18 @@
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-capsule);
-    background: var(--hue);
-    color: #0b0d13;
+    background: var(--accent);
+    color: var(--on-accent);
     font-size: .75rem;
-    font-weight: 750;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
+    animation: pop var(--dur-2) var(--ease-spring) both;
 }
 
 .pos-tile-name {
     font-size: var(--fs-subhead);
-    font-weight: 650;
-    line-height: 1.25;
-    letter-spacing: -.01em;
+    font-weight: 600;
+    line-height: 1.3;
 }
 
 .pos-tile-foot {
@@ -99,7 +98,7 @@
 
 .pos-tile-price {
     font-size: var(--fs-subhead);
-    font-weight: 600;
+    font-weight: 550;
     color: var(--label-2);
     font-variant-numeric: tabular-nums;
 }
@@ -108,19 +107,23 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.5rem;
-    height: 1.5rem;
-    border-radius: 7px;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 8px;
     background: var(--fill);
     color: var(--label-2);
-    transition: background-color .14s ease, color .14s ease;
+    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 
-.pos-tile:hover .pos-tile-add { background: var(--hue); color: #0b0d13; }
+@media (hover: hover) {
+    .pos-tile:hover .pos-tile-add { background: var(--label); color: var(--bg-2); }
+}
 
-.pos-side {
-    position: sticky;
-    top: calc(var(--toolbar-h) + 1rem);
+@media (min-width: 992px) {
+    .pos-side {
+        position: sticky;
+        top: calc(var(--toolbar-h) + 1.5rem);
+    }
 }
 
 .cart-line {
@@ -163,11 +166,11 @@
 }
 
 .cart-total {
-    background: linear-gradient(90deg, rgba(124, 108, 255, .1), transparent);
+    background: var(--inset);
 }
 
 .cart-total-value {
-    font-family: var(--font-rounded);
+    font-family: var(--font-display);
     font-size: 1.75rem;
     font-weight: 700;
     letter-spacing: -.03em;

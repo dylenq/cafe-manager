@@ -6,7 +6,7 @@
     padding: 0 .75rem;
     border: 1px solid var(--hairline);
     border-radius: var(--radius-capsule);
-    background: rgba(148, 163, 184, .05);
+    background: var(--bg-2);
     font-size: var(--fs-footnote);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -16,8 +16,8 @@
     width: .45rem;
     height: .45rem;
     border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 0 3px rgba(52, 211, 153, .18);
+    background: var(--dot-green);
+    box-shadow: 0 0 0 3px var(--green-tint);
 }
 
 .live-time {

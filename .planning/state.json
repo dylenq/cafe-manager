@@ -1,0 +1,48 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": null,
+  "phases": [
+    {
+      "number": "1",
+      "name": "Foundation",
+      "status": "in_progress"
+    },
+    {
+      "number": "2",
+      "name": "Session Engine & Pricing",
+      "status": "in_progress"
+    },
+    {
+      "number": "3",
+      "name": "PC Agent",
+      "status": "in_progress"
+    },
+    {
+      "number": "4",
+      "name": "Samsung TV Control",
+      "status": "in_progress"
+    },
+    {
+      "number": "5",
+      "name": "Customers & Packages",
+      "status": "in_progress"
+    },
+    {
+      "number": "6",
+      "name": "POS & Receipts",
+      "status": "in_progress"
+    },
+    {
+      "number": "7",
+      "name": "Reports & Deployment",
+      "status": "in_progress"
+    }
+  ],
+  "next": {
+    "command": "/gsd:progress --next",
+    "label": "Advance to the next step",
+    "reason": "Phase 6 of 7 · 0% · executing"
+  },
+  "updated_at": "2026-11-20T16:56:51.716Z"
+}

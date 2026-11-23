@@ -24,7 +24,7 @@
     gap: .6rem;
     height: var(--toolbar-h);
     padding: 0 .75rem;
-    background: rgba(8, 9, 13, .72);
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
     -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     border-bottom: 1px solid var(--hairline);
@@ -61,9 +61,9 @@
 .content {
     flex: 1;
     width: 100%;
-    max-width: 104rem;
+    max-width: 96rem;
     margin: 0 auto;
-    padding: 1.25rem 1rem 3rem;
+    padding: 1.5rem 1rem 4rem;
 }
 
 /* Off-canvas sidebar at compact widths */
@@ -77,7 +77,9 @@
     transform: translateX(-100%);
     visibility: hidden;
     transition: transform .2s ease, visibility 0s linear .2s;
-    background: linear-gradient(180deg, #0e1017 0%, #0a0b10 100%);
+    background: var(--glass-bg-strong);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
     border-right: 1px solid var(--hairline);
 }
 
@@ -124,7 +126,13 @@
     }
 
     .content {
-        padding: 1.75rem 2rem 4rem;
+        padding: 2.5rem 3rem 5rem;
+    }
+
+    .sidebar {
+        background: var(--bg);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
     }
 }
 
@@ -136,11 +144,10 @@
 }
 
 #blazor-error-ui {
-    color-scheme: dark;
-    background: var(--bg-3);
+    background: var(--bg-2);
     color: var(--label);
     border-top: 1px solid var(--separator);
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, .5);
+    box-shadow: var(--shadow-sheet);
     box-sizing: border-box;
     display: none;
     left: 0;
@@ -152,7 +159,7 @@
 }
 
 #blazor-error-ui .reload {
-    color: var(--accent);
+    color: var(--accent-text);
     margin-left: .5rem;
 }
 

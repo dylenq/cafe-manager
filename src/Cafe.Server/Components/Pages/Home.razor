@@ -85,9 +85,9 @@ else
             </div>
         }
         <div class="station-grid">
-            @foreach (var card in group)
+            @foreach (var (card, i) in group.Select((c, i) => (c, i)))
             {
-                <div class="station-grid-item" @key="card.StationId">
+                <div class="station-grid-item" @key="card.StationId" style="--i:@i">
                     <StationCard Model="card" IdleStations="IdleStations" OnNotice="AddNotice" Acknowledged="_tracker.IsAcknowledged(card.StationId)" />
                 </div>
             }

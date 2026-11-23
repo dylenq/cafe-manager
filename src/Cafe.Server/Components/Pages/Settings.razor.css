@@ -1,15 +1,14 @@
 .settings-layout {
     display: grid;
-    grid-template-columns: 13rem minmax(0, 1fr);
-    gap: 1.75rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
     align-items: start;
 }
 
 .settings-nav {
-    position: sticky;
-    top: calc(var(--toolbar-h) + 1rem);
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: 2px;
     padding: .4rem;
     border: 1px solid var(--hairline);
@@ -42,11 +41,12 @@
 .settings-body ::deep > section {
     scroll-margin-top: calc(var(--toolbar-h) + 1rem);
     margin-bottom: 1.25rem !important;
-    padding: 1.2rem 1.3rem 1.3rem;
+    padding: 1.5rem 1.5rem 1.6rem;
     border: 1px solid var(--hairline);
     border-radius: 16px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, .018), transparent 120px), var(--bg-2);
+    background: var(--bg-2);
     box-shadow: var(--panel-shadow);
+    animation: rise var(--dur-3) var(--ease) both;
 }
 
 .settings-body ::deep > section > h2 {
@@ -55,24 +55,26 @@
 }
 
 .settings-body ::deep > section .group {
-    background: rgba(8, 9, 13, .4);
+    background: var(--inset);
     box-shadow: none;
 }
 
 .settings-body ::deep > section .table-responsive,
 .settings-body ::deep > section .table-card {
-    background: rgba(8, 9, 13, .4);
+    background: var(--inset);
     box-shadow: none;
 }
 
-@media (max-width: 1100px) {
+@media (min-width: 1100px) {
     .settings-layout {
-        grid-template-columns: 1fr;
+        grid-template-columns: 13rem minmax(0, 1fr);
+        gap: 2rem;
     }
 
     .settings-nav {
-        position: static;
-        flex-direction: row;
-        flex-wrap: wrap;
+        position: sticky;
+        top: calc(var(--toolbar-h) + 1.5rem);
+        flex-direction: column;
+        flex-wrap: nowrap;
     }
 }

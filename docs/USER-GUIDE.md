@@ -14,7 +14,7 @@ There is no "forgot password" button. If nobody knows the admin password, ask th
 
 ## The dashboard
 
-The Dashboard shows one card per station, updated live and grouped by station type.
+The Dashboard shows one card per station, updated live and grouped by station type. The app follows the device's light or dark setting.
 
 Along the top, five tiles count All stations, Free, In use, Needs attention (nearly out of time or out of time) and Offline. Press a tile to show only those stations; press "All stations" to see everything again.
 

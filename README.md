@@ -14,7 +14,7 @@ Features:
 
 ## Install (for the cafe)
 
-Use the release bundle `CafeManager-1.1.2-win-x64.zip` (see "Build the release bundle" below to produce it).
+Use the release bundle `CafeManager-1.1.3-win-x64.zip` (see "Build the release bundle" below to produce it).
 
 - [docs/INSTALL.md](docs/INSTALL.md): server, first-run setup, agents on gaming PCs, TVs, printer, backups, upgrades.
 - [docs/USER-GUIDE.md](docs/USER-GUIDE.md): the daily staff guide.

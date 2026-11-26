@@ -37,6 +37,17 @@ param(
 # Captured at script scope: inside a function $PSBoundParameters would be the function's own (empty) set.
 $ScriptArguments = $PSBoundParameters
 
+# $PSScriptRoot and $PSCommandPath can be empty in Windows PowerShell 5.1 (seen in param() defaults on a real PC), so
+# resolve this script's own path once, at script scope, from $MyInvocation.
+$ScriptPath = $MyInvocation.MyCommand.Path
+if ([string]::IsNullOrWhiteSpace($ScriptPath)) { $ScriptPath = $PSCommandPath }
+if ([string]::IsNullOrWhiteSpace($ScriptPath)) {
+    $ScriptDir = (Get-Location).ProviderPath
+}
+else {
+    $ScriptDir = Split-Path -Parent $ScriptPath
+}
+
 Set-StrictMode -Version 2
 $ErrorActionPreference = 'Stop'
 
@@ -123,7 +134,7 @@ function Assert-SafeInstallPath {
 # An elevated (administrator) window runs in a separate Windows logon session that cannot see mapped network drives,
 # so a script started from one would close at once without a message. Refuse that case up front.
 function Assert-LocalScriptFolder {
-    $folder = $PSScriptRoot
+    $folder = $ScriptDir
     $isNetwork = $folder.StartsWith('\\')
     if (-not $isNetwork) {
         try {
@@ -260,7 +271,10 @@ function Uninstall-Agent {
         # The elevated window must not inherit -FromLauncher: nothing else would keep that window open.
         [void]$ScriptArguments.Remove('FromLauncher')
         Assert-LocalScriptFolder
-        $argList = '-NoProfile -ExecutionPolicy Bypass -File ' + (Quote-NativeArg $PSCommandPath)
+        if ([string]::IsNullOrWhiteSpace($ScriptPath)) {
+            throw 'Could not find the path of this script. Open PowerShell as administrator in the extracted folder and run it from there.'
+        }
+        $argList = '-NoProfile -ExecutionPolicy Bypass -File ' + (Quote-NativeArg $ScriptPath)
         foreach ($key in $ScriptArguments.Keys) {
             $value = $ScriptArguments[$key]
             if ($value -is [System.Management.Automation.SwitchParameter]) {

@@ -2,12 +2,12 @@
 
 This guide is for the cafe owner or whoever sets up the computers. It takes you from the release zip to a working cafe: server, first-run setup, gaming PCs, Samsung TVs, receipt printer, backups, upgrades and removal. Day-to-day use is covered in `USER-GUIDE.md`.
 
-Only run the scripts from the bundle you built yourself or received directly from the person who built it. The programs are not code-signed in version 1.1.0.
+Only run the scripts from the bundle you built yourself or received directly from the person who built it. The programs are not code-signed in version 1.1.1.
 
 ## What you need
 
 - A Windows 10 or 11 PC at the front desk to act as the server. It must stay on whenever the cafe is open. Give it a fixed address on your network: in your router, find the DHCP reservation (or "address reservation") page, pick this PC and reserve its current address. Without this the address can change after a reboot and every gaming PC would lose the server.
-- The two release packages: `CafeManager-1.1.0-FrontDesk.zip` for the server PC and `CafeManager-1.1.0-GamingPC.zip` for every gaming PC (a USB stick is fine). Each has a short `README.txt` with the same steps in plain language. The full `CafeManager-1.1.0-win-x64.zip` contains both plus the agent simulator.
+- The two release packages: `CafeManager-1.1.1-FrontDesk.zip` for the server PC and `CafeManager-1.1.1-GamingPC.zip` for every gaming PC (a USB stick is fine). Each has a short `README.txt` with the same steps in plain language. The full `CafeManager-1.1.1-win-x64.zip` contains both plus the agent simulator.
 - Administrator rights on the server PC and on every gaming PC.
 - The gaming PCs on the same local network (same router) as the server. No internet connection is needed to run the cafe.
 - Samsung smart TVs on the same network for console stations.

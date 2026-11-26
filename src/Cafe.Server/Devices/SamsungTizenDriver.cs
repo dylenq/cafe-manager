@@ -31,6 +31,13 @@ public sealed class SamsungTizenDriver(ITvTransport transport, IOptions<TvOption
 
     private TvOptions Options => options.Value;
 
+    /// <summary>
+    /// Clock behind the wake window and every pause. Always the system clock in the app; tests swap in a fake so the
+    /// number of reads in a window does not depend on machine load. Not taken from DI on purpose: the test host
+    /// registers a manually advanced FakeTimeProvider, which would stall the driver's real-time pauses.
+    /// </summary>
+    internal TimeProvider Time { get; init; } = TimeProvider.System;
+
     public async Task<TvPowerState> GetStateAsync(Station station, CancellationToken cancellationToken)
     {
         if (!TryGetIp(station, out var ip))
@@ -212,18 +219,18 @@ public sealed class SamsungTizenDriver(ITvTransport transport, IOptions<TvOption
     {
         var window = TimeSpan.FromMilliseconds(Math.Max(0, Options.WakeWaitMilliseconds));
         var poll = Math.Max(0, Options.WakePollMilliseconds);
-        var clock = Stopwatch.StartNew();
+        var started = Time.GetTimestamp();
         var state = TvPowerState.Unknown;
         var standbyThroughout = true;
         do
         {
-            var remaining = window - clock.Elapsed;
+            var remaining = window - Time.GetElapsedTime(started);
             var pause = poll > 0 ? (int)Math.Min(poll, Math.Max(0, remaining.TotalMilliseconds)) : (int)Math.Max(0, remaining.TotalMilliseconds);
             await DelayAsync(pause, ct);
             state = await ReadStateAsync(ip, ct);
             standbyThroughout &= state == TvPowerState.Standby;
         }
-        while (state != TvPowerState.On && clock.Elapsed < window);
+        while (state != TvPowerState.On && Time.GetElapsedTime(started) < window);
 
         return (state, standbyThroughout);
     }
@@ -419,8 +426,8 @@ public sealed class SamsungTizenDriver(ITvTransport transport, IOptions<TvOption
         return true;
     }
 
-    private static Task DelayAsync(int milliseconds, CancellationToken ct) =>
-        milliseconds > 0 ? Task.Delay(milliseconds, ct) : Task.CompletedTask;
+    private Task DelayAsync(int milliseconds, CancellationToken ct) =>
+        milliseconds > 0 ? Task.Delay(TimeSpan.FromMilliseconds(milliseconds), Time, ct) : Task.CompletedTask;
 
     private async Task<IDisposable> LockAsync(string ip, CancellationToken ct)
     {

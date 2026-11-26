@@ -9,7 +9,8 @@ namespace Cafe.Server.Devices;
 /// Turns session signals for Console stations into TV power actions. It only reads the database and enqueues; the TV
 /// is never awaited here, so a slow or dead TV cannot delay or fail a session operation or the PC agent sink.
 /// Start and resume power on, stop powers off (unless Tv:PowerOffOnStop is false), a move powers the old TV off and
-/// the new one on (only while the session is active); pause and the rest do nothing.
+/// the new one on (only while the session is active); pause and the rest do nothing. When an action runs it is
+/// skipped if the station's session no longer matches it (power on with no open session, power off with one).
 /// </summary>
 public sealed class TvSessionEventSink(
     TvControlService control,
@@ -79,6 +80,25 @@ public sealed class TvSessionEventSink(
             return;
         }
 
-        queue.Enqueue(station.Id, ct => control.ExecuteAsync(station, on, source, ct));
+        queue.Enqueue(station.Id, async ct =>
+        {
+            // Signals reach the queue after their own database reads, so a slower, older signal can be enqueued after
+            // a newer one (Stop then Start: the power-off would then win and switch the TV off mid-session). The queue
+            // runs one action per station at a time, so checking the station's session here, at run time, keeps the
+            // TV in step with the session that exists now rather than with the order the signals arrived in.
+            if (await HasOpenSessionAsync(station.Id, ct) != on)
+            {
+                logger.LogInformation("Skipped a stale TV power {Action} for station {StationId} ({Source}).", on ? "on" : "off", station.Id, source);
+                return;
+            }
+
+            await control.ExecuteAsync(station, on, source, ct);
+        });
+    }
+
+    private async Task<bool> HasOpenSessionAsync(int stationId, CancellationToken cancellationToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Sessions.AsNoTracking().AnyAsync(s => s.StationId == stationId && s.Status != SessionStatus.Ended, cancellationToken);
     }
 }

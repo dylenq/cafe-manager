@@ -17,6 +17,9 @@ public sealed class FakeTvDriver : ITvDriver
     /// <summary>Blocks the first PowerOn/PowerOff call until the source completes.</summary>
     public TaskCompletionSource? Gate { get; set; }
 
+    /// <summary>Completes when the gated call has reached the driver (and is now waiting on <see cref="Gate"/>).</summary>
+    public TaskCompletionSource GateEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     /// <summary>Called before each action; throw from it to simulate a driver exception.</summary>
     public Func<int, string, Task>? Hook { get; set; }
 
@@ -52,6 +55,7 @@ public sealed class FakeTvDriver : ITvDriver
         _calls.Enqueue((station.Id, action));
         if (Gate is { } gate && Interlocked.Exchange(ref _gated, 1) == 0)
         {
+            GateEntered.TrySetResult();
             await gate.Task.WaitAsync(ct);
         }
 

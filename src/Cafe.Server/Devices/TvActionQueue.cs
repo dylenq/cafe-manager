@@ -19,7 +19,7 @@ public sealed class TvActionQueue(ILogger<TvActionQueue> logger, IHostApplicatio
     public void Enqueue(int stationId, Func<CancellationToken, Task> action)
     {
         var sequence = Interlocked.Increment(ref _sequence);
-        _latest[stationId] = sequence;
+        _latest.AddOrUpdate(stationId, sequence, (_, current) => Math.Max(current, sequence)); // never move back to an older action
         var id = Interlocked.Increment(ref _taskId);
         var task = Task.Run(() => RunAsync(stationId, sequence, action));
         _running[id] = task;

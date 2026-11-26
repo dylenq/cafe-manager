@@ -145,6 +145,9 @@ public class TvSessionSinkTests : SessionTestBase
         _driver.Gate = new TaskCompletionSource();
         var id = await ConsoleAsync();
         var first = await PrepaidAsync(id);
+        // The first power-on runs on a background task; wait until it is in the driver (holding the station's queue
+        // slot) so the stop and the new start really queue up behind it, however slowly the thread pool starts it.
+        await _driver.GateEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
         Assert.True((await SvcAsync(s => s.StopAsync(first.Id))).Success);
         await PrepaidAsync(id);
         _driver.Gate.SetResult();
@@ -153,6 +156,43 @@ public class TvSessionSinkTests : SessionTestBase
         var actions = _driver.Actions(id);
         Assert.Equal("PowerOn", actions[^1]);
         Assert.DoesNotContain("PowerOff", actions);
+    }
+
+    [Fact]
+    public async Task A_stop_signal_that_arrives_after_a_newer_start_does_not_power_the_tv_off()
+    {
+        var id = await ConsoleAsync();
+        var first = await PrepaidAsync(id);
+        Assert.True((await SvcAsync(s => s.StopAsync(first.Id))).Success);
+        var second = await PrepaidAsync(id);
+        await Queue.WhenIdleAsync();
+        var before = _driver.Actions(id).Length;
+
+        // The stop signal for the first session is delivered late, after the second session started.
+        var sink = Factory.Services.GetServices<ISessionEventSink>().OfType<TvSessionEventSink>().Single();
+        await sink.OnSessionSignalAsync(new SessionSignal(SessionSignalKind.Stopped, id, first.Id), default);
+        await Queue.WhenIdleAsync();
+
+        Assert.Equal(before, _driver.Actions(id).Length);
+        Assert.Equal("PowerOn", _driver.Actions(id)[^1]);
+        Assert.NotEqual(first.Id, second.Id);
+    }
+
+    [Fact]
+    public async Task A_start_signal_that_arrives_after_the_session_ended_does_not_power_the_tv_on()
+    {
+        var id = await ConsoleAsync();
+        var session = await PrepaidAsync(id);
+        Assert.True((await SvcAsync(s => s.StopAsync(session.Id))).Success);
+        await Queue.WhenIdleAsync();
+        var before = _driver.Actions(id).Length;
+
+        var sink = Factory.Services.GetServices<ISessionEventSink>().OfType<TvSessionEventSink>().Single();
+        await sink.OnSessionSignalAsync(new SessionSignal(SessionSignalKind.Started, id, session.Id), default);
+        await Queue.WhenIdleAsync();
+
+        Assert.Equal(before, _driver.Actions(id).Length);
+        Assert.Equal("PowerOff", _driver.Actions(id)[^1]);
     }
 
     [Fact]

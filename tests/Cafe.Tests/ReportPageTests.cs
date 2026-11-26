@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using Cafe.Server.Data;
 using Cafe.Tests.Infrastructure;
 
@@ -56,7 +57,44 @@ public class ReportPageTests : ReportTestBase
         Assert.Contains("<text", html);
         Assert.DoesNotContain("<!text", html);
         Assert.Contains("Iced Coffee", html);
-        Assert.DoesNotContain("cdn", html, StringComparison.OrdinalIgnoreCase);
+        // Everything the page loads must be served locally (the cafe runs offline). Check the URLs the page actually
+        // references, not the raw text: a bare "cdn" substring also matches random base64 tokens in the markup.
+        var external = ExternalUrls(html);
+        Assert.True(external.Count == 0, "The page references external resources: " + string.Join(", ", external));
+    }
+
+    /// <summary>Absolute URLs in src/href/srcset/action/poster/data attributes, CSS url() and @import that are not localhost.</summary>
+    private static List<string> ExternalUrls(string html)
+    {
+        const string url = @"((?:https?:)?//[^""'\s>)]+)";
+        string[] patterns =
+        [
+            @"\b(?:src|href|srcset|action|poster|data)\s*=\s*[""']?\s*" + url,
+            @"url\(\s*[""']?" + url,
+            @"@import\s+(?:url\(\s*)?[""']?" + url,
+        ];
+        return patterns
+            .SelectMany(p => Regex.Matches(html, p, RegexOptions.IgnoreCase).Select(m => m.Groups[1].Value))
+            .Where(u => !(Uri.TryCreate(u.StartsWith("//", StringComparison.Ordinal) ? "http:" + u : u, UriKind.Absolute, out var uri) && uri.IsLoopback))
+            .ToList();
+    }
+
+    [Fact]
+    public void External_resource_check_flags_cdn_references_but_not_tokens_that_contain_cdn()
+    {
+        Assert.Equal(
+            ["https://cdn.jsdelivr.net/npm/chart.js", "//cdnjs.cloudflare.com/a.css", "https://fonts.example/x.woff2", "https://cdn.example/b.css"],
+            ExternalUrls("""
+                <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                <link rel="stylesheet" href='//cdnjs.cloudflare.com/a.css'>
+                <style>@font-face { src: url(https://fonts.example/x.woff2) } @import "https://cdn.example/b.css";</style>
+                """).Distinct());
+        Assert.Empty(ExternalUrls("""
+            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8CDNxYz-cdn_Q" />
+            <script src="_framework/blazor.web.js"></script>
+            <link href="http://localhost/app.css" rel="stylesheet">
+            <svg xmlns="http://www.w3.org/2000/svg"></svg>
+            """));
     }
 
     [Fact]

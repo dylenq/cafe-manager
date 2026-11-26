@@ -15,14 +15,14 @@ public class TvDriverTests
 {
     private readonly FakeTvTransport _net = new();
 
-    private SamsungTizenDriver Driver(Action<TvOptions>? tweak = null)
+    private SamsungTizenDriver Driver(Action<TvOptions>? tweak = null, TimeProvider? time = null)
     {
         var o = new TvOptions
         {
             SettleMilliseconds = 0, KeyFlushMilliseconds = 0, WakeWaitMilliseconds = 0, WakePollMilliseconds = 0, WolRoundDelayMilliseconds = 0, PairTimeoutSeconds = 1,
         };
         tweak?.Invoke(o);
-        return new SamsungTizenDriver(_net, Options.Create(o), NullLogger<SamsungTizenDriver>.Instance);
+        return new SamsungTizenDriver(_net, Options.Create(o), NullLogger<SamsungTizenDriver>.Instance) { Time = time ?? TimeProvider.System };
     }
 
     private static Station Tv(string? token = "TOK", string? ip = "192.168.1.50", string? mac = "AA:BB:CC:DD:EE:FF") =>
@@ -400,14 +400,20 @@ public class TvDriverTests
     [Fact]
     public async Task A_tv_in_standby_for_the_whole_window_is_read_several_times_before_the_key()
     {
+        // The clock only moves when the driver waits, so the read count is exact instead of depending on load.
+        var clock = new SteppingTimeProvider();
         var power = "standby";
+        var readsBeforeKey = -1;
+        TimeSpan? keyAt = null;
         _net.Http = () => FakeTvTransport.State(power);
-        _net.OnKeyPower = () => power = "on";
+        _net.OnKeyPower = () => { readsBeforeKey = _net.HttpRequests; keyAt = clock.Elapsed; power = "on"; };
         _net.Incoming.Enqueue(FakeTvTransport.Connected());
-        var r = await Driver(o => { o.WakeWaitMilliseconds = 100; o.WakePollMilliseconds = 10; }).PowerOnAsync(Tv(), default);
+        var r = await Driver(o => { o.WakeWaitMilliseconds = 100; o.WakePollMilliseconds = 10; }, clock).PowerOnAsync(Tv(), default);
         Assert.Equal(TvActionOutcome.PoweredOn, r.Outcome);
         Assert.Equal(1, _net.KeyCount);
-        Assert.True(_net.HttpRequests >= 5, $"expected several reads, got {_net.HttpRequests}");
+        // 1 read before the wake packets, one per 10 ms poll across the 100 ms window, 1 recheck right before the key.
+        Assert.Equal(1 + 10 + 1, readsBeforeKey);
+        Assert.True(keyAt >= TimeSpan.FromMilliseconds(100), $"key sent before the wake window ended ({keyAt})");
     }
 
     [Fact]

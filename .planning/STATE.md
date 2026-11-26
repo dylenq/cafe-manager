@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 Phase: 7 (Reports & Deployment) — COMPLETE
 Plan: 5 of 5
 Status: Complete; Windows-only install checks open
-Last activity: 2026-11-20 — Plan 07-05 complete
+Last activity: 2026-11-26 - Completed quick task 261126-i53: Stabilize three flaky tests
 
 Progress: [██████████] 100%
 

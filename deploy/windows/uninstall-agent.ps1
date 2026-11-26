@@ -28,7 +28,10 @@ param(
     [string]$GamingUser = '',
     [string]$InstallPath = (Join-Path $env:ProgramFiles 'CafeManager\Agent'),
     [switch]$RemoveData,
-    [switch]$NoPause
+    [switch]$NoPause,
+
+    # Set by the .cmd launcher, which keeps its own window open; the script then skips its final pause there.
+    [switch]$FromLauncher
 )
 
 # Captured at script scope: inside a function $PSBoundParameters would be the function's own (empty) set.
@@ -63,7 +66,7 @@ if ([string]::IsNullOrWhiteSpace($GamingUser)) {
 }
 
 function Wait-ForEnter {
-    if (-not $NoPause) {
+    if (-not $NoPause -and -not $FromLauncher) {
         [void](Read-Host 'Press Enter to close this window')
     }
 }
@@ -114,6 +117,25 @@ function Assert-SafeInstallPath {
         if ($full.StartsWith($windowsPrefix, [StringComparison]::OrdinalIgnoreCase)) {
             throw "-InstallPath '$Path' is inside the Windows folder. Use for example $example."
         }
+    }
+}
+
+# An elevated (administrator) window runs in a separate Windows logon session that cannot see mapped network drives,
+# so a script started from one would close at once without a message. Refuse that case up front.
+function Assert-LocalScriptFolder {
+    $folder = $PSScriptRoot
+    $isNetwork = $folder.StartsWith('\\')
+    if (-not $isNetwork) {
+        try {
+            $drive = New-Object System.IO.DriveInfo([System.IO.Path]::GetPathRoot($folder))
+            $isNetwork = ($drive.DriveType -eq [System.IO.DriveType]::Network)
+        }
+        catch {
+            $isNetwork = $false
+        }
+    }
+    if ($isNetwork) {
+        throw "This folder is on a network drive ($folder), which the administrator window cannot open. Copy the extracted folder to this PC first, for example to C:\CafeManager-Setup, and run it from there."
     }
 }
 
@@ -235,6 +257,9 @@ function Uninstall-Agent {
     Assert-SafeInstallPath -Path $InstallPath
     if (-not (Test-IsAdministrator)) {
         Write-Host 'Administrator rights are needed. A Windows (UAC) prompt will appear: choose Yes.'
+        # The elevated window must not inherit -FromLauncher: nothing else would keep that window open.
+        [void]$ScriptArguments.Remove('FromLauncher')
+        Assert-LocalScriptFolder
         $argList = '-NoProfile -ExecutionPolicy Bypass -File ' + (Quote-NativeArg $PSCommandPath)
         foreach ($key in $ScriptArguments.Keys) {
             $value = $ScriptArguments[$key]
@@ -246,7 +271,19 @@ function Uninstall-Agent {
             }
         }
         $child = Start-Process -FilePath 'powershell.exe' -ArgumentList $argList -Verb RunAs -Wait -PassThru
-        exit $child.ExitCode
+        $code = $child.ExitCode
+        Write-Host ''
+        if ($null -eq $code) {
+            Write-Host 'The administrator window has closed.'
+            $code = 0
+        }
+        elseif ($code -eq 0) {
+            Write-Host 'The administrator window finished.' -ForegroundColor Green
+        }
+        else {
+            Write-Host "The administrator window stopped with exit code $code. Its messages explain why." -ForegroundColor Red
+        }
+        exit $code
     }
 
     Write-Host '== Cafe Manager agent uninstall ==' -ForegroundColor Cyan

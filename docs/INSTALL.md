@@ -2,12 +2,12 @@
 
 This guide is for the cafe owner or whoever sets up the computers. It takes you from the release zip to a working cafe: server, first-run setup, gaming PCs, Samsung TVs, receipt printer, backups, upgrades and removal. Day-to-day use is covered in `USER-GUIDE.md`.
 
-Only run the scripts from the bundle you built yourself or received directly from the person who built it. The programs are not code-signed in version 1.1.1.
+Only run the scripts from the bundle you built yourself or received directly from the person who built it. The programs are not code-signed in version 1.1.2.
 
 ## What you need
 
 - A Windows 10 or 11 PC at the front desk to act as the server. It must stay on whenever the cafe is open. Give it a fixed address on your network: in your router, find the DHCP reservation (or "address reservation") page, pick this PC and reserve its current address. Without this the address can change after a reboot and every gaming PC would lose the server.
-- The two release packages: `CafeManager-1.1.1-FrontDesk.zip` for the server PC and `CafeManager-1.1.1-GamingPC.zip` for every gaming PC (a USB stick is fine). Each has a short `README.txt` with the same steps in plain language. The full `CafeManager-1.1.1-win-x64.zip` contains both plus the agent simulator.
+- The two release packages: `CafeManager-1.1.2-FrontDesk.zip` for the server PC and `CafeManager-1.1.2-GamingPC.zip` for every gaming PC (a USB stick is fine). Each has a short `README.txt` with the same steps in plain language. The full `CafeManager-1.1.2-win-x64.zip` contains both plus the agent simulator.
 - Administrator rights on the server PC and on every gaming PC.
 - The gaming PCs on the same local network (same router) as the server. No internet connection is needed to run the cafe.
 - Samsung smart TVs on the same network for console stations.
@@ -187,6 +187,8 @@ With no connection string, a service (or Production run) stores the database at 
 - The service will not start, or the installer says the server did not answer: open `C:\ProgramData\CafeManager\logs` and read the newest log file. A common cause is another program already using port 5080: run `netstat -ano | findstr :5080` in a Command Prompt, or change `Kestrel__Endpoints__Http__Url` to another port (and the firewall rule).
 - A phone or another PC cannot connect: check the server address (`ipconfig`), that the server PC's network profile is Private, that the firewall rule "Cafe Manager (TCP 5080)" exists and is enabled, and that the device is on the same network. Try `http://<server-ip>:5080` in the server PC's own browser first.
 - The script closes at once or asks for rights: the UAC prompt was not accepted. Run it again and choose Yes. Run it from a PowerShell window opened as administrator if the prompt does not appear.
+- The double-click launchers always wait for a key at the end. The installer runs in a second, administrator window; the first window then says whether that window finished or stopped with an error. The server installer and uninstaller also write `install-server.log` / `uninstall-server.log` next to the script.
+- "This folder is on a network drive": the administrator window cannot open mapped network drives. Copy the extracted folder to the PC itself (for example `C:\CafeManager-Setup`) and run it from there. A folder synced by OneDrive works only if its files are downloaded to the PC ("Always keep on this device").
 - "Running scripts is disabled" or "not digitally signed": use the full command with `-ExecutionPolicy Bypass` shown at the top of this guide, and unblock the zip (see "What you need").
 - Agent shows offline on the dashboard: check `ServerUrl` in `C:\Program Files\CafeManager\Agent\agentsettings.json` (the installer wrote it), that the PC can open the server address in a browser, that the gaming user is logged on, and that the station's "Agent machine ID" matches. A 401 in the agent log (`logs` folder next to the agent) means the shared key is wrong or was regenerated on the server: re-run `install-agent.ps1` with the new key.
 - The lock screen says "Agent configuration error": `agentsettings.json` is missing or invalid. Re-run `install-agent.ps1`.

@@ -40,7 +40,10 @@ param(
     [string]$SourcePath = (Join-Path $PSScriptRoot 'Server'),
     [string]$InstallPath = (Join-Path $env:ProgramFiles 'CafeManager\Server'),
     [switch]$NoBrowser,
-    [switch]$NoPause
+    [switch]$NoPause,
+
+    # Set by the .cmd launcher, which keeps its own window open; the script then skips its final pause there.
+    [switch]$FromLauncher
 )
 
 # Captured at script scope: inside a function $PSBoundParameters would be the function's own (empty) set.
@@ -48,6 +51,18 @@ $ScriptArguments = $PSBoundParameters
 
 Set-StrictMode -Version 2
 $ErrorActionPreference = 'Stop'
+
+# The administrator run keeps a log next to this script, so a failure can still be read after its window closes.
+$LogPath = $null
+if (([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    try {
+        Start-Transcript -LiteralPath (Join-Path $PSScriptRoot 'install-server.log') -Append -ErrorAction Stop | Out-Null
+        $LogPath = Join-Path $PSScriptRoot 'install-server.log'
+    }
+    catch {
+        $LogPath = $null
+    }
+}
 
 $ServiceName = 'CafeManager'
 $ServiceDisplayName = 'Cafe Manager Server'
@@ -60,7 +75,7 @@ $DataPath = Join-Path $env:ProgramData 'CafeManager'
 Get-ChildItem -LiteralPath $PSScriptRoot -Recurse -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
 
 function Wait-ForEnter {
-    if (-not $NoPause) {
+    if (-not $NoPause -and -not $FromLauncher) {
         [void](Read-Host 'Press Enter to close this window')
     }
 }
@@ -114,6 +129,25 @@ function Assert-SafeInstallPath {
     }
 }
 
+# An elevated (administrator) window runs in a separate Windows logon session that cannot see mapped network drives,
+# so a script started from one would close at once without a message. Refuse that case up front.
+function Assert-LocalScriptFolder {
+    $folder = $PSScriptRoot
+    $isNetwork = $folder.StartsWith('\\')
+    if (-not $isNetwork) {
+        try {
+            $drive = New-Object System.IO.DriveInfo([System.IO.Path]::GetPathRoot($folder))
+            $isNetwork = ($drive.DriveType -eq [System.IO.DriveType]::Network)
+        }
+        catch {
+            $isNetwork = $false
+        }
+    }
+    if ($isNetwork) {
+        throw "This folder is on a network drive ($folder), which the administrator window cannot open. Copy the extracted folder to this PC first, for example to C:\CafeManager-Setup, and run it from there."
+    }
+}
+
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
@@ -143,6 +177,9 @@ function Install-Server {
     # 1. Elevation
     if (-not (Test-IsAdministrator)) {
         Write-Host 'Administrator rights are needed. A Windows (UAC) prompt will appear: choose Yes.'
+        # The elevated window must not inherit -FromLauncher: nothing else would keep that window open.
+        [void]$ScriptArguments.Remove('FromLauncher')
+        Assert-LocalScriptFolder
         $argList = '-NoProfile -ExecutionPolicy Bypass -File ' + (Quote-NativeArg $PSCommandPath)
         foreach ($key in $ScriptArguments.Keys) {
             $value = $ScriptArguments[$key]
@@ -154,7 +191,19 @@ function Install-Server {
             }
         }
         $child = Start-Process -FilePath 'powershell.exe' -ArgumentList $argList -Verb RunAs -Wait -PassThru
-        exit $child.ExitCode
+        $code = $child.ExitCode
+        Write-Host ''
+        if ($null -eq $code) {
+            Write-Host 'The administrator window has closed.'
+            $code = 0
+        }
+        elseif ($code -eq 0) {
+            Write-Host 'The administrator window finished.' -ForegroundColor Green
+        }
+        else {
+            Write-Host "The administrator window stopped with exit code $code. Its messages explain why." -ForegroundColor Red
+        }
+        exit $code
     }
 
     Write-Host '== Cafe Manager server install ==' -ForegroundColor Cyan
@@ -310,6 +359,7 @@ try {
 catch {
     Write-Host ''
     Write-Host ('ERROR: ' + $_.Exception.Message) -ForegroundColor Red
+    if ($LogPath) { Write-Host "A log of this run is in $LogPath" }
     Wait-ForEnter
     exit 1
 }

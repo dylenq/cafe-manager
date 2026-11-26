@@ -2,7 +2,7 @@
 setlocal
 title Cafe Manager - install server
 rem Double-click this file. It runs the PowerShell script next to it; Windows asks for administrator rights (choose Yes).
-rem The window stays open when something goes wrong, so the error can be read.
+rem This window always waits for a key at the end, so every message can be read.
 if not exist "%~dp0install-server.ps1" (
   echo.
   echo ERROR: install-server.ps1 was not found next to this file.
@@ -21,11 +21,9 @@ if not exist "%~dp0Server\Cafe.Server.exe" (
   pause
   exit /b 1
 )
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0install-server.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0install-server.ps1" -FromLauncher
 set CAFE_EXIT=%ERRORLEVEL%
-if not "%CAFE_EXIT%"=="0" (
-  echo.
-  echo The script stopped with exit code %CAFE_EXIT%. Read the message above, or take a photo of this window.
-  pause
-)
+echo.
+if not "%CAFE_EXIT%"=="0" echo The script stopped with exit code %CAFE_EXIT%. Read the messages above, or take a photo of this window.
+pause
 exit /b %CAFE_EXIT%
